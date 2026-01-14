@@ -1,10 +1,16 @@
-require("dotenv").config();
+﻿require("dotenv").config();
 
 const express = require("express");
 const axios = require("axios");
 
 const app = express();
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf.toString("utf8");
+    },
+  })
+);
 
 const { WHATSAPP_TOKEN, PHONE_NUMBER_ID, VERIFY_TOKEN } = process.env;
 const PORT = process.env.PORT || 3000;
@@ -18,6 +24,7 @@ async function sendText(to, text) {
   const url = `https://graph.facebook.com/v22.0/${PHONE_NUMBER_ID}/messages`;
 
   try {
+    console.log("Sending to:", to);
     await axios.post(
       url,
       {
@@ -57,11 +64,18 @@ app.get("/webhook", (req, res) => {
 });
 
 app.post("/webhook", (req, res) => {
-  const body = req.body;
-  console.log(JSON.stringify(body, null, 2));
+  const timestamp = new Date().toISOString();
+  console.log(`WEBHOOK HIT ${timestamp}`);
+  console.log(req.rawBody || "");
+  if (req.body && Object.keys(req.body).length > 0) {
+    console.log(JSON.stringify(req.body, null, 2));
+  } else {
+    console.log("Parsed body: <empty>");
+  }
+
   res.status(200).send("EVENT_RECEIVED");
 
-  const message = body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
+  const message = req.body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
   if (!message) {
     return;
   }
@@ -73,6 +87,17 @@ app.post("/webhook", (req, res) => {
 
 app.get("/health", (req, res) => {
   res.send("ok");
+});
+
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.type === "entity.parse.failed") {
+    const timestamp = new Date().toISOString();
+    console.error(`WEBHOOK PARSE ERROR ${timestamp}`, err.message);
+    console.error(req.rawBody || "");
+    return res.status(400).send("INVALID_JSON");
+  }
+
+  return next(err);
 });
 
 app.listen(PORT, () => {

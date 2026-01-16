@@ -357,6 +357,86 @@ async function getLastPosOrders(partnerId, limit = 5) {
   );
 }
 
+async function getPosOrdersWithLines(partnerId, limit = 50) {
+  if (!partnerId) {
+    return { orders: [], lines: [] };
+  }
+
+  const domain = [["partner_id", "=", partnerId]];
+  const primaryFields = [
+    "id",
+    "name",
+    "date_order",
+    "amount_total",
+    "amount_paid",
+    "state",
+  ];
+  const fallbackFields = ["id", "name", "date_order", "amount_total", "state"];
+
+  let orders = await safeSearchRead(
+    "pos.order",
+    domain,
+    primaryFields,
+    limit,
+    "date_order desc"
+  );
+  if (!orders) {
+    orders = await safeSearchRead(
+      "pos.order",
+      domain,
+      fallbackFields,
+      limit,
+      "date_order desc"
+    );
+  }
+  if (!orders) {
+    return { orders: [], lines: [] };
+  }
+
+  const orderIds = orders.map((order) => order.id).filter(Boolean);
+  if (!orderIds.length) {
+    return { orders, lines: [] };
+  }
+
+  const lineFieldsPrimary = [
+    "order_id",
+    "full_product_name",
+    "name",
+    "qty",
+    "price_subtotal_incl",
+    "price_subtotal",
+    "price_unit",
+    "product_id",
+  ];
+  const lineFieldsFallback = [
+    "order_id",
+    "name",
+    "qty",
+    "price_subtotal",
+    "price_unit",
+    "product_id",
+  ];
+
+  let lines = await safeSearchRead(
+    "pos.order.line",
+    [["order_id", "in", orderIds]],
+    lineFieldsPrimary,
+    2000,
+    null
+  );
+  if (!lines) {
+    lines = await safeSearchRead(
+      "pos.order.line",
+      [["order_id", "in", orderIds]],
+      lineFieldsFallback,
+      2000,
+      null
+    );
+  }
+
+  return { orders, lines: lines || [] };
+}
+
 module.exports = {
   odooLogin,
   searchRead,
@@ -365,6 +445,7 @@ module.exports = {
   findPatientByCI,
   getUnpaidInvoices,
   getLastPosOrders,
+  getPosOrdersWithLines,
   hasOdooConfig,
   getSessionInfo: () => ({
     uid: sessionUid,

@@ -3,7 +3,7 @@ const {
   findPatientByPhone,
   findPartnerByPhone,
   findPatientByCI,
-  getUnpaidInvoices,
+  getPosOrdersWithLines,
   getLastPosOrders,
 } = require("./odoo");
 const sessionStore = require("./sessionStore");
@@ -25,37 +25,37 @@ const ACTIONS = {
 
 const MENU = {
   header: "Podopie",
-  body: "¿Qué querés hacer?",
-  footer: "Escribí 'menu' para volver al menú.",
+  body: "Que queres hacer?",
+  footer: "Escribi 'menu' para volver al menu.",
   button: "Ver opciones",
   sections: [
     {
       title: "Mi cuenta",
       rows: [
-        { id: ACTIONS.PAYMENTS, title: "📌 Pagos pendientes" },
-        { id: ACTIONS.POS_LAST, title: "🧾 Últimas compras" },
-        { id: ACTIONS.MY_DATA, title: "🧑‍⚕️ Mis datos" },
+        { id: ACTIONS.PAYMENTS, title: "Pagos pendientes" },
+        { id: ACTIONS.POS_LAST, title: "Ultimas compras" },
+        { id: ACTIONS.MY_DATA, title: "Mis datos" },
       ],
     },
     {
-      title: "Información",
+      title: "Informacion",
       rows: [
-        { id: ACTIONS.LOCATION, title: "📍 Ubicación" },
-        { id: ACTIONS.HOURS, title: "🕒 Horarios" },
+        { id: ACTIONS.LOCATION, title: "Ubicacion" },
+        { id: ACTIONS.HOURS, title: "Horarios" },
       ],
     },
   ],
 };
 
 const HOURS_TEXT =
-  "Horarios de atención:\nLunes a Viernes 09:00 a 19:00\nSábados 09:00 a 13:00";
-const LOCATION_TEXT = "Estamos en Podopie. Te comparto la ubicación.";
+  "Horarios de atencion:\nLunes a Viernes 09:00 a 19:00\nSabados 09:00 a 13:00";
+const LOCATION_TEXT = "Estamos en Podopie. Te comparto la ubicacion.";
 
 const LOCATION = {
   latitude: process.env.LOCATION_LAT,
   longitude: process.env.LOCATION_LNG,
   name: process.env.LOCATION_NAME || "Podopie",
-  address: process.env.LOCATION_ADDRESS || "Dirección pendiente",
+  address: process.env.LOCATION_ADDRESS || "Direccion pendiente",
 };
 
 function normalizeText(text) {
@@ -108,6 +108,76 @@ function extractPartnerId(record) {
   return null;
 }
 
+function getLineName(line) {
+  if (!line) {
+    return "";
+  }
+  if (line.full_product_name) {
+    return line.full_product_name;
+  }
+  if (line.name) {
+    return line.name;
+  }
+  if (Array.isArray(line.product_id)) {
+    return line.product_id[1] || "";
+  }
+  return "";
+}
+
+function getLineAmount(line) {
+  const incl = Number(line.price_subtotal_incl || 0);
+  if (incl) {
+    return incl;
+  }
+  const subtotal = Number(line.price_subtotal || 0);
+  if (subtotal) {
+    return subtotal;
+  }
+  const qty = Number(line.qty || 1);
+  const unit = Number(line.price_unit || 0);
+  return qty * unit;
+}
+
+function parsePlanSessions(name) {
+  if (!name) {
+    return null;
+  }
+  const match = name.match(/(\d+)\s*SESION(?:ES)?/i);
+  if (!match) {
+    return null;
+  }
+  return Number(match[1]);
+}
+
+function parseLaserSession(name) {
+  if (!name) {
+    return null;
+  }
+  const match = name.match(/\bLASER\s*(\d+)/i);
+  if (!match) {
+    return null;
+  }
+  return Number(match[1]);
+}
+
+function isPagoLaser(name) {
+  return name.toUpperCase().includes("PAGO LASER");
+}
+
+function isRefundName(name) {
+  return name.toUpperCase().includes("REEMBOLSO");
+}
+
+function extractOrderId(value) {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+  if (typeof value === "number") {
+    return value;
+  }
+  return null;
+}
+
 async function sendMainMenu(waId) {
   await sendList(
     waId,
@@ -156,11 +226,117 @@ async function linkByPhone(waId) {
   return null;
 }
 
+async function buildLaserSummary(partnerId) {
+  const { orders, lines } = await getPosOrdersWithLines(partnerId, 80);
+  if (!orders.length) {
+    return null;
+  }
+
+  const linesByOrder = new Map();
+  for (const line of lines) {
+    const orderId = extractOrderId(line.order_id);
+    if (!orderId) {
+      continue;
+    }
+    if (!linesByOrder.has(orderId)) {
+      linesByOrder.set(orderId, []);
+    }
+    linesByOrder.get(orderId).push(line);
+  }
+
+  const sortedOrders = [...orders].sort((a, b) => {
+    const aTime = Date.parse(a.date_order || "") || 0;
+    const bTime = Date.parse(b.date_order || "") || 0;
+    return bTime - aTime;
+  });
+
+  let planOrder = null;
+  let planLine = null;
+  let planSessions = null;
+
+  for (const order of sortedOrders) {
+    if (isRefundName(order.name || "")) {
+      continue;
+    }
+    const orderLines = linesByOrder.get(order.id) || [];
+    if (orderLines.some((line) => isRefundName(getLineName(line)))) {
+      continue;
+    }
+    for (const line of orderLines) {
+      const sessions = parsePlanSessions(getLineName(line));
+      if (sessions) {
+        planOrder = order;
+        planLine = line;
+        planSessions = sessions;
+        break;
+      }
+    }
+    if (planOrder) {
+      break;
+    }
+  }
+
+  if (!planOrder || !planLine || !planSessions) {
+    return null;
+  }
+
+  const planTotal =
+    getLineAmount(planLine) || Number(planOrder.amount_total || 0);
+  const initialPaid = Number(planOrder.amount_paid || 0);
+  const planDate = Date.parse(planOrder.date_order || "") || 0;
+
+  let pagoTotal = 0;
+  let sessionsUsed = 0;
+
+  for (const order of sortedOrders) {
+    if (isRefundName(order.name || "")) {
+      continue;
+    }
+    const orderDate = Date.parse(order.date_order || "") || 0;
+    if (orderDate && planDate && orderDate < planDate) {
+      continue;
+    }
+    const orderLines = linesByOrder.get(order.id) || [];
+    if (orderLines.some((line) => isRefundName(getLineName(line)))) {
+      continue;
+    }
+    for (const line of orderLines) {
+      const name = getLineName(line);
+      if (!name) {
+        continue;
+      }
+      if (isPagoLaser(name)) {
+        pagoTotal += getLineAmount(line);
+        continue;
+      }
+      const sessionNum = parseLaserSession(name);
+      if (sessionNum !== null) {
+        const qty = Number(line.qty || 1);
+        sessionsUsed += qty > 0 ? qty : 1;
+      }
+    }
+  }
+
+  const paidTotal = initialPaid + pagoTotal;
+  const pending = Math.max(0, planTotal - paidTotal);
+  const nextSession = Math.min(planSessions, sessionsUsed + 1);
+
+  return {
+    planName: getLineName(planLine),
+    planSessions,
+    planTotal,
+    paidTotal,
+    pending,
+    sessionsUsed,
+    nextSession,
+  };
+}
+
 async function handleAskCi(waId, session, text) {
   const normalized = normalizeText(text);
   if (normalized === "salir") {
     await sessionStore.clearSession(waId);
-    await sendText(waId, "Listo, sesión cerrada.");
+    await sendText(waId, "Listo, sesion cerrada.");
     return null;
   }
 
@@ -168,7 +344,7 @@ async function handleAskCi(waId, session, text) {
   if (!ci) {
     await sendText(
       waId,
-      "No entendí el CI. Escribilo solo con números o responde 'SALIR'."
+      "No entendi el CI. Escribilo solo con numeros o responde 'SALIR'."
     );
     return session;
   }
@@ -180,14 +356,14 @@ async function handleAskCi(waId, session, text) {
     console.error("Odoo CI lookup error", error?.message || error);
     await sendText(
       waId,
-      "Tuvimos un problema al validar tu CI. Probá de nuevo en unos minutos."
+      "Tuvimos un problema al validar tu CI. Proba de nuevo en unos minutos."
     );
     return session;
   }
   if (!match) {
     await sendText(
       waId,
-      "No encontré ese CI. ¿Querés intentar de nuevo? Escribe tu CI o responde 'SALIR'."
+      "No encontre ese CI. Queres intentar de nuevo? Escribe tu CI o responde 'SALIR'."
     );
     return session;
   }
@@ -246,7 +422,7 @@ async function ensureLinked(waId, session) {
     console.error("Odoo phone lookup error", error?.message || error);
     await sendText(
       waId,
-      "Tuvimos un problema al validar tu identidad. Probá más tarde."
+      "Tuvimos un problema al validar tu identidad. Proba mas tarde."
     );
     return session;
   }
@@ -266,19 +442,9 @@ async function ensureLinked(waId, session) {
   const next = await sessionStore.updateSession(waId, { state: STATES.ASK_CI });
   await sendText(
     waId,
-    "👋 Hola! Para ayudarte necesito validar tu identidad. Escribe tu CI (solo números)."
+    "Hola! Para ayudarte necesito validar tu identidad. Escribe tu CI (solo numeros)."
   );
   return next;
-}
-
-function formatInvoices(invoices) {
-  return invoices
-    .map((invoice) => {
-      const date = invoice.invoice_date || "s/f";
-      const amount = Number(invoice.amount_residual || 0).toFixed(2);
-      return `- ${invoice.name || "Factura"} | ${date} | ${amount}`;
-    })
-    .join("\n");
 }
 
 function formatPosOrders(orders) {
@@ -298,14 +464,14 @@ async function handleMenuAction(waId, actionId, session) {
     if (!partnerId) {
       await sendText(
         waId,
-        "Necesito validar tu identidad antes de ver pagos. Escribí tu CI."
+        "Necesito validar tu identidad antes de ver pagos. Escribi tu CI."
       );
       await sessionStore.updateSession(waId, { state: STATES.ASK_CI });
       return;
     }
-    let invoices = [];
+    let summary = null;
     try {
-      invoices = await getUnpaidInvoices(partnerId);
+      summary = await buildLaserSummary(partnerId);
     } catch (error) {
       console.error("Odoo payments error", error?.message || error);
       await sendText(
@@ -314,13 +480,25 @@ async function handleMenuAction(waId, actionId, session) {
       );
       return;
     }
-    if (!invoices.length) {
-      await sendText(waId, "✅ No tienes pagos pendientes.");
-    } else {
+    if (!summary) {
       await sendText(
         waId,
-        `Pagos pendientes:\n${formatInvoices(invoices)}`
+        "No encontre un plan de sesiones laser activo asociado a tu cuenta."
       );
+    } else {
+      const lines = [
+        `Plan: ${summary.planName || `${summary.planSessions} sesiones`}`,
+        `Sesiones usadas: ${summary.sessionsUsed} de ${summary.planSessions}`,
+        `Sesion siguiente: ${summary.nextSession}`,
+      ];
+      if (summary.pending <= 0) {
+        lines.unshift("No tienes pagos pendientes de sesiones laser.");
+      } else {
+        lines.unshift(
+          `Pendiente por sesiones laser: ${summary.pending.toFixed(2)} Bs.`
+        );
+      }
+      await sendText(waId, lines.join("\n"));
     }
     await sessionStore.updateSession(waId, {
       state: STATES.MAIN,
@@ -334,7 +512,7 @@ async function handleMenuAction(waId, actionId, session) {
     if (!partnerId) {
       await sendText(
         waId,
-        "Necesito validar tu identidad antes de ver compras. Escribí tu CI."
+        "Necesito validar tu identidad antes de ver compras. Escribi tu CI."
       );
       await sessionStore.updateSession(waId, { state: STATES.ASK_CI });
       return;
@@ -351,9 +529,9 @@ async function handleMenuAction(waId, actionId, session) {
       return;
     }
     if (!orders.length) {
-      await sendText(waId, "No encontré compras recientes.");
+      await sendText(waId, "No encontre compras recientes.");
     } else {
-      await sendText(waId, `Últimas compras:\n${formatPosOrders(orders)}`);
+      await sendText(waId, `Ultimas compras:\n${formatPosOrders(orders)}`);
     }
     await sessionStore.updateSession(waId, {
       state: STATES.MAIN,
@@ -417,7 +595,7 @@ async function handleIncomingText(waId, text) {
 
   if (normalized === "salir") {
     await sessionStore.clearSession(waId);
-    await sendText(waId, "Listo, sesión cerrada.");
+    await sendText(waId, "Listo, sesion cerrada.");
     return;
   }
 

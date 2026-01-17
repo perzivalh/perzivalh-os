@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  recepcion
+  caja
+  marketing
+  doctor
+}
+
+enum ConversationStatus {
+  open
+  pending
+  closed
+}
+
+enum MessageDirection {
+  in
+  out
+}
+
+enum MessageType {
+  text
+  interactive
+  image
+  location
+  template
+  unknown
+  note
+}
+
+model User {
+  id            String     @id @default(cuid())
+  name          String
+  email         String     @unique
+  password_hash String
+  role          UserRole   @default(recepcion)
+  is_active     Boolean    @default(true)
+  created_at    DateTime   @default(now())
+  AuditLog      AuditLog[]    @relation("UserAuditLogs")
+  Conversation  Conversation[] @relation("AssignedConversations")
+}
+
+model Conversation {
+  id               String              @id @default(cuid())
+  wa_id            String              @unique
+  phone_e164       String
+  display_name     String?
+  status           ConversationStatus  @default(open)
+  assigned_user_id String?
+  last_message_at  DateTime?
+  created_at       DateTime            @default(now())
+  messages         Message[]
+  tags             ConversationTag[]
+  assigned_user    User?               @relation("AssignedConversations", fields: [assigned_user_id], references: [id])
+
+  @@index([status])
+  @@index([assigned_user_id])
+  @@index([last_message_at])
+}
+
+model Message {
+  id              String           @id @default(cuid())
+  conversation_id String
+  direction       MessageDirection
+  type            MessageType
+  text            String?
+  raw_json        Json
+  created_at      DateTime         @default(now())
+  conversation    Conversation     @relation(fields: [conversation_id], references: [id])
+
+  @@index([conversation_id, created_at])
+}
+
+model Tag {
+  id    String            @id @default(cuid())
+  name  String            @unique
+  color String?
+  tags  ConversationTag[]
+}
+
+model ConversationTag {
+  conversation_id String
+  tag_id          String
+  conversation    Conversation @relation(fields: [conversation_id], references: [id])
+  tag             Tag          @relation(fields: [tag_id], references: [id])
+
+  @@id([conversation_id, tag_id])
+}
+
+model Settings {
+  id                 Int      @id @default(1)
+  bot_enabled        Boolean  @default(true)
+  auto_reply_enabled Boolean  @default(true)
+  updated_at         DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  user_id   String?
+  action    String
+  data_json Json
+  created_at DateTime @default(now())
+  user      User?    @relation("UserAuditLogs", fields: [user_id], references: [id])
+}

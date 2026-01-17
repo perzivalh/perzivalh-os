@@ -1,4 +1,7 @@
 const axios = require("axios");
+const { upsertConversation, createMessage } = require("./services/conversations");
+const { toPhoneE164 } = require("./lib/normalize");
+const logger = require("./lib/logger");
 
 const { WHATSAPP_TOKEN, PHONE_NUMBER_ID } = process.env;
 
@@ -12,39 +15,84 @@ function getWhatsAppUrl() {
 async function sendWhatsAppMessage(payload) {
   const url = getWhatsAppUrl();
   if (!WHATSAPP_TOKEN || !url) {
-    console.error("WhatsApp config missing");
-    return;
+    logger.error("WhatsApp config missing");
+    return {
+      ok: false,
+      error: { message: "config_missing" },
+    };
   }
 
   try {
-    await axios.post(url, payload, {
+    const response = await axios.post(url, payload, {
       headers: {
         Authorization: `Bearer ${WHATSAPP_TOKEN}`,
         "Content-Type": "application/json",
       },
     });
+    return {
+      ok: true,
+      response: {
+        status: response.status,
+        data: response.data,
+      },
+    };
   } catch (error) {
     const status = error.response?.status;
     const data = error.response?.data;
     if (status || data) {
-      console.error("WhatsApp API error", status, data);
-      return;
+      logger.error("WhatsApp API error", { status, data });
+      return {
+        ok: false,
+        error: { status, data },
+      };
     }
-    console.error("WhatsApp API error", error.message || error);
+    logger.error("WhatsApp API error", { message: error.message || error });
+    return {
+      ok: false,
+      error: { message: error.message || error },
+    };
   }
 }
 
-async function sendText(to, text) {
-  return sendWhatsAppMessage({
+async function recordOutgoingMessage(to, type, text, raw) {
+  try {
+    const conversation = await upsertConversation({
+      waId: to,
+      phoneE164: toPhoneE164(to),
+    });
+    await createMessage({
+      conversationId: conversation.id,
+      direction: "out",
+      type,
+      text,
+      rawJson: raw || {},
+    });
+  } catch (error) {
+    logger.error("Outgoing message log error", {
+      message: error.message || error,
+    });
+  }
+}
+
+async function sendText(to, text, options = {}) {
+  const payload = {
     messaging_product: "whatsapp",
     to,
     type: "text",
     text: { body: text },
+  };
+  const result = await sendWhatsAppMessage(payload);
+  await recordOutgoingMessage(to, "text", text, {
+    payload,
+    response: result.response,
+    error: result.error,
+    meta: options.meta,
   });
+  return result;
 }
 
-async function sendButtons(to, text, buttons) {
-  return sendWhatsAppMessage({
+async function sendButtons(to, text, buttons, options = {}) {
+  const payload = {
     messaging_product: "whatsapp",
     to,
     type: "interactive",
@@ -61,10 +109,26 @@ async function sendButtons(to, text, buttons) {
         })),
       },
     },
+  };
+  const result = await sendWhatsAppMessage(payload);
+  await recordOutgoingMessage(to, "interactive", text, {
+    payload,
+    response: result.response,
+    error: result.error,
+    meta: options.meta,
   });
+  return result;
 }
 
-async function sendList(to, header, body, footer, buttonText, sections) {
+async function sendList(
+  to,
+  header,
+  body,
+  footer,
+  buttonText,
+  sections,
+  options = {}
+) {
   const interactive = {
     type: "list",
     body: { text: body },
@@ -88,15 +152,30 @@ async function sendList(to, header, body, footer, buttonText, sections) {
     interactive.footer = { text: footer };
   }
 
-  return sendWhatsAppMessage({
+  const payload = {
     messaging_product: "whatsapp",
     to,
     type: "interactive",
     interactive,
+  };
+  const result = await sendWhatsAppMessage(payload);
+  await recordOutgoingMessage(to, "interactive", body, {
+    payload,
+    response: result.response,
+    error: result.error,
+    meta: options.meta,
   });
+  return result;
 }
 
-async function sendLocation(to, latitude, longitude, name, address) {
+async function sendLocation(
+  to,
+  latitude,
+  longitude,
+  name,
+  address,
+  options = {}
+) {
   if (
     latitude === undefined ||
     longitude === undefined ||
@@ -106,7 +185,7 @@ async function sendLocation(to, latitude, longitude, name, address) {
     return sendText(to, "Ubicacion no disponible por ahora.");
   }
 
-  return sendWhatsAppMessage({
+  const payload = {
     messaging_product: "whatsapp",
     to,
     type: "location",
@@ -116,7 +195,15 @@ async function sendLocation(to, latitude, longitude, name, address) {
       name,
       address,
     },
+  };
+  const result = await sendWhatsAppMessage(payload);
+  await recordOutgoingMessage(to, "location", null, {
+    payload,
+    response: result.response,
+    error: result.error,
+    meta: options.meta,
   });
+  return result;
 }
 
 function parseInteractiveSelection(message) {
@@ -146,4 +233,5 @@ module.exports = {
   sendList,
   sendLocation,
   parseInteractiveSelection,
+  sendInteractiveList: sendList,
 };

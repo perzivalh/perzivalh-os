@@ -9,40 +9,64 @@ const {
 const sessionStore = require("./sessionStore");
 
 const STATES = {
-  MAIN: "MAIN",
+  MAIN_MENU: "MAIN_MENU",
   ASK_CI: "ASK_CI",
-  LINKING: "LINKING",
-  DONE: "DONE",
+  PATIENT_MENU: "PATIENT_MENU",
 };
 
 const ACTIONS = {
-  PAYMENTS: "PAYMENTS",
-  POS_LAST: "POS_LAST",
-  MY_DATA: "MY_DATA",
-  LOCATION: "LOCATION",
-  HOURS: "HOURS",
+  INFO_PRICES: "INFO_PRICES",
+  INFO_LOCATION: "INFO_LOCATION",
+  INFO_HOURS: "INFO_HOURS",
+  PATIENT_ENTRY: "PATIENT_ENTRY",
+  HANDOFF: "HANDOFF",
+  PATIENT_PAYMENTS: "PATIENT_PAYMENTS",
+  PATIENT_POS_LAST: "PATIENT_POS_LAST",
+  PATIENT_MY_DATA: "PATIENT_MY_DATA",
+  MAIN_MENU: "MAIN_MENU",
 };
 
-const MENU = {
-  header: "Podopie",
-  body: "Que queres hacer?",
-  footer: "Escribi 'menu' para volver al menu.",
+const MAIN_MENU_COPY = "👋 Bienvenido a Podopie\nElige una opción:";
+
+const MAIN_MENU = {
+  header: null,
+  body: MAIN_MENU_COPY,
+  footer: null,
+  button: "Ver opciones",
+  sections: [
+    {
+      title: "Opciones",
+      rows: [
+        { id: ACTIONS.INFO_PRICES, title: "💬 Consultar precios/servicios" },
+        { id: ACTIONS.INFO_LOCATION, title: "📍 Ubicación y sucursales" },
+        { id: ACTIONS.INFO_HOURS, title: "⏰ Horarios" },
+        {
+          id: ACTIONS.PATIENT_ENTRY,
+          title: "👤 Soy paciente (ver pagos / historial)",
+        },
+        { id: ACTIONS.HANDOFF, title: "🧑‍💼 Hablar con recepción" },
+      ],
+    },
+  ],
+};
+
+const PATIENT_MENU = {
+  header: "Paciente",
+  body: "Selecciona una opción:",
+  footer: null,
   button: "Ver opciones",
   sections: [
     {
       title: "Mi cuenta",
       rows: [
-        { id: ACTIONS.PAYMENTS, title: "Pagos pendientes" },
-        { id: ACTIONS.POS_LAST, title: "Ultimas compras" },
-        { id: ACTIONS.MY_DATA, title: "Mis datos" },
+        { id: ACTIONS.PATIENT_PAYMENTS, title: "Pagos pendientes" },
+        { id: ACTIONS.PATIENT_POS_LAST, title: "Ultimas compras" },
+        { id: ACTIONS.PATIENT_MY_DATA, title: "Mis datos" },
       ],
     },
     {
-      title: "Informacion",
-      rows: [
-        { id: ACTIONS.LOCATION, title: "Ubicacion" },
-        { id: ACTIONS.HOURS, title: "Horarios" },
-      ],
+      title: "Navegacion",
+      rows: [{ id: ACTIONS.MAIN_MENU, title: "⬅ Menú" }],
     },
   ],
 };
@@ -50,6 +74,8 @@ const MENU = {
 const HOURS_TEXT =
   "Horarios de atencion:\nLunes a Viernes 09:00 a 19:00\nSabados 09:00 a 13:00";
 const LOCATION_TEXT = "Estamos en Podopie. Te comparto la ubicacion.";
+const PRICES_TEXT =
+  "Para precios y servicios, contanos que tratamiento te interesa y te respondemos a la brevedad.";
 
 const LOCATION = {
   latitude: process.env.LOCATION_LAT,
@@ -179,13 +205,26 @@ function extractOrderId(value) {
 }
 
 async function sendMainMenu(waId) {
+  await sessionStore.updateSession(waId, { state: STATES.MAIN_MENU });
   await sendList(
     waId,
-    MENU.header,
-    MENU.body,
-    MENU.footer,
-    MENU.button,
-    MENU.sections
+    MAIN_MENU.header,
+    MAIN_MENU.body,
+    MAIN_MENU.footer,
+    MAIN_MENU.button,
+    MAIN_MENU.sections
+  );
+}
+
+async function sendPatientMenu(waId) {
+  await sessionStore.updateSession(waId, { state: STATES.PATIENT_MENU });
+  await sendList(
+    waId,
+    PATIENT_MENU.header,
+    PATIENT_MENU.body,
+    PATIENT_MENU.footer,
+    PATIENT_MENU.button,
+    PATIENT_MENU.sections
   );
 }
 
@@ -389,7 +428,7 @@ async function handleAskCi(waId, session, text) {
   }
 
   const next = await sessionStore.updateSession(waId, {
-    state: STATES.MAIN,
+    state: STATES.PATIENT_MENU,
     data: {
       partnerId,
       patientId,
@@ -405,16 +444,16 @@ async function handleAskCi(waId, session, text) {
       partnerId || "n/a"
     }`
   );
-  await sendMainMenu(waId);
+  await sendPatientMenu(waId);
   return next;
 }
 
-async function ensureLinked(waId, session) {
+async function ensureLinkedForPatient(waId, session) {
   if (session.data?.partnerId || session.data?.patientId) {
     return session;
   }
 
-  await sessionStore.updateSession(waId, { state: STATES.LINKING });
+  await sessionStore.updateSession(waId, { state: STATES.PATIENT_MENU });
   let data = null;
   try {
     data = await linkByPhone(waId);
@@ -428,7 +467,7 @@ async function ensureLinked(waId, session) {
   }
   if (data) {
     const next = await sessionStore.updateSession(waId, {
-      state: STATES.MAIN,
+      state: STATES.PATIENT_MENU,
       data: { ...data, lastAction: "IDENTIFIED_BY_PHONE" },
     });
     console.log(
@@ -457,10 +496,10 @@ function formatPosOrders(orders) {
     .join("\n");
 }
 
-async function handleMenuAction(waId, actionId, session) {
+async function handlePatientAction(waId, actionId, session) {
   const partnerId = session.data?.partnerId;
 
-  if (actionId === ACTIONS.PAYMENTS) {
+  if (actionId === ACTIONS.PATIENT_PAYMENTS) {
     if (!partnerId) {
       await sendText(
         waId,
@@ -501,14 +540,14 @@ async function handleMenuAction(waId, actionId, session) {
       await sendText(waId, lines.join("\n"));
     }
     await sessionStore.updateSession(waId, {
-      state: STATES.MAIN,
-      data: { lastAction: ACTIONS.PAYMENTS },
+      state: STATES.PATIENT_MENU,
+      data: { lastAction: ACTIONS.PATIENT_PAYMENTS },
     });
-    await sendMainMenu(waId);
+    await sendPatientMenu(waId);
     return;
   }
 
-  if (actionId === ACTIONS.POS_LAST) {
+  if (actionId === ACTIONS.PATIENT_POS_LAST) {
     if (!partnerId) {
       await sendText(
         waId,
@@ -534,14 +573,14 @@ async function handleMenuAction(waId, actionId, session) {
       await sendText(waId, `Ultimas compras:\n${formatPosOrders(orders)}`);
     }
     await sessionStore.updateSession(waId, {
-      state: STATES.MAIN,
-      data: { lastAction: ACTIONS.POS_LAST },
+      state: STATES.PATIENT_MENU,
+      data: { lastAction: ACTIONS.PATIENT_POS_LAST },
     });
-    await sendMainMenu(waId);
+    await sendPatientMenu(waId);
     return;
   }
 
-  if (actionId === ACTIONS.MY_DATA) {
+  if (actionId === ACTIONS.PATIENT_MY_DATA) {
     const name = session.data?.name || "Paciente";
     const phone = session.data?.phone || session.data?.mobile || "-";
     const vat = session.data?.vat || "-";
@@ -552,14 +591,24 @@ async function handleMenuAction(waId, actionId, session) {
       `Mis datos:\nNombre: ${name}\nTel: ${phone}\nCI/NIT: ${vat}\nPaciente ID: ${patientId}\nPartner ID: ${partner}`
     );
     await sessionStore.updateSession(waId, {
-      state: STATES.MAIN,
-      data: { lastAction: ACTIONS.MY_DATA },
+      state: STATES.PATIENT_MENU,
+      data: { lastAction: ACTIONS.PATIENT_MY_DATA },
     });
+    await sendPatientMenu(waId);
+    return;
+  }
+
+  await sendPatientMenu(waId);
+}
+
+async function handleInfoAction(waId, actionId) {
+  if (actionId === ACTIONS.INFO_PRICES) {
+    await sendText(waId, PRICES_TEXT);
     await sendMainMenu(waId);
     return;
   }
 
-  if (actionId === ACTIONS.LOCATION) {
+  if (actionId === ACTIONS.INFO_LOCATION) {
     await sendText(waId, LOCATION_TEXT);
     await sendLocation(
       waId,
@@ -568,25 +617,21 @@ async function handleMenuAction(waId, actionId, session) {
       LOCATION.name,
       LOCATION.address
     );
-    await sessionStore.updateSession(waId, {
-      state: STATES.MAIN,
-      data: { lastAction: ACTIONS.LOCATION },
-    });
     await sendMainMenu(waId);
     return;
   }
 
-  if (actionId === ACTIONS.HOURS) {
+  if (actionId === ACTIONS.INFO_HOURS) {
     await sendText(waId, HOURS_TEXT);
-    await sessionStore.updateSession(waId, {
-      state: STATES.MAIN,
-      data: { lastAction: ACTIONS.HOURS },
-    });
     await sendMainMenu(waId);
     return;
   }
 
   await sendMainMenu(waId);
+}
+
+function isMenuTrigger(normalized) {
+  return ["menu", "inicio", "volver"].includes(normalized);
 }
 
 async function handleIncomingText(waId, text) {
@@ -599,22 +644,13 @@ async function handleIncomingText(waId, text) {
     return;
   }
 
-  if (normalized === "menu" || normalized === "0") {
-    const linked = await ensureLinked(waId, session);
-    if (linked.state === STATES.ASK_CI) {
-      return;
-    }
+  if (isMenuTrigger(normalized) || normalized === "0") {
     await sendMainMenu(waId);
     return;
   }
 
   if (session.state === STATES.ASK_CI) {
     await handleAskCi(waId, session, text);
-    return;
-  }
-
-  const linked = await ensureLinked(waId, session);
-  if (linked.state === STATES.ASK_CI) {
     return;
   }
 
@@ -626,11 +662,38 @@ async function handleInteractive(waId, selectionId) {
     return;
   }
   const session = await sessionStore.getSession(waId);
-  const linked = await ensureLinked(waId, session);
-  if (linked.state === STATES.ASK_CI) {
+
+  if (selectionId === ACTIONS.MAIN_MENU) {
+    await sendMainMenu(waId);
     return;
   }
-  await handleMenuAction(waId, selectionId, linked);
+
+  if (
+    selectionId === ACTIONS.INFO_PRICES ||
+    selectionId === ACTIONS.INFO_LOCATION ||
+    selectionId === ACTIONS.INFO_HOURS
+  ) {
+    await handleInfoAction(waId, selectionId);
+    return;
+  }
+
+  if (selectionId === ACTIONS.PATIENT_ENTRY) {
+    const linked = await ensureLinkedForPatient(waId, session);
+    if (linked.state === STATES.ASK_CI) {
+      return;
+    }
+    await sendPatientMenu(waId);
+    return;
+  }
+
+  if (
+    selectionId === ACTIONS.PATIENT_PAYMENTS ||
+    selectionId === ACTIONS.PATIENT_POS_LAST ||
+    selectionId === ACTIONS.PATIENT_MY_DATA
+  ) {
+    await handlePatientAction(waId, selectionId, session);
+    return;
+  }
 }
 
 module.exports = {

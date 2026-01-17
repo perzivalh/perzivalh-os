@@ -9,7 +9,7 @@ try {
 }
 
 const SQLITE_PATH = process.env.SQLITE_PATH;
-const DEFAULT_STATE = "MAIN";
+const DEFAULT_STATE = "MAIN_MENU";
 
 const memoryStore = new Map();
 let db = null;

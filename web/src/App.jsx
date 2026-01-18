@@ -1,5 +1,5 @@
 ﻿
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { apiDelete, apiGet, apiPatch, apiPost, setToken } from "./api";
 import { connectSocket } from "./socket";
 
@@ -24,6 +24,22 @@ function formatCompactDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return "-";
+  }
+  return date.toLocaleDateString();
+}
+
+function formatListTime(value) {
+  if (!value) {
+    return "-";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
+  if (sameDay) {
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
   return date.toLocaleDateString();
 }
@@ -76,12 +92,180 @@ function hasRole(user, roles) {
   return roles.includes(user.role);
 }
 
+function getInitial(value) {
+  if (!value) {
+    return "?";
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed[0].toUpperCase() : "?";
+}
+
+function ChatIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+      <path
+        d="M4.5 5.5h15v10H8l-3.5 3.5V5.5Z"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path d="M8 9h8" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M8 12.5h5" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function DashboardIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+      <rect x="3" y="3" width="7" height="7" rx="1.6" strokeWidth="1.8" />
+      <rect x="14" y="3" width="7" height="7" rx="1.6" strokeWidth="1.8" />
+      <rect x="3" y="14" width="7" height="7" rx="1.6" strokeWidth="1.8" />
+      <rect x="14" y="14" width="7" height="7" rx="1.6" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function BellIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+      <path
+        d="M6 9a6 6 0 1 1 12 0c0 4.2 2 5.5 2 5.5H4S6 13.2 6 9Z"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path d="M9.5 19a2.5 2.5 0 0 0 5 0" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function SettingsIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+      <circle cx="12" cy="12" r="3.2" strokeWidth="1.8" />
+      <path
+        d="M19.5 12a7.5 7.5 0 0 0-.1-1.2l2-1.4-2-3.4-2.3.8a7.5 7.5 0 0 0-1.8-1L14.9 2h-3.8l-.4 2.8a7.5 7.5 0 0 0-1.8 1l-2.3-.8-2 3.4 2 1.4a7.5 7.5 0 0 0 0 2.4l-2 1.4 2 3.4 2.3-.8a7.5 7.5 0 0 0 1.8 1l.4 2.8h3.8l.4-2.8a7.5 7.5 0 0 0 1.8-1l2.3.8 2-3.4-2-1.4c.1-.4.1-.8.1-1.2Z"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function SunIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+      <circle cx="12" cy="12" r="4" strokeWidth="1.8" />
+      <path d="M12 3v2.5" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M12 18.5V21" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M3 12h2.5" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M18.5 12H21" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M5.2 5.2l1.8 1.8" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M17 17l1.8 1.8" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M5.2 18.8 7 17" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M17 7l1.8-1.8" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function MoonIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+      <path
+        d="M20 14.2A8.5 8.5 0 1 1 9.8 4 6.5 6.5 0 0 0 20 14.2Z"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function UserIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+      <circle cx="12" cy="8" r="3.5" strokeWidth="1.8" />
+      <path
+        d="M5 19.5a7 7 0 0 1 14 0"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function SearchIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+      <circle cx="11" cy="11" r="6.5" strokeWidth="1.8" />
+      <path d="M16.5 16.5 21 21" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PlusIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+      <path d="M12 5v14" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M5 12h14" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function VideoIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+      <rect x="3.5" y="6" width="11" height="12" rx="2" strokeWidth="1.8" />
+      <path d="m14.5 10 6-3v10l-6-3" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function PhoneIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+      <path
+        d="M6.5 4.5 9 3l2.5 4-2.5 1.5c1.2 2.3 3.2 4.3 5.5 5.5L16 11l4 2.5-1.5 2.5c-.7 1.2-2.2 1.7-3.6 1.3a15.9 15.9 0 0 1-7.7-7.7c-.4-1.4.1-2.9 1.3-3.6Z"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function InfoIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+      <circle cx="12" cy="12" r="9" strokeWidth="1.8" />
+      <path d="M12 10v6" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="12" cy="7.5" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function SendIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+      <path
+        d="m4 12 15-7-6 14-2.5-5.2L4 12Z"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function App() {
   const [token, setTokenState] = useState(localStorage.getItem("token") || "");
   const [user, setUser] = useState(null);
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [loginError, setLoginError] = useState("");
-  const [view, setView] = useState("inbox");
+  const [view, setView] = useState("chats");
+  const [theme, setTheme] = useState(
+    () => localStorage.getItem("theme") || "light"
+  );
+  const [showFilters, setShowFilters] = useState(false);
+  const [isInfoOpen, setIsInfoOpen] = useState(true);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const messageInputRef = useRef(null);
   const [adminTab, setAdminTab] = useState("users");
 
   const [filters, setFilters] = useState({
@@ -170,6 +354,10 @@ function App() {
     () => templates.find((template) => template.id === campaignForm.template_id),
     [templates, campaignForm.template_id]
   );
+  const latestNote = useMemo(() => {
+    const note = [...messages].reverse().find((message) => message.type === "note");
+    return note?.text || "";
+  }, [messages]);
 
   useEffect(() => {
     if (token) {
@@ -178,6 +366,17 @@ function App() {
       setToken(null);
     }
   }, [token]);
+
+  useEffect(() => {
+    document.body.dataset.theme = theme;
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
+    if (filters.status || filters.assigned_user_id || filters.tag) {
+      setShowFilters(true);
+    }
+  }, [filters.status, filters.assigned_user_id, filters.tag]);
 
   useEffect(() => {
     if (!token) {
@@ -212,7 +411,7 @@ function App() {
   }, [user]);
 
   useEffect(() => {
-    if (!user || view !== "inbox") {
+    if (!user || view !== "chats") {
       return;
     }
     void loadConversations();
@@ -235,16 +434,15 @@ function App() {
     if (!user || view !== "admin") {
       return;
     }
-    if (
-      !hasRole(user, ["admin"]) &&
-      ["users", "settings", "audit"].includes(adminTab)
-    ) {
+    const isAdmin = hasRole(user, ["admin"]);
+    if (!isAdmin && ["users", "settings", "audit"].includes(adminTab)) {
       setAdminTab("catalog");
+      return;
     }
-    if (adminTab === "users") {
+    if (adminTab === "users" && isAdmin) {
       void loadAdminUsers();
     }
-    if (adminTab === "settings") {
+    if (adminTab === "settings" && isAdmin) {
       void loadSettings();
     }
     if (adminTab === "catalog") {
@@ -253,7 +451,7 @@ function App() {
     if (adminTab === "templates") {
       void loadTemplates();
     }
-    if (adminTab === "audit") {
+    if (adminTab === "audit" && isAdmin) {
       void loadAuditLogs();
     }
   }, [user, view, adminTab]);
@@ -352,7 +550,7 @@ function App() {
       });
       setTokenState(result.token);
       setUser(result.user);
-      setView("inbox");
+      setView("chats");
     } catch (error) {
       setLoginError("Credenciales invalidas");
     }
@@ -364,7 +562,17 @@ function App() {
     setConversations([]);
     setActiveConversation(null);
     setMessages([]);
-    setView("inbox");
+    setView("chats");
+    setIsProfileOpen(false);
+  }
+
+  function toggleTheme() {
+    setTheme((prev) => (prev === "light" ? "dark" : "light"));
+  }
+
+  function handleQuickAction(text) {
+    setMessageDraft(text);
+    messageInputRef.current?.focus();
   }
 
   async function handleSendMessage(event) {
@@ -829,327 +1037,497 @@ function App() {
   const canSeeAdmin = hasRole(user, ["admin", "marketing"]);
   const canAdminSettings = hasRole(user, ["admin"]);
   const canManageStatus = hasRole(user, ["admin", "recepcion"]);
+  const quickActions = ["Confirmar Cita", "Solicitar Resultados", "Urgencia"];
+  const statusLabels = {
+    open: "En linea",
+    pending: "Pendiente",
+    closed: "Cerrado",
+  };
+  const activeName = activeConversation
+    ? activeConversation.display_name ||
+      activeConversation.phone_e164 ||
+      activeConversation.wa_id
+    : "Selecciona un chat";
+  const activePhone = activeConversation?.phone_e164 || activeConversation?.wa_id || "";
+  const activeStatusLabel = activeConversation
+    ? statusLabels[activeConversation.status] || "Sin estado"
+    : "";
+  const navItems = [
+    { id: "chats", label: "Chats", icon: ChatIcon, enabled: true },
+    { id: "dashboard", label: "Dashboard", icon: DashboardIcon, enabled: true },
+    {
+      id: "campaigns",
+      label: "Campanas",
+      icon: BellIcon,
+      enabled: canSeeCampaigns,
+    },
+    {
+      id: "admin",
+      label: "Configuraciones",
+      icon: SettingsIcon,
+      enabled: canSeeAdmin,
+    },
+  ];
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <div>
-            <span className="brand-title">Podopie OS</span>
-            <span className="brand-sub">Hola, {user.name}</span>
-          </div>
-          <button className="ghost" onClick={handleLogout}>
-            Salir
-          </button>
-        </div>
-
-        <nav className="nav">
-          <button
-            className={`nav-button ${view === "inbox" ? "active" : ""}`}
-            onClick={() => setView("inbox")}
-          >
-            Inbox
-          </button>
-          <button
-            className={`nav-button ${view === "dashboard" ? "active" : ""}`}
-            onClick={() => setView("dashboard")}
-          >
-            Dashboard
-          </button>
-          {canSeeCampaigns && (
-            <button
-              className={`nav-button ${view === "campaigns" ? "active" : ""}`}
-              onClick={() => setView("campaigns")}
-            >
-              Campanas
-            </button>
-          )}
-          {canSeeAdmin && (
-            <button
-              className={`nav-button ${view === "admin" ? "active" : ""}`}
-              onClick={() => setView("admin")}
-            >
-              Admin
-            </button>
-          )}
+      <aside className="nav-rail">
+        <button className="rail-logo" type="button" title="Podopie">
+          <span className="logo-mark">P</span>
+        </button>
+        <nav className="rail-nav">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                className={`rail-button ${view === item.id ? "active" : ""}`}
+                onClick={() => item.enabled && setView(item.id)}
+                title={item.label}
+                aria-label={item.label}
+                type="button"
+                disabled={!item.enabled}
+              >
+                <Icon className="rail-icon" />
+              </button>
+            );
+          })}
         </nav>
+        <div className="rail-spacer" />
+        <button
+          className="rail-button"
+          type="button"
+          onClick={toggleTheme}
+          title={theme === "dark" ? "Tema claro" : "Tema oscuro"}
+          aria-label={theme === "dark" ? "Tema claro" : "Tema oscuro"}
+        >
+          {theme === "dark" ? (
+            <SunIcon className="rail-icon" />
+          ) : (
+            <MoonIcon className="rail-icon" />
+          )}
+        </button>
+        <div className="rail-profile">
+          <button
+            className={`profile-button ${isProfileOpen ? "active" : ""}`}
+            type="button"
+            onClick={() => setIsProfileOpen((prev) => !prev)}
+            title="Perfil"
+            aria-label="Perfil"
+          >
+            <span>{getInitial(user.name)}</span>
+          </button>
+          {isProfileOpen && (
+            <div className="profile-card">
+              <div className="profile-title">{user.name}</div>
+              <div className="profile-meta">{user.email || "Sin correo"}</div>
+              <div className="profile-role">{user.role}</div>
+              <button className="primary" type="button" onClick={handleLogout}>
+                Salir
+              </button>
+            </div>
+          )}
+        </div>
+      </aside>
 
-        {view === "inbox" && (
-          <>
-            <div className="filters">
-              <label className="field compact">
-                <span>Status</span>
-                <select
-                  value={filters.status}
-                  onChange={(event) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      status: event.target.value,
-                    }))
-                  }
+      <main
+        className={`content ${view === "chats" ? "content-chats" : "content-page"}`}
+      >
+        {view === "chats" && (
+          <section className="chat-shell">
+            <aside className="chat-list-panel">
+              <div className="chat-list-header">
+                <div>
+                  <div className="list-title">PODOPIE</div>
+                  <div className="list-subtitle">Chats</div>
+                </div>
+                <button
+                  className="icon-button add-chat"
+                  type="button"
+                  title="Nuevo chat"
                 >
-                  <option value="">Todos</option>
-                  {STATUS_OPTIONS.map((status) => (
-                    <option value={status} key={status}>
-                      {status}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field compact">
-                <span>Asignado</span>
-                <select
-                  value={filters.assigned_user_id}
-                  onChange={(event) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      assigned_user_id: event.target.value,
-                    }))
-                  }
-                >
-                  <option value="">Todos</option>
-                  <option value="unassigned">Sin asignar</option>
-                  {users.map((item) => (
-                    <option value={item.id} key={item.id}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field compact">
-                <span>Tag</span>
-                <select
-                  value={filters.tag}
-                  onChange={(event) =>
-                    setFilters((prev) => ({ ...prev, tag: event.target.value }))
-                  }
-                >
-                  <option value="">Todos</option>
-                  {tags.map((tag) => (
-                    <option value={tag.name} key={tag.id}>
-                      {tag.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field compact">
-                <span>Buscar</span>
+                  <PlusIcon className="icon" />
+                </button>
+              </div>
+
+              <div className="chat-search">
+                <SearchIcon className="search-icon" />
                 <input
                   type="text"
-                  placeholder="Telefono o nombre"
+                  placeholder="Buscar pacientes o mensajes"
                   value={filters.search}
+                  onFocus={() => setShowFilters(true)}
+                  onClick={() => setShowFilters(true)}
                   onChange={(event) =>
                     setFilters((prev) => ({ ...prev, search: event.target.value }))
                   }
                 />
-              </label>
-            </div>
-
-            <div className="list-header">
-              <span>Conversaciones</span>
-              <span>{conversations.length}</span>
-            </div>
-
-            <div className="conversation-list">
-              {conversations.map((conversation) => {
-                const active = activeConversation?.id === conversation.id;
-                const pendingUnassigned =
-                  conversation.status === "pending" &&
-                  !conversation.assigned_user_id;
-                return (
-                  <button
-                    key={conversation.id}
-                    className={`conversation-item ${active ? "active" : ""}`}
-                    onClick={() => loadConversation(conversation.id)}
-                  >
-                    <div className="row">
-                      <span className="name">
-                        {conversation.display_name ||
-                          conversation.phone_e164 ||
-                          conversation.wa_id}
-                      </span>
-                      <span className={`status ${conversation.status}`}>
-                        {conversation.status}
-                      </span>
-                    </div>
-                    <div className="row subtle">
-                      <span>
-                        {conversation.assigned_user?.name || "Sin asignar"}
-                      </span>
-                      <span>{formatCompactDate(conversation.last_message_at)}</span>
-                    </div>
-                    {pendingUnassigned && (
-                      <span className="badge wide">Pendiente sin asignar</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        )}
-      </aside>
-
-      <main className="content">
-        {view === "inbox" && (
-          <section className="chat">
-            <header className="chat-header">
-              <div>
-                <div className="chat-title">
-                  {activeConversation
-                    ? activeConversation.display_name ||
-                      activeConversation.phone_e164 ||
-                      activeConversation.wa_id
-                    : "Selecciona una conversacion"}
-                </div>
-                <div className="chat-sub">
-                  {activeConversation
-                    ? `Status: ${activeConversation.status} - Asignado: ${
-                        activeConversation.assigned_user?.name || "Sin asignar"
-                      }`
-                    : "Elige una conversacion para ver detalles"}
-                </div>
               </div>
-              <div className="chat-actions">
-                <button className="ghost" onClick={handleAssignSelf}>
-                  Tomar conversacion
-                </button>
-                {canManageStatus && (
-                  <>
-                    <button
-                      className="ghost"
-                      onClick={() => handleStatusChange("open")}
-                    >
-                      Reactivar bot
-                    </button>
-                    <button
-                      className="ghost"
-                      onClick={() => handleStatusChange("pending")}
-                    >
-                      Marcar pendiente
-                    </button>
-                    <button
-                      className="danger"
-                      onClick={() => handleStatusChange("closed")}
-                    >
-                      Cerrar
-                    </button>
-                  </>
-                )}
-              </div>
-            </header>
 
-            <div className="chat-body">
-              {loadingConversation && <div className="empty">Cargando...</div>}
-              {!loadingConversation && !activeConversation && (
-                <div className="empty">Selecciona una conversacion</div>
+              {showFilters && (
+                <div className="chat-filters">
+                  <label className="filter-field">
+                    <span>Status</span>
+                    <select
+                      value={filters.status}
+                      onChange={(event) =>
+                        setFilters((prev) => ({
+                          ...prev,
+                          status: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">Todos</option>
+                      {STATUS_OPTIONS.map((status) => (
+                        <option value={status} key={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="filter-field">
+                    <span>Asignado</span>
+                    <select
+                      value={filters.assigned_user_id}
+                      onChange={(event) =>
+                        setFilters((prev) => ({
+                          ...prev,
+                          assigned_user_id: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">Todos</option>
+                      <option value="unassigned">Sin asignar</option>
+                      {users.map((item) => (
+                        <option value={item.id} key={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="filter-field">
+                    <span>Tags</span>
+                    <select
+                      value={filters.tag}
+                      onChange={(event) =>
+                        setFilters((prev) => ({ ...prev, tag: event.target.value }))
+                      }
+                    >
+                      <option value="">Todos</option>
+                      {tags.map((tag) => (
+                        <option value={tag.name} key={tag.id}>
+                          {tag.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
               )}
-              {!loadingConversation &&
-                activeConversation &&
-                messages.map((message) => {
-                  const typeClass = message.type === "note" ? "note" : "";
+
+              <div className="list-header">
+                <span>Conversaciones</span>
+                <span>{conversations.length}</span>
+              </div>
+
+              <div className="conversation-list">
+                {conversations.map((conversation, index) => {
+                  const active = activeConversation?.id === conversation.id;
+                  const pendingUnassigned =
+                    conversation.status === "pending" &&
+                    !conversation.assigned_user_id;
+                  const displayName =
+                    conversation.display_name ||
+                    conversation.phone_e164 ||
+                    conversation.wa_id ||
+                    "Sin nombre";
+                  const preview =
+                    conversation.last_message_preview ||
+                    conversation.last_message_text ||
+                    conversation.last_message ||
+                    "Sin mensajes";
                   return (
-                    <div
-                      key={message.id}
-                      className={`message ${message.direction} ${typeClass}`}
+                    <button
+                      key={conversation.id}
+                      className={`conversation-item ${active ? "active" : ""}`}
+                      onClick={() => loadConversation(conversation.id)}
+                      style={{ animationDelay: `${Math.min(index, 6) * 60}ms` }}
                     >
-                      <div className="message-text">
-                        {message.text || `[${message.type}]`}
+                      <div className="avatar">
+                        <span>{getInitial(displayName)}</span>
+                        {pendingUnassigned && <span className="presence-dot" />}
                       </div>
-                      <div className="message-meta">
-                        {formatDate(message.created_at)}
+                      <div className="conversation-body">
+                        <div className="conversation-row">
+                          <span className="conversation-name">{displayName}</span>
+                          <span className="conversation-time">
+                            {formatListTime(conversation.last_message_at)}
+                          </span>
+                        </div>
+                        <div className="conversation-preview">{preview}</div>
+                        <div className="conversation-meta">
+                          <span className={`status-pill ${conversation.status}`}>
+                            {statusLabels[conversation.status] || conversation.status}
+                          </span>
+                          <span className="assignee">
+                            {conversation.assigned_user?.name || "Sin asignar"}
+                          </span>
+                        </div>
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
-            </div>
+              </div>
+            </aside>
 
-            <div className="chat-aside">
-              <div className="panel">
-                <div className="panel-title">Tags</div>
-                <div className="tag-list">
-                  {tags.map((tag) => (
-                    <button
-                      key={tag.id}
-                      className={`tag ${
-                        activeConversation?.tags?.some(
-                          (item) => item.name === tag.name
-                        )
-                          ? "active"
-                          : ""
-                      }`}
-                      onClick={() => handleToggleTag(tag.name)}
-                    >
-                      {tag.name}
-                    </button>
-                  ))}
+            <div
+              className={`chat-view ${isInfoOpen ? "info-open" : "info-closed"}`}
+            >
+              <div className="chat-main">
+                <div className="chat-card">
+                  <header className="chat-topbar">
+                    <div className="chat-title">
+                      <div className="chat-avatar">
+                        <span>{getInitial(activeName)}</span>
+                      </div>
+                      <div>
+                        <div className="chat-name">{activeName}</div>
+                        {activeConversation ? (
+                          <div className="chat-status">
+                            <span
+                              className={`status-dot ${activeConversation.status}`}
+                            />
+                            {activeStatusLabel}
+                          </div>
+                        ) : (
+                          <div className="chat-status muted">
+                            Elige una conversacion
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="chat-actions">
+                      <button className="icon-button" type="button" title="Video">
+                        <VideoIcon className="icon" />
+                      </button>
+                      <button className="icon-button" type="button" title="Llamar">
+                        <PhoneIcon className="icon" />
+                      </button>
+                      <button className="icon-button" type="button" title="Buscar">
+                        <SearchIcon className="icon" />
+                      </button>
+                      <button
+                        className={`icon-button ${isInfoOpen ? "active" : ""}`}
+                        type="button"
+                        title="Info"
+                        onClick={() => setIsInfoOpen((prev) => !prev)}
+                      >
+                        <InfoIcon className="icon" />
+                      </button>
+                    </div>
+                  </header>
+
+                  <div className="chat-body">
+                    {loadingConversation && (
+                      <div className="empty">Cargando...</div>
+                    )}
+                    {!loadingConversation && !activeConversation && (
+                      <div className="empty">Selecciona una conversacion</div>
+                    )}
+                    {!loadingConversation && activeConversation && (
+                      <>
+                        <div className="day-pill">Hoy</div>
+                        {messages.map((message) => {
+                          const typeClass = message.type === "note" ? "note" : "";
+                          return (
+                            <div
+                              key={message.id}
+                              className={`message ${message.direction} ${typeClass}`}
+                            >
+                              <div className="message-text">
+                                {message.text || `[${message.type}]`}
+                              </div>
+                              <div className="message-meta">
+                                {formatDate(message.created_at)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <div className="chat-encryption">
+                          Los mensajes estan cifrados de extremo a extremo.
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <form className="chat-composer" onSubmit={handleSendMessage}>
+                    <div className="quick-actions">
+                      {quickActions.map((action) => (
+                        <button
+                          key={action}
+                          className="quick-action"
+                          type="button"
+                          onClick={() => handleQuickAction(action)}
+                        >
+                          {action}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="composer-row">
+                      <select
+                        className="message-mode"
+                        value={messageMode}
+                        onChange={(event) => setMessageMode(event.target.value)}
+                      >
+                        <option value="text">WhatsApp</option>
+                        <option value="note">Nota interna</option>
+                      </select>
+                      <input
+                        ref={messageInputRef}
+                        type="text"
+                        placeholder="Escribe un mensaje..."
+                        value={messageDraft}
+                        onChange={(event) => setMessageDraft(event.target.value)}
+                      />
+                      <button className="send-button" type="submit">
+                        <SendIcon className="icon" />
+                      </button>
+                    </div>
+                  </form>
                 </div>
-                <form className="tag-form" onSubmit={handleAddTag}>
-                  <input
-                    type="text"
-                    placeholder="Nuevo tag"
-                    value={tagInput}
-                    onChange={(event) => setTagInput(event.target.value)}
-                  />
-                  <button className="ghost" type="submit">
-                    Agregar
-                  </button>
-                </form>
               </div>
-              <div className="panel">
-                <div className="panel-title">Datos</div>
-                {activeConversation ? (
-                  <>
-                    <div className="panel-row">
-                      <span>WA ID</span>
-                      <span>{activeConversation.wa_id}</span>
-                    </div>
-                    <div className="panel-row">
-                      <span>Telefono</span>
-                      <span>{activeConversation.phone_e164}</span>
-                    </div>
-                    <div className="panel-row">
-                      <span>Partner ID</span>
-                      <span>{activeConversation.partner_id || "-"}</span>
-                    </div>
-                    <div className="panel-row">
-                      <span>Paciente ID</span>
-                      <span>{activeConversation.patient_id || "-"}</span>
-                    </div>
-                    <div className="panel-row">
-                      <span>Verificado</span>
-                      <span>{activeConversation.verified_at ? "Si" : "No"}</span>
-                    </div>
-                  </>
-                ) : (
-                  <div className="empty-state">Sin conversacion</div>
-                )}
-              </div>
-            </div>
 
-            <form className="composer" onSubmit={handleSendMessage}>
-              <label className="field grow">
-                <span>Mensaje</span>
-                <input
-                  type="text"
-                  placeholder="Escribe un mensaje"
-                  value={messageDraft}
-                  onChange={(event) => setMessageDraft(event.target.value)}
-                />
-              </label>
-              <label className="field compact">
-                <span>Modo</span>
-                <select
-                  value={messageMode}
-                  onChange={(event) => setMessageMode(event.target.value)}
-                >
-                  <option value="text">WhatsApp</option>
-                  <option value="note">Nota interna</option>
-                </select>
-              </label>
-              <button className="primary" type="submit">
-                Enviar
-              </button>
-            </form>
+              <aside className="chat-info">
+                <div className="info-card">
+                  <div className="info-avatar">
+                    <span>{getInitial(activeName)}</span>
+                  </div>
+                  <div className="info-name">{activeName}</div>
+                  <div className="info-phone">{activePhone || "Sin telefono"}</div>
+                  <button className="primary" type="button">
+                    Abrir en Odoo
+                  </button>
+                </div>
+
+                <div className="info-section">
+                  <div className="section-title">Informacion del paciente</div>
+                  <div className="info-row">
+                    <span>Ultima visita</span>
+                    <span>
+                      {formatCompactDate(
+                        activeConversation?.last_visit_at ||
+                          activeConversation?.last_visit
+                      )}
+                    </span>
+                  </div>
+                  <div className="info-row">
+                    <span>Tratamiento actual</span>
+                    <span>
+                      {activeConversation?.current_treatment ||
+                        activeConversation?.treatment ||
+                        "-"}
+                    </span>
+                  </div>
+                  <div className="info-row">
+                    <span>Alergias</span>
+                    <span>
+                      {activeConversation?.allergies || "Ninguna reportada"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="info-section">
+                  <div className="section-header">
+                    <div className="section-title">Etiquetas</div>
+                    <button className="link-button" type="button">
+                      Gestionar
+                    </button>
+                  </div>
+                  <div className="tag-list">
+                    {tags.map((tag) => (
+                      <button
+                        key={tag.id}
+                        className={`tag ${
+                          activeConversation?.tags?.some(
+                            (item) => item.name === tag.name
+                          )
+                            ? "active"
+                            : ""
+                        }`}
+                        onClick={() => handleToggleTag(tag.name)}
+                      >
+                        {tag.name}
+                      </button>
+                    ))}
+                  </div>
+                  <form className="tag-form" onSubmit={handleAddTag}>
+                    <input
+                      type="text"
+                      placeholder="Anadir etiqueta..."
+                      value={tagInput}
+                      onChange={(event) => setTagInput(event.target.value)}
+                    />
+                    <button
+                      className="icon-button"
+                      type="submit"
+                      title="Agregar"
+                    >
+                      <PlusIcon className="icon" />
+                    </button>
+                  </form>
+                </div>
+
+                <div className="info-section">
+                  <div className="section-title">Notas internas</div>
+                  {latestNote ? (
+                    <div className="note-card">{latestNote}</div>
+                  ) : (
+                    <div className="empty-state">Sin notas internas</div>
+                  )}
+                </div>
+
+                {activeConversation && (
+                  <div className="info-section">
+                    <div className="section-title">Acciones</div>
+                    <div className="action-stack">
+                      <button
+                        className="ghost"
+                        type="button"
+                        onClick={handleAssignSelf}
+                      >
+                        Tomar conversacion
+                      </button>
+                      {canManageStatus && (
+                        <>
+                          <button
+                            className="ghost"
+                            type="button"
+                            onClick={() => handleStatusChange("open")}
+                          >
+                            Reactivar bot
+                          </button>
+                          <button
+                            className="ghost"
+                            type="button"
+                            onClick={() => handleStatusChange("pending")}
+                          >
+                            Marcar pendiente
+                          </button>
+                        </>
+                      )}
+                      {canManageStatus && (
+                        <button
+                          className="danger soft"
+                          type="button"
+                          onClick={() => handleStatusChange("closed")}
+                        >
+                          Cerrar conversacion
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </aside>
+            </div>
           </section>
         )}
         {view === "dashboard" && (

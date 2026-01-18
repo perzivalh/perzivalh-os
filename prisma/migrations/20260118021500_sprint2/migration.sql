@@ -1,4 +1,4 @@
-﻿-- CreateEnum
+-- CreateEnum
 CREATE TYPE "VerificationMethod" AS ENUM ('phone', 'ci', 'manual');
 
 -- CreateEnum

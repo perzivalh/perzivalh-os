@@ -806,60 +806,70 @@ async function refreshCampaignStatus(campaignId) {
 }
 
 async function processCampaignQueue() {
-  const due = await prisma.campaign.findMany({
-    where: {
-      status: "scheduled",
-      scheduled_for: { lte: new Date() },
-    },
-  });
-  for (const campaign of due) {
-    const queued = await queueCampaignMessages(campaign, campaign.created_by_user_id);
-    await prisma.campaign.update({
-      where: { id: campaign.id },
-      data: { status: queued > 0 ? "sending" : "failed" },
+  try {
+    const due = await prisma.campaign.findMany({
+      where: {
+        status: "scheduled",
+        scheduled_for: { lte: new Date() },
+      },
     });
-  }
-
-  const queuedMessages = await prisma.campaignMessage.findMany({
-    where: {
-      status: "queued",
-      campaign: { status: "sending" },
-    },
-    include: {
-      campaign: { include: { template: true } },
-    },
-    take: CAMPAIGN_BATCH_SIZE,
-  });
-
-  if (!queuedMessages.length) {
-    return;
-  }
-
-  const processedCampaigns = new Set();
-  for (const message of queuedMessages) {
-    const template = message.campaign.template;
-    const result = await sendTemplate(
-      message.wa_id,
-      template.name,
-      template.language,
-      []
-    );
-    if (result.ok) {
-      await prisma.campaignMessage.update({
-        where: { id: message.id },
-        data: { status: "sent", sent_at: new Date(), error_json: null },
-      });
-    } else {
-      await prisma.campaignMessage.update({
-        where: { id: message.id },
-        data: { status: "failed", error_json: result.error || {} },
+    for (const campaign of due) {
+      const queued = await queueCampaignMessages(
+        campaign,
+        campaign.created_by_user_id
+      );
+      await prisma.campaign.update({
+        where: { id: campaign.id },
+        data: { status: queued > 0 ? "sending" : "failed" },
       });
     }
-    processedCampaigns.add(message.campaign_id);
-  }
 
-  for (const campaignId of processedCampaigns) {
-    await refreshCampaignStatus(campaignId);
+    const queuedMessages = await prisma.campaignMessage.findMany({
+      where: {
+        status: "queued",
+        campaign: { status: "sending" },
+      },
+      include: {
+        campaign: { include: { template: true } },
+      },
+      take: CAMPAIGN_BATCH_SIZE,
+    });
+
+    if (!queuedMessages.length) {
+      return;
+    }
+
+    const processedCampaigns = new Set();
+    for (const message of queuedMessages) {
+      const template = message.campaign.template;
+      const result = await sendTemplate(
+        message.wa_id,
+        template.name,
+        template.language,
+        []
+      );
+      if (result.ok) {
+        await prisma.campaignMessage.update({
+          where: { id: message.id },
+          data: { status: "sent", sent_at: new Date(), error_json: null },
+        });
+      } else {
+        await prisma.campaignMessage.update({
+          where: { id: message.id },
+          data: { status: "failed", error_json: result.error || {} },
+        });
+      }
+      processedCampaigns.add(message.campaign_id);
+    }
+
+    for (const campaignId of processedCampaigns) {
+      await refreshCampaignStatus(campaignId);
+    }
+  } catch (error) {
+    logger.error("campaign.queue_error", {
+      message: error.message || error,
+      code: error.code,
+    });
   }
 }
 

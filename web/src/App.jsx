@@ -378,12 +378,6 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
-    if (filters.status || filters.assigned_user_id || filters.tag) {
-      setShowFilters(true);
-    }
-  }, [filters.status, filters.assigned_user_id, filters.tag]);
-
-  useEffect(() => {
     setHasUnread(false);
     setIsAtBottom(true);
     requestAnimationFrame(() => {
@@ -1216,6 +1210,16 @@ function App() {
                     setFilters((prev) => ({ ...prev, search: event.target.value }))
                   }
                 />
+                {showFilters && (
+                  <button
+                    className="search-close"
+                    type="button"
+                    onClick={() => setShowFilters(false)}
+                    aria-label="Cerrar filtros"
+                  >
+                    x
+                  </button>
+                )}
               </div>
 
               {showFilters && (

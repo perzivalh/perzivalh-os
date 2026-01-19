@@ -38,8 +38,19 @@ const { VERIFY_TOKEN, ADMIN_PHONE_E164, WHATSAPP_BUSINESS_ACCOUNT_ID } = process
 const PORT = process.env.PORT || 3000;
 const FRONTEND_ORIGIN =
   process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+function normalizeOrigin(value) {
+  if (!value) {
+    return "";
+  }
+  const trimmed = String(value).trim();
+  if (!trimmed) {
+    return "";
+  }
+  return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
+}
+
 const FRONTEND_ORIGINS = FRONTEND_ORIGIN.split(",")
-  .map((origin) => origin.trim())
+  .map((origin) => normalizeOrigin(origin))
   .filter(Boolean);
 const WHATSAPP_APP_SECRET = process.env.WHATSAPP_APP_SECRET || "";
 const ALLOWED_STATUS = new Set(["open", "pending", "closed"]);
@@ -133,10 +144,11 @@ function isAllowedOrigin(origin) {
   if (!origin) {
     return true;
   }
+  const normalized = normalizeOrigin(origin);
   if (FRONTEND_ORIGINS.includes("*")) {
     return true;
   }
-  return FRONTEND_ORIGINS.includes(origin);
+  return FRONTEND_ORIGINS.includes(normalized);
 }
 
 const app = express();

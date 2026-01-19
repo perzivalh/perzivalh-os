@@ -38,17 +38,118 @@ const { VERIFY_TOKEN, ADMIN_PHONE_E164, WHATSAPP_BUSINESS_ACCOUNT_ID } = process
 const PORT = process.env.PORT || 3000;
 const FRONTEND_ORIGIN =
   process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+const FRONTEND_ORIGINS = FRONTEND_ORIGIN.split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 const WHATSAPP_APP_SECRET = process.env.WHATSAPP_APP_SECRET || "";
 const ALLOWED_STATUS = new Set(["open", "pending", "closed"]);
 const CAMPAIGN_BATCH_SIZE = Number(process.env.CAMPAIGN_BATCH_SIZE || 8);
 const CAMPAIGN_INTERVAL_MS = Number(process.env.CAMPAIGN_INTERVAL_MS || 1500);
 const ROLE_OPTIONS = ["admin", "recepcion", "caja", "marketing", "doctor"];
+const DEFAULT_ROLE_PERMISSIONS = {
+  admin: {
+    modules: {
+      chat: { read: true, write: true },
+      dashboard: { read: true, write: true },
+      campaigns: { read: true, write: true },
+      settings: { read: true, write: true },
+    },
+    settings: {
+      general: { read: true, write: true },
+      users: { read: true, write: true },
+      bot: { read: true, write: true },
+      templates: { read: true, write: true },
+      audit: { read: true, write: true },
+      odoo: { read: true, write: true },
+    },
+  },
+  recepcion: {
+    modules: {
+      chat: { read: true, write: true },
+      dashboard: { read: true, write: false },
+      campaigns: { read: false, write: false },
+      settings: { read: false, write: false },
+    },
+    settings: {
+      general: { read: false, write: false },
+      users: { read: false, write: false },
+      bot: { read: false, write: false },
+      templates: { read: false, write: false },
+      audit: { read: false, write: false },
+      odoo: { read: false, write: false },
+    },
+  },
+  caja: {
+    modules: {
+      chat: { read: true, write: false },
+      dashboard: { read: true, write: false },
+      campaigns: { read: false, write: false },
+      settings: { read: false, write: false },
+    },
+    settings: {
+      general: { read: false, write: false },
+      users: { read: false, write: false },
+      bot: { read: false, write: false },
+      templates: { read: false, write: false },
+      audit: { read: false, write: false },
+      odoo: { read: false, write: false },
+    },
+  },
+  marketing: {
+    modules: {
+      chat: { read: false, write: false },
+      dashboard: { read: true, write: false },
+      campaigns: { read: true, write: true },
+      settings: { read: true, write: false },
+    },
+    settings: {
+      general: { read: true, write: false },
+      users: { read: false, write: false },
+      bot: { read: false, write: false },
+      templates: { read: true, write: true },
+      audit: { read: false, write: false },
+      odoo: { read: false, write: false },
+    },
+  },
+  doctor: {
+    modules: {
+      chat: { read: true, write: false },
+      dashboard: { read: false, write: false },
+      campaigns: { read: false, write: false },
+      settings: { read: false, write: false },
+    },
+    settings: {
+      general: { read: false, write: false },
+      users: { read: false, write: false },
+      bot: { read: false, write: false },
+      templates: { read: false, write: false },
+      audit: { read: false, write: false },
+      odoo: { read: false, write: false },
+    },
+  },
+};
+
+function isAllowedOrigin(origin) {
+  if (!origin) {
+    return true;
+  }
+  if (FRONTEND_ORIGINS.includes("*")) {
+    return true;
+  }
+  return FRONTEND_ORIGINS.includes(origin);
+}
 
 const app = express();
 app.set("trust proxy", 1);
 app.use(
   cors({
-    origin: FRONTEND_ORIGIN,
+    origin: (origin, callback) => {
+      if (isAllowedOrigin(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error("cors_not_allowed"));
+    },
     credentials: true,
   })
 );
@@ -63,7 +164,7 @@ app.use(
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: FRONTEND_ORIGIN,
+    origin: FRONTEND_ORIGINS.includes("*") ? "*" : FRONTEND_ORIGINS,
     credentials: true,
   },
 });
@@ -107,7 +208,46 @@ async function ensureSettings() {
   }
 }
 
+async function ensureRolePermissions() {
+  try {
+    const existing = await prisma.rolePermission.findMany();
+    const byRole = new Map(existing.map((entry) => [entry.role, entry]));
+    const updates = [];
+    ROLE_OPTIONS.forEach((role) => {
+      const current = byRole.get(role);
+      const defaults = DEFAULT_ROLE_PERMISSIONS[role] || {};
+      if (!current) {
+        updates.push(
+          prisma.rolePermission.create({
+            data: { role, permissions_json: defaults },
+          })
+        );
+        return;
+      }
+      if (
+        !current.permissions_json ||
+        Object.keys(current.permissions_json || {}).length === 0
+      ) {
+        updates.push(
+          prisma.rolePermission.update({
+            where: { role },
+            data: { permissions_json: defaults },
+          })
+        );
+      }
+    });
+    if (updates.length) {
+      await prisma.$transaction(updates);
+    }
+  } catch (error) {
+    logger.error("role_permissions.init_failed", {
+      message: error.message || error,
+    });
+  }
+}
+
 ensureSettings();
+ensureRolePermissions();
 
 let settingsCache = null;
 let settingsCacheAt = 0;

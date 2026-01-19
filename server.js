@@ -42,9 +42,15 @@ function normalizeOrigin(value) {
   if (!value) {
     return "";
   }
-  const trimmed = String(value).trim();
+  let trimmed = String(value).trim();
   if (!trimmed) {
     return "";
+  }
+  if (
+    (trimmed.startsWith("\"") && trimmed.endsWith("\"")) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    trimmed = trimmed.slice(1, -1).trim();
   }
   return trimmed.endsWith("/") ? trimmed.slice(0, -1) : trimmed;
 }

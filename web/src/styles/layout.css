@@ -67,6 +67,10 @@
   background: var(--bg);
 }
 
+.app-shell.admin-shell {
+  grid-template-columns: 88px 300px minmax(0, 1fr);
+}
+
 .content {
   padding: 1.5rem 2rem;
   display: flex;

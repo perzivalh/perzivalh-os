@@ -66,6 +66,8 @@ function AdminView({
   handleSyncTemplates,
   auditLogs,
   formatDate,
+  useShellLayout = false,
+  pageError,
 }) {
   const [userSearch, setUserSearch] = useState("");
   const [showUserForm, setShowUserForm] = useState(false);
@@ -176,8 +178,8 @@ function AdminView({
     setShowUserForm(true);
   }
 
-  return (
-    <section className="settings-layout">
+  const content = (
+    <>
       <aside className="settings-sidebar">
         <div className="settings-header">
           <div className="settings-title">CONFIGURACION</div>
@@ -1080,9 +1082,16 @@ function AdminView({
             <div className="empty-state">Seccion en construccion</div>
           </div>
         )}
+        {pageError && <div className="error-banner">{pageError}</div>}
       </div>
-    </section>
+    </>
   );
+
+  if (useShellLayout) {
+    return content;
+  }
+
+  return <section className="settings-layout">{content}</section>;
 }
 
 export default AdminView;

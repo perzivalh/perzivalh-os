@@ -1438,7 +1438,7 @@ function App() {
   });
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${view === "admin" ? "admin-shell" : ""}`}>
       <NavRail
         navItems={navItems}
         view={view}
@@ -1454,129 +1454,132 @@ function App() {
         MoonIcon={MoonIcon}
       />
 
-      <main
-        className={`content ${view === "chats" ? "content-chats" : "content-page"}`}
-      >
-        {view === "chats" && (
-          <ChatView
-            activeConversation={activeConversation}
-            conversations={conversations}
-            filters={filters}
-            showFilters={showFilters}
-            users={users}
-            tags={tags}
-            statusOptions={STATUS_OPTIONS}
-            statusLabels={statusLabels}
-            formatListTime={formatListTime}
-            formatCompactDate={formatCompactDate}
-            messageBlocks={messageBlocks}
-            messageDraft={messageDraft}
-            messageMode={messageMode}
-            quickActions={quickActions}
-            tagInput={tagInput}
-            latestNote={latestNote}
-            loadingConversation={loadingConversation}
-            isInfoOpen={isInfoOpen}
-            hasUnread={hasUnread}
-            activeName={activeName}
-            activePhone={activePhone}
-            activeStatusLabel={activeStatusLabel}
-            canManageStatus={canManageStatus}
-            messageInputRef={messageInputRef}
-            chatBodyRef={chatBodyRef}
-            setShowFilters={setShowFilters}
-            setFilters={setFilters}
-            loadConversation={loadConversation}
-            handleBackToList={handleBackToList}
-            setIsInfoOpen={setIsInfoOpen}
-            handleChatScroll={handleChatScroll}
-            handleAssignSelf={handleAssignSelf}
-            handleStatusChange={handleStatusChange}
-            handleToggleTag={handleToggleTag}
-            handleAddTag={handleAddTag}
-            handleQuickAction={handleQuickAction}
-            handleSendMessage={handleSendMessage}
-            setMessageMode={setMessageMode}
-            setMessageDraft={setMessageDraft}
-            scrollChatToBottom={scrollChatToBottom}
-            getInitial={getInitial}
-            PlusIcon={PlusIcon}
-            SearchIcon={SearchIcon}
-            VideoIcon={VideoIcon}
-            PhoneIcon={PhoneIcon}
-            InfoIcon={InfoIcon}
-            SendIcon={SendIcon}
-          />
-        )}
-        {view === "dashboard" && (
-          <DashboardView
-            statusCounts={statusCounts}
-            metrics={metrics}
-            onRefresh={loadMetrics}
-          />
-        )}
-        {view === "campaigns" && (
-          <CampaignsView
-            campaignForm={campaignForm}
-            setCampaignForm={setCampaignForm}
-            campaignFilter={campaignFilter}
-            setCampaignFilter={setCampaignFilter}
-            templates={templates}
-            campaigns={campaigns}
-            selectedCampaignId={selectedCampaignId}
-            campaignMessages={campaignMessages}
-            users={users}
-            tags={tags}
-            selectedTemplate={selectedTemplate}
-            statusOptions={STATUS_OPTIONS}
-            onCreateCampaign={handleCreateCampaign}
-            onLoadCampaigns={loadCampaigns}
-            onLoadCampaignMessages={loadCampaignMessages}
-            onSendCampaign={handleSendCampaign}
-            formatDate={formatDate}
-          />
-        )}
-        {view === "admin" && (
-          <AdminView
-            settingsSection={settingsSection}
-            setSettingsSection={setSettingsSection}
-            settingsTab={settingsTab}
-            setSettingsTab={setSettingsTab}
-            rolePermissions={rolePermissions}
-            setRolePermissions={handleRolePermissionsUpdate}
-            currentRole={user.role}
-            isAdmin={isAdmin}
-            adminUsers={adminUsers}
-            userForm={userForm}
-            setUserForm={setUserForm}
-            roleOptions={ROLE_OPTIONS}
-            handleUserSubmit={handleUserSubmit}
-            settings={settings}
-            setSettings={setSettings}
-            handleSaveSettings={handleSaveSettings}
-            branches={branches}
-            services={services}
-            branchForm={branchForm}
-            setBranchForm={setBranchForm}
-            handleBranchSubmit={handleBranchSubmit}
-            handleBranchDisable={handleBranchDisable}
-            serviceForm={serviceForm}
-            setServiceForm={setServiceForm}
-            handleServiceSubmit={handleServiceSubmit}
-            handleServiceDisable={handleServiceDisable}
-            handleServiceBranchToggle={handleServiceBranchToggle}
-            templates={templates}
-            templateForm={templateForm}
-            setTemplateForm={setTemplateForm}
-            handleTemplateSubmit={handleTemplateSubmit}
-            handleSyncTemplates={handleSyncTemplates}
-            auditLogs={auditLogs}
-            formatDate={formatDate}
-          />
-        )}
+      {view === "admin" ? (
+        <AdminView
+          settingsSection={settingsSection}
+          setSettingsSection={setSettingsSection}
+          settingsTab={settingsTab}
+          setSettingsTab={setSettingsTab}
+          rolePermissions={rolePermissions}
+          setRolePermissions={handleRolePermissionsUpdate}
+          currentRole={user.role}
+          isAdmin={isAdmin}
+          adminUsers={adminUsers}
+          userForm={userForm}
+          setUserForm={setUserForm}
+          roleOptions={ROLE_OPTIONS}
+          handleUserSubmit={handleUserSubmit}
+          settings={settings}
+          setSettings={setSettings}
+          handleSaveSettings={handleSaveSettings}
+          branches={branches}
+          services={services}
+          branchForm={branchForm}
+          setBranchForm={setBranchForm}
+          handleBranchSubmit={handleBranchSubmit}
+          handleBranchDisable={handleBranchDisable}
+          serviceForm={serviceForm}
+          setServiceForm={setServiceForm}
+          handleServiceSubmit={handleServiceSubmit}
+          handleServiceDisable={handleServiceDisable}
+          handleServiceBranchToggle={handleServiceBranchToggle}
+          templates={templates}
+          templateForm={templateForm}
+          setTemplateForm={setTemplateForm}
+          handleTemplateSubmit={handleTemplateSubmit}
+          handleSyncTemplates={handleSyncTemplates}
+          auditLogs={auditLogs}
+          formatDate={formatDate}
+          useShellLayout
+          pageError={pageError}
+        />
+      ) : (
+        <main
+          className={`content ${view === "chats" ? "content-chats" : "content-page"}`}
+        >
+          {view === "chats" && (
+            <ChatView
+              activeConversation={activeConversation}
+              conversations={conversations}
+              filters={filters}
+              showFilters={showFilters}
+              users={users}
+              tags={tags}
+              statusOptions={STATUS_OPTIONS}
+              statusLabels={statusLabels}
+              formatListTime={formatListTime}
+              formatCompactDate={formatCompactDate}
+              messageBlocks={messageBlocks}
+              messageDraft={messageDraft}
+              messageMode={messageMode}
+              quickActions={quickActions}
+              tagInput={tagInput}
+              latestNote={latestNote}
+              loadingConversation={loadingConversation}
+              isInfoOpen={isInfoOpen}
+              hasUnread={hasUnread}
+              activeName={activeName}
+              activePhone={activePhone}
+              activeStatusLabel={activeStatusLabel}
+              canManageStatus={canManageStatus}
+              messageInputRef={messageInputRef}
+              chatBodyRef={chatBodyRef}
+              setShowFilters={setShowFilters}
+              setFilters={setFilters}
+              loadConversation={loadConversation}
+              handleBackToList={handleBackToList}
+              setIsInfoOpen={setIsInfoOpen}
+              handleChatScroll={handleChatScroll}
+              handleAssignSelf={handleAssignSelf}
+              handleStatusChange={handleStatusChange}
+              handleToggleTag={handleToggleTag}
+              handleAddTag={handleAddTag}
+              handleQuickAction={handleQuickAction}
+              handleSendMessage={handleSendMessage}
+              setMessageMode={setMessageMode}
+              setMessageDraft={setMessageDraft}
+              scrollChatToBottom={scrollChatToBottom}
+              getInitial={getInitial}
+              PlusIcon={PlusIcon}
+              SearchIcon={SearchIcon}
+              VideoIcon={VideoIcon}
+              PhoneIcon={PhoneIcon}
+              InfoIcon={InfoIcon}
+              SendIcon={SendIcon}
+            />
+          )}
+          {view === "dashboard" && (
+            <DashboardView
+              statusCounts={statusCounts}
+              metrics={metrics}
+              onRefresh={loadMetrics}
+            />
+          )}
+          {view === "campaigns" && (
+            <CampaignsView
+              campaignForm={campaignForm}
+              setCampaignForm={setCampaignForm}
+              campaignFilter={campaignFilter}
+              setCampaignFilter={setCampaignFilter}
+              templates={templates}
+              campaigns={campaigns}
+              selectedCampaignId={selectedCampaignId}
+              campaignMessages={campaignMessages}
+              users={users}
+              tags={tags}
+              selectedTemplate={selectedTemplate}
+              statusOptions={STATUS_OPTIONS}
+              onCreateCampaign={handleCreateCampaign}
+              onLoadCampaigns={loadCampaigns}
+              onLoadCampaignMessages={loadCampaignMessages}
+              onSendCampaign={handleSendCampaign}
+              formatDate={formatDate}
+            />
+          )}
 
-        {pageError && <div className="error-banner">{pageError}</div>}
-      </main>
+          {pageError && <div className="error-banner">{pageError}</div>}
+        </main>
+      )}
     </div>
   );
 }

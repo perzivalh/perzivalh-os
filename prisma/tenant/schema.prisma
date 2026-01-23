@@ -1,0 +1,252 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../node_modules/@prisma/client-tenant"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("TENANT_DB_URL")
+}
+
+enum UserRole {
+  admin
+  recepcion
+  caja
+  marketing
+  doctor
+}
+
+enum ConversationStatus {
+  open
+  pending
+  closed
+}
+
+enum MessageDirection {
+  in
+  out
+}
+
+enum MessageType {
+  text
+  interactive
+  image
+  location
+  template
+  unknown
+  note
+}
+
+enum VerificationMethod {
+  phone
+  ci
+  manual
+}
+
+enum CampaignStatus {
+  draft
+  scheduled
+  sending
+  sent
+  failed
+}
+
+enum CampaignMessageStatus {
+  queued
+  sent
+  failed
+}
+
+model User {
+  id            String     @id @default(cuid())
+  name          String
+  email         String     @unique
+  password_hash String
+  role          UserRole   @default(recepcion)
+  is_active     Boolean    @default(true)
+  created_at    DateTime   @default(now())
+  AuditLogTenant      AuditLogTenant[]    @relation("UserAuditLogs")
+  Conversation  Conversation[] @relation("AssignedConversations")
+  Campaign      Campaign[] @relation("CampaignCreatedBy")
+}
+
+model Conversation {
+  id               String              @id @default(cuid())
+  wa_id            String
+  phone_number_id  String?
+  phone_e164       String
+  display_name     String?
+  status           ConversationStatus  @default(open)
+  assigned_user_id String?
+  partner_id       Int?
+  patient_id       Int?
+  verified_at      DateTime?
+  verification_method VerificationMethod?
+  last_message_at  DateTime?
+  created_at       DateTime            @default(now())
+  messages         Message[]
+  tags             ConversationTag[]
+  assigned_user    User?               @relation("AssignedConversations", fields: [assigned_user_id], references: [id])
+  campaign_messages CampaignMessage[]
+
+  @@index([status])
+  @@index([assigned_user_id])
+  @@index([last_message_at])
+  @@index([partner_id])
+  @@index([phone_number_id])
+  @@unique([wa_id, phone_number_id])
+}
+
+model Message {
+  id              String           @id @default(cuid())
+  conversation_id String
+  direction       MessageDirection
+  type            MessageType
+  text            String?
+  raw_json        Json
+  created_at      DateTime         @default(now())
+  conversation    Conversation     @relation(fields: [conversation_id], references: [id])
+
+  @@index([conversation_id, created_at])
+}
+
+model Tag {
+  id    String            @id @default(cuid())
+  name  String            @unique
+  color String?
+  tags  ConversationTag[]
+}
+
+model ConversationTag {
+  conversation_id String
+  tag_id          String
+  conversation    Conversation @relation(fields: [conversation_id], references: [id])
+  tag             Tag          @relation(fields: [tag_id], references: [id])
+
+  @@id([conversation_id, tag_id])
+}
+
+model Settings {
+  id                 Int      @id @default(1)
+  bot_enabled        Boolean  @default(true)
+  auto_reply_enabled Boolean  @default(true)
+  updated_at         DateTime @updatedAt
+}
+
+model AuditLogTenant {
+  id        String   @id @default(cuid())
+  user_id   String?
+  action    String
+  data_json Json
+  created_at DateTime @default(now())
+  user      User?    @relation("UserAuditLogs", fields: [user_id], references: [id])
+
+  @@map("AuditLog")
+}
+
+model RolePermission {
+  id               String   @id @default(cuid())
+  role             UserRole @unique
+  permissions_json Json
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+}
+
+model Branch {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  name       String
+  address    String
+  lat        Float
+  lng        Float
+  hours_text String
+  phone      String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  services   ServiceBranch[]
+}
+
+model Service {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  name         String
+  subtitle     String?
+  description  String
+  price_bob    Int
+  duration_min Int?
+  image_url    String?
+  is_featured  Boolean  @default(false)
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  branches     ServiceBranch[]
+
+  @@index([is_featured])
+}
+
+model ServiceBranch {
+  service_id   String
+  branch_id    String
+  is_available Boolean @default(true)
+  service      Service @relation(fields: [service_id], references: [id])
+  branch       Branch  @relation(fields: [branch_id], references: [id])
+
+  @@id([service_id, branch_id])
+}
+
+model Template {
+  id               String   @id @default(cuid())
+  name             String   @unique
+  language         String
+  category         String?
+  body_preview     String
+  variables_schema Json?
+  is_active        Boolean  @default(true)
+  created_at       DateTime @default(now())
+  campaigns        Campaign[]
+}
+
+model Campaign {
+  id                  String             @id @default(cuid())
+  name                String
+  template_id         String
+  audience_filter     Json
+  status              CampaignStatus     @default(draft)
+  created_by_user_id  String?
+  scheduled_for       DateTime?
+  created_at          DateTime           @default(now())
+  template            Template           @relation(fields: [template_id], references: [id])
+  created_by_user     User?              @relation("CampaignCreatedBy", fields: [created_by_user_id], references: [id])
+  messages            CampaignMessage[]
+
+  @@index([status])
+}
+
+model CampaignMessage {
+  id               String               @id @default(cuid())
+  campaign_id      String
+  conversation_id  String?
+  wa_id            String
+  phone_e164       String
+  phone_number_id  String?
+  status           CampaignMessageStatus @default(queued)
+  error_json       Json?
+  sent_at          DateTime?
+  campaign         Campaign             @relation(fields: [campaign_id], references: [id])
+  conversation     Conversation?        @relation(fields: [conversation_id], references: [id])
+
+  @@index([campaign_id])
+  @@index([status])
+  @@index([phone_number_id])
+}
+
+model Prospect {
+  id           String   @id @default(cuid())
+  wa_id        String   @unique
+  phone_e164   String
+  display_name String?
+  ci_digits    String?
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  @@index([created_at])
+}

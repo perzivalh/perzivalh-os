@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../node_modules/@prisma/client-control"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("CONTROL_DB_URL")
+}
+
+model Tenant {
+  id         String          @id @default(cuid())
+  name       String
+  slug       String          @unique
+  plan       String?
+  is_active  Boolean         @default(true)
+  created_at DateTime        @default(now())
+  databases  TenantDatabase?
+  channels   Channel[]
+  users      UserControl[]
+  branding   Branding?
+  audits     AuditLogControl[]
+}
+
+model TenantDatabase {
+  id               String   @id @default(cuid())
+  tenant_id        String   @unique
+  db_url_encrypted String
+  created_at       DateTime @default(now())
+  tenant           Tenant   @relation(fields: [tenant_id], references: [id])
+}
+
+model Channel {
+  id               String   @id @default(cuid())
+  tenant_id        String
+  provider         String   @default("whatsapp")
+  phone_number_id  String   @unique
+  verify_token     String
+  wa_token_encrypted String
+  created_at       DateTime @default(now())
+  tenant           Tenant   @relation(fields: [tenant_id], references: [id])
+
+  @@index([tenant_id])
+  @@index([provider])
+}
+
+model UserControl {
+  id            String       @id @default(cuid())
+  tenant_id     String?
+  email         String       @unique
+  password_hash String
+  role          String       @default("admin")
+  is_active     Boolean      @default(true)
+  created_at    DateTime     @default(now())
+  tenant        Tenant?      @relation(fields: [tenant_id], references: [id])
+  audits        AuditLogControl[]
+
+  @@index([tenant_id])
+}
+
+model Branding {
+  id          String   @id @default(cuid())
+  tenant_id   String   @unique
+  brand_name  String
+  logo_url    String?
+  colors      Json?
+  timezone    String?
+  created_at  DateTime @default(now())
+  tenant      Tenant   @relation(fields: [tenant_id], references: [id])
+}
+
+model AuditLogControl {
+  id         String   @id @default(cuid())
+  tenant_id  String?
+  user_id    String?
+  action     String
+  data_json  Json
+  created_at DateTime @default(now())
+  tenant     Tenant?      @relation(fields: [tenant_id], references: [id])
+  user       UserControl? @relation(fields: [user_id], references: [id])
+
+  @@index([tenant_id])
+  @@index([user_id])
+  @@index([action])
+}

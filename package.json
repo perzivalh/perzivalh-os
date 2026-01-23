@@ -16,7 +16,11 @@
     "postinstall": "node scripts/postinstall.js",
     "prisma:generate": "npm --workspace apps/api run prisma:generate",
     "prisma:migrate": "npm --workspace apps/api run prisma:migrate",
-    "seed:admin": "node prisma/seed.js"
+    "prisma:control:migrate": "npm --workspace apps/api run prisma:control:migrate",
+    "prisma:control:deploy": "npm --workspace apps/api run prisma:control:deploy",
+    "seed:admin": "node prisma/seed.js",
+    "seed:superadmin": "node scripts/seed-control-superadmin.js",
+    "seed:tenant-user": "node scripts/seed-tenant-user.js"
   },
   "engines": {
     "node": ">=18"

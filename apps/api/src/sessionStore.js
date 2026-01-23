@@ -17,6 +17,28 @@ let dbRun;
 let dbGet;
 let dbAll;
 
+function buildSessionKey(waId, phoneNumberId) {
+  if (!waId) {
+    return "";
+  }
+  const lineId = phoneNumberId ? String(phoneNumberId).trim() : "";
+  return lineId ? `${lineId}:${waId}` : waId;
+}
+
+function parseSessionKey(key) {
+  if (!key) {
+    return { wa_id: "", phone_number_id: null };
+  }
+  const idx = key.indexOf(":");
+  if (idx === -1) {
+    return { wa_id: key, phone_number_id: null };
+  }
+  return {
+    phone_number_id: key.slice(0, idx),
+    wa_id: key.slice(idx + 1),
+  };
+}
+
 function serializeData(data) {
   return JSON.stringify(data || {});
 }
@@ -60,7 +82,7 @@ const initPromise = initSqlite().catch((error) => {
   console.error("SQLite session init error", error.message || error);
 });
 
-async function getSession(waId) {
+async function getSession(waId, phoneNumberId) {
   await initPromise;
   if (!waId) {
     return {
@@ -69,26 +91,27 @@ async function getSession(waId) {
       updatedAt: new Date().toISOString(),
     };
   }
+  const key = buildSessionKey(waId, phoneNumberId);
 
   if (!db) {
-    if (!memoryStore.has(waId)) {
-      memoryStore.set(waId, {
+    if (!memoryStore.has(key)) {
+      memoryStore.set(key, {
         state: DEFAULT_STATE,
         data: {},
         updatedAt: new Date().toISOString(),
       });
     }
-    return memoryStore.get(waId);
+    return memoryStore.get(key);
   }
 
-  const row = await dbGet("SELECT * FROM sessions WHERE wa_id = ?", [waId]);
+  const row = await dbGet("SELECT * FROM sessions WHERE wa_id = ?", [key]);
   if (!row) {
     const session = {
       state: DEFAULT_STATE,
       data: {},
       updatedAt: new Date().toISOString(),
     };
-    await saveSession(waId, session);
+    await saveSession(waId, phoneNumberId, session);
     return session;
   }
   return {
@@ -98,11 +121,12 @@ async function getSession(waId) {
   };
 }
 
-async function saveSession(waId, session) {
+async function saveSession(waId, phoneNumberId, session) {
   await initPromise;
   if (!waId) {
     return;
   }
+  const key = buildSessionKey(waId, phoneNumberId);
 
   const payload = {
     state: session.state || DEFAULT_STATE,
@@ -111,39 +135,40 @@ async function saveSession(waId, session) {
   };
 
   if (!db) {
-    memoryStore.set(waId, payload);
+    memoryStore.set(key, payload);
     return;
   }
 
   await dbRun(
     `INSERT OR REPLACE INTO sessions (wa_id, state, data, updated_at)
      VALUES (?, ?, ?, ?)`,
-    [waId, payload.state, serializeData(payload.data), payload.updatedAt]
+    [key, payload.state, serializeData(payload.data), payload.updatedAt]
   );
 }
 
-async function updateSession(waId, updates) {
-  const current = await getSession(waId);
+async function updateSession(waId, phoneNumberId, updates) {
+  const current = await getSession(waId, phoneNumberId);
   const next = {
     ...current,
     ...updates,
     data: { ...current.data, ...(updates.data || {}) },
     updatedAt: new Date().toISOString(),
   };
-  await saveSession(waId, next);
+  await saveSession(waId, phoneNumberId, next);
   return next;
 }
 
-async function clearSession(waId) {
+async function clearSession(waId, phoneNumberId) {
   await initPromise;
   if (!waId) {
     return;
   }
+  const key = buildSessionKey(waId, phoneNumberId);
   if (!db) {
-    memoryStore.delete(waId);
+    memoryStore.delete(key);
     return;
   }
-  await dbRun("DELETE FROM sessions WHERE wa_id = ?", [waId]);
+  await dbRun("DELETE FROM sessions WHERE wa_id = ?", [key]);
 }
 
 async function listSessions(limit = 200) {
@@ -151,8 +176,8 @@ async function listSessions(limit = 200) {
   if (!db) {
     return Array.from(memoryStore.entries())
       .slice(0, limit)
-      .map(([waId, session]) => ({
-        wa_id: waId,
+      .map(([key, session]) => ({
+        ...parseSessionKey(key),
         state: session.state,
         data: session.data,
         updatedAt: session.updatedAt,
@@ -163,7 +188,7 @@ async function listSessions(limit = 200) {
     [limit]
   );
   return rows.map((row) => ({
-    wa_id: row.wa_id,
+    ...parseSessionKey(row.wa_id),
     state: row.state,
     data: deserializeData(row.data),
     updatedAt: row.updated_at,

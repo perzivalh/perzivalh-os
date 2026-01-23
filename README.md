@@ -8,7 +8,9 @@ Podopie OS incluye el webhook de WhatsApp Cloud API integrado a Odoo y una bande
 /apps
   /api        Backend Node + Express + Socket.io
   /web        Vite + React
-/prisma       Schema + migraciones
+/prisma
+  /control    Control Plane (multi-tenant)
+  /tenant     Tenant DB (chat/inbox)
 /infra        Infraestructura (placeholder)
 /scripts      Scripts operativos (placeholder)
 ```
@@ -44,12 +46,17 @@ Compatibilidad (legacy): `ODOO_URL`, `ODOO_USER`, `ODOO_PASS`.
 
 ### Base de datos / Auth
 
-- `DATABASE_URL` (Postgres)
+- `DATABASE_URL` (Postgres, legacy)
+- `CONTROL_DB_URL` (Control Plane Postgres)
+- `TENANT_DB_URL` (solo CLI: migraciones/seed del tenant)
+- `MASTER_KEY` (AES-256-GCM, 32 bytes base64 o hex)
 - `JWT_SECRET`
 - `ADMIN_EMAIL` (seed admin)
 - `ADMIN_PASSWORD` (seed admin)
 - `ADMIN_NAME` (opcional)
 - `ADMIN_ROLE` (opcional, default `admin`)
+- `SUPERADMIN_EMAIL` (seed control plane)
+- `SUPERADMIN_PASSWORD` (seed control plane)
 
 ### App
 
@@ -96,6 +103,7 @@ Local:
 ```bash
 npm run prisma:migrate
 npm run seed:admin
+node scripts/seed-control-superadmin.js
 ```
 
 Produccion:
@@ -103,10 +111,31 @@ Produccion:
 ```bash
 npm run prisma:deploy
 npm run seed:admin
+node scripts/seed-control-superadmin.js
 ```
 
 Seed incluye catalogo base (sucursales + servicios).
 Se registra Prospect si el paciente no existe en Odoo.
+
+Control plane:
+
+```bash
+npm run prisma:control:deploy
+```
+
+Provisionar un tenant DB:
+
+```bash
+node scripts/provision-tenant-db.js <TENANT_DB_URL>
+```
+
+## Multi-tenant (DB por tenant)
+
+- Si se resuelve tenant por `phone_number_id`, se usa su DB propia.
+- Si no se resuelve tenant, el webhook se ignora (modo estricto, sin fallback).
+- Tokens de canal y DB URLs se guardan cifrados con `MASTER_KEY`.
+- Un tenant puede tener multiples lineas: registra varios Channels con el mismo `tenant_id`.
+- Las conversaciones se separan por linea: `wa_id + phone_number_id`.
 
 ## Webhook
 
@@ -141,6 +170,10 @@ Se registra Prospect si el paciente no existe en Odoo.
 - `GET /api/admin/campaigns` / `POST /api/admin/campaigns` / `POST /api/admin/campaigns/:id/send`
 - `GET /api/admin/campaigns/:id/messages`
 - `GET /api/admin/audit`
+- `GET /api/superadmin/tenants` / `POST /api/superadmin/tenants` / `PATCH /api/superadmin/tenants/:id`
+- `POST /api/superadmin/tenants/:id/database`
+- `GET /api/superadmin/channels` / `POST /api/superadmin/channels` / `PATCH /api/superadmin/channels/:id`
+- `GET /api/superadmin/branding` / `PATCH /api/superadmin/branding`
 
 ## Paginas publicas para Meta
 
@@ -169,11 +202,12 @@ Pega estas URLs en Meta:
 ## Railway deploy
 
 1. Crea un proyecto en Railway y conecta este repo.
-2. Agrega un servicio Postgres y copia `DATABASE_URL`.
-3. Configura las variables de entorno listadas arriba.
-4. Ejecuta `npm run prisma:deploy` y `npm run seed:admin`.
-5. Despliega el servicio.
-6. Usa esta URL de webhook en Meta:
+2. Agrega 2 Postgres: uno para Control Plane y otro para el tenant.
+3. Configura `CONTROL_DB_URL` y `TENANT_DB_URL` (este ultimo solo para migrar/seed).
+4. Ejecuta `npm run prisma:control:deploy` y `node scripts/provision-tenant-db.js <TENANT_DB_URL>`.
+5. Ejecuta `npm run seed:superadmin` y `npm run seed:admin`.
+6. Despliega el servicio.
+7. Usa esta URL de webhook en Meta:
    - `https://<railway-domain>/webhook`
 
 Nota: tu WABA debe estar en `subscribed_apps` para recibir eventos.

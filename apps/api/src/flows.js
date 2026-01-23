@@ -13,6 +13,7 @@ const {
 } = require("./services/odooClient");
 const sessionStore = require("./sessionStore");
 const { updateConversationByWaId } = require("./services/conversations");
+const { getTenantContext } = require("./tenancy/tenantContext");
 
 const STATES = {
   MAIN_MENU: "MAIN_MENU",
@@ -103,6 +104,10 @@ const PRICES_FALLBACK =
   "Para precios y servicios, contanos que tratamiento te interesa y te respondemos a la brevedad.";
 
 const MAX_LIST_TITLE = 24;
+
+function getCurrentLineId() {
+  return getTenantContext().channel?.phone_number_id || null;
+}
 
 function normalizeText(text) {
   return (text || "")
@@ -260,7 +265,7 @@ async function upsertProspect(waId, ciDigits) {
 }
 
 async function sendMainMenu(waId) {
-  await sessionStore.updateSession(waId, { state: STATES.MAIN_MENU });
+  await sessionStore.updateSession(waId, getCurrentLineId(), { state: STATES.MAIN_MENU });
   await sendList(
     waId,
     MAIN_MENU.header,
@@ -272,7 +277,7 @@ async function sendMainMenu(waId) {
 }
 
 async function sendPatientMenu(waId) {
-  await sessionStore.updateSession(waId, { state: STATES.PATIENT_MENU });
+  await sessionStore.updateSession(waId, getCurrentLineId(), { state: STATES.PATIENT_MENU });
   await sendList(
     waId,
     PATIENT_MENU.header,
@@ -394,7 +399,8 @@ async function sendBranchHours(waId, branchId) {
 
 async function recordVerification(waId, partnerId, patientId, method) {
   try {
-    await updateConversationByWaId(waId, {
+    const phoneNumberId = getCurrentLineId();
+    await updateConversationByWaId(waId, phoneNumberId, {
       partner_id: partnerId ?? null,
       patient_id: patientId ?? null,
       verified_at: new Date(),
@@ -596,7 +602,7 @@ async function buildLaserSummary(partnerId) {
 async function handleAskCi(waId, session, text) {
   const normalized = normalizeText(text);
   if (normalized === "salir") {
-    await sessionStore.clearSession(waId);
+    await sessionStore.clearSession(waId, getCurrentLineId());
     await sendText(waId, "Listo, sesion cerrada.");
     return null;
   }
@@ -630,7 +636,7 @@ async function handleAskCi(waId, session, text) {
     return session;
   }
 
-  const next = await sessionStore.updateSession(waId, {
+  const next = await sessionStore.updateSession(waId, getCurrentLineId(), {
     state: STATES.PATIENT_MENU,
     data: {
       partnerId: resolved.partnerId,
@@ -652,7 +658,7 @@ async function ensureLinkedForPatient(waId, session) {
     return session;
   }
 
-  await sessionStore.updateSession(waId, { state: STATES.PATIENT_MENU });
+  await sessionStore.updateSession(waId, getCurrentLineId(), { state: STATES.PATIENT_MENU });
   let data = null;
   try {
     data = await linkByPhone(waId);
@@ -665,7 +671,7 @@ async function ensureLinkedForPatient(waId, session) {
     return session;
   }
   if (data) {
-    const next = await sessionStore.updateSession(waId, {
+    const next = await sessionStore.updateSession(waId, getCurrentLineId(), {
       state: STATES.PATIENT_MENU,
       data: { ...data, lastAction: "IDENTIFIED_BY_PHONE" },
     });
@@ -674,7 +680,7 @@ async function ensureLinkedForPatient(waId, session) {
   }
 
   await upsertProspect(waId, null);
-  const next = await sessionStore.updateSession(waId, { state: STATES.ASK_CI });
+  const next = await sessionStore.updateSession(waId, getCurrentLineId(), { state: STATES.ASK_CI });
   await sendText(
     waId,
     "Hola! Para ayudarte necesito validar tu identidad. Escribe tu CI (solo numeros)."
@@ -701,7 +707,7 @@ async function handlePatientAction(waId, actionId, session) {
         waId,
         "Necesito validar tu identidad antes de ver pagos. Escribi tu CI."
       );
-      await sessionStore.updateSession(waId, { state: STATES.ASK_CI });
+      await sessionStore.updateSession(waId, getCurrentLineId(), { state: STATES.ASK_CI });
       return;
     }
     let summary = null;
@@ -735,7 +741,7 @@ async function handlePatientAction(waId, actionId, session) {
       }
       await sendText(waId, lines.join("\n"));
     }
-    await sessionStore.updateSession(waId, {
+    await sessionStore.updateSession(waId, getCurrentLineId(), {
       state: STATES.PATIENT_MENU,
       data: { lastAction: ACTIONS.PATIENT_PAYMENTS },
     });
@@ -749,7 +755,7 @@ async function handlePatientAction(waId, actionId, session) {
         waId,
         "Necesito validar tu identidad antes de ver compras. Escribi tu CI."
       );
-      await sessionStore.updateSession(waId, { state: STATES.ASK_CI });
+      await sessionStore.updateSession(waId, getCurrentLineId(), { state: STATES.ASK_CI });
       return;
     }
     let orders = [];
@@ -768,7 +774,7 @@ async function handlePatientAction(waId, actionId, session) {
     } else {
       await sendText(waId, `Ultimas compras:\n${formatPosOrders(orders)}`);
     }
-    await sessionStore.updateSession(waId, {
+    await sessionStore.updateSession(waId, getCurrentLineId(), {
       state: STATES.PATIENT_MENU,
       data: { lastAction: ACTIONS.PATIENT_POS_LAST },
     });
@@ -786,7 +792,7 @@ async function handlePatientAction(waId, actionId, session) {
       waId,
       `Mis datos:\nNombre: ${name}\nTel: ${phone}\nCI/NIT: ${vat}\nPaciente ID: ${patientId}\nPartner ID: ${partner}`
     );
-    await sessionStore.updateSession(waId, {
+    await sessionStore.updateSession(waId, getCurrentLineId(), {
       state: STATES.PATIENT_MENU,
       data: { lastAction: ACTIONS.PATIENT_MY_DATA },
     });
@@ -857,10 +863,10 @@ function parsePatientSelection(normalized) {
 
 async function handleIncomingText(waId, text) {
   const normalized = normalizeText(text);
-  const session = await sessionStore.getSession(waId);
+  const session = await sessionStore.getSession(waId, getCurrentLineId());
 
   if (normalized === "salir") {
-    await sessionStore.clearSession(waId);
+    await sessionStore.clearSession(waId, getCurrentLineId());
     await sendText(waId, "Listo, sesion cerrada.");
     return;
   }
@@ -920,7 +926,7 @@ async function handleInteractive(waId, selectionId) {
   if (!selectionId) {
     return;
   }
-  const session = await sessionStore.getSession(waId);
+  const session = await sessionStore.getSession(waId, getCurrentLineId());
 
   if (selectionId === ACTIONS.MAIN_MENU || selectionId === ACTIONS.SERVICE_MENU) {
     await sendMainMenu(waId);

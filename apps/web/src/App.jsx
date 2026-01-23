@@ -7,6 +7,7 @@ import ChatView from "./components/ChatView.jsx";
 import DashboardView from "./components/DashboardView.jsx";
 import CampaignsView from "./components/CampaignsView.jsx";
 import AdminView from "./components/AdminView.jsx";
+import SuperAdminView from "./components/SuperAdminView.jsx";
 
 const STATUS_OPTIONS = ["open", "pending", "closed"];
 const ROLE_OPTIONS = ["admin", "recepcion", "caja", "marketing", "doctor"];
@@ -350,6 +351,18 @@ function UserIcon(props) {
         d="M5 19.5a7 7 0 0 1 14 0"
         strokeWidth="1.8"
         strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function ShieldIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+      <path
+        d="M12 3l7 3v5.5c0 5-3.5 8.8-7 10.5-3.5-1.7-7-5.5-7-10.5V6l7-3Z"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
       />
     </svg>
   );
@@ -720,6 +733,12 @@ function App() {
 
   useEffect(() => {
     if (!user) {
+      return;
+    }
+    if (user.role === "superadmin") {
+      if (view !== "superadmin") {
+        setView("superadmin");
+      }
       return;
     }
     const roleAccess =
@@ -1370,6 +1389,7 @@ function App() {
   const canViewDashboard = hasPermission(roleAccess, "modules", "dashboard");
   const canViewCampaigns = hasPermission(roleAccess, "modules", "campaigns");
   const canViewAdmin = hasPermission(roleAccess, "modules", "settings");
+  const isSuperAdmin = hasRole(user, ["superadmin"]);
   const isAdmin = hasRole(user, ["admin"]);
   const canManageStatus = hasPermission(roleAccess, "modules", "chat", "write");
   const quickActions = ["Confirmar Cita", "Solicitar Resultados", "Urgencia"];
@@ -1408,6 +1428,14 @@ function App() {
       enabled: canViewAdmin,
     },
   ];
+  if (isSuperAdmin) {
+    navItems.push({
+      id: "superadmin",
+      label: "SuperAdmin",
+      icon: ShieldIcon,
+      enabled: true,
+    });
+  }
   const messageBlocks = [];
   let lastDayKey = "";
   messages.forEach((message) => {
@@ -1493,6 +1521,10 @@ function App() {
           useShellLayout
           pageError={pageError}
         />
+      ) : view === "superadmin" ? (
+        <main className="content content-page">
+          <SuperAdminView />
+        </main>
       ) : (
         <main
           className={`content ${view === "chats" ? "content-chats" : "content-page"}`}

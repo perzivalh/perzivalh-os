@@ -4,6 +4,7 @@ const { emitEvent } = require("../realtime");
 const CONVERSATION_SELECT = {
   id: true,
   wa_id: true,
+  phone_number_id: true,
   phone_e164: true,
   display_name: true,
   status: true,
@@ -44,13 +45,25 @@ function formatConversation(record) {
   };
 }
 
-async function upsertConversation({ waId, phoneE164, displayName, lastMessageAt }) {
+async function upsertConversation({
+  waId,
+  phoneE164,
+  phoneNumberId,
+  displayName,
+  lastMessageAt,
+}) {
   if (!waId) {
     throw new Error("waId required");
+  }
+  if (!phoneNumberId) {
+    throw new Error("phoneNumberId required");
   }
   const update = {};
   if (phoneE164) {
     update.phone_e164 = phoneE164;
+  }
+  if (phoneNumberId) {
+    update.phone_number_id = phoneNumberId;
   }
   if (displayName !== undefined) {
     update.display_name = displayName || null;
@@ -59,11 +72,47 @@ async function upsertConversation({ waId, phoneE164, displayName, lastMessageAt 
     update.last_message_at = lastMessageAt;
   }
 
-  const conversation = await prisma.conversation.upsert({
-    where: { wa_id: waId },
-    update,
-    create: {
+  const compositeKey = {
+    wa_id_phone_number_id: {
       wa_id: waId,
+      phone_number_id: phoneNumberId,
+    },
+  };
+  let conversation = await prisma.conversation.findUnique({
+    where: compositeKey,
+    select: CONVERSATION_SELECT,
+  });
+
+  if (conversation) {
+    conversation = await prisma.conversation.update({
+      where: compositeKey,
+      data: update,
+      select: CONVERSATION_SELECT,
+    });
+    return formatConversation(conversation);
+  }
+
+  const legacy = await prisma.conversation.findFirst({
+    where: { wa_id: waId, phone_number_id: null },
+    select: { id: true },
+  });
+
+  if (legacy) {
+    conversation = await prisma.conversation.update({
+      where: { id: legacy.id },
+      data: {
+        ...update,
+        phone_number_id: phoneNumberId,
+      },
+      select: CONVERSATION_SELECT,
+    });
+    return formatConversation(conversation);
+  }
+
+  conversation = await prisma.conversation.create({
+    data: {
+      wa_id: waId,
+      phone_number_id: phoneNumberId,
       phone_e164: phoneE164 || waId,
       display_name: displayName || null,
       last_message_at: lastMessageAt || null,
@@ -104,7 +153,7 @@ async function createMessage({
 }
 
 async function logAudit({ userId, action, data }) {
-  await prisma.auditLog.create({
+  await prisma.auditLogTenant.create({
     data: {
       user_id: userId || null,
       action,
@@ -275,9 +324,17 @@ async function updateConversationVerification({
   return formatted;
 }
 
-async function updateConversationByWaId(waId, data) {
+async function updateConversationByWaId(waId, phoneNumberId, data) {
+  if (!waId || !phoneNumberId) {
+    throw new Error("waId and phoneNumberId required");
+  }
   const updated = await prisma.conversation.update({
-    where: { wa_id: waId },
+    where: {
+      wa_id_phone_number_id: {
+        wa_id: waId,
+        phone_number_id: phoneNumberId,
+      },
+    },
     data,
     select: CONVERSATION_SELECT,
   });

@@ -14,6 +14,22 @@ const { parseInteractiveSelection, sendText, sendTemplate } = require("./src/wha
 const { handleIncomingText, handleInteractive } = require("./src/flows");
 const sessionStore = require("./src/sessionStore");
 const prisma = require("./src/db");
+const {
+  getControlClient,
+  disconnectControlClient,
+} = require("./src/control/controlClient");
+const { encryptString } = require("./src/core/crypto");
+const {
+  resolveTenantContextById,
+  resolveTenantContextByPhoneNumberId,
+  resolveChannelByPhoneNumberId,
+  clearTenantDbCache,
+  clearChannelCache,
+} = require("./src/tenancy/tenantResolver");
+const {
+  disconnectAllTenantClients,
+} = require("./src/tenancy/tenantPrismaManager");
+const { getTenantContext } = require("./src/tenancy/tenantContext");
 const logger = require("./src/lib/logger");
 const { redactObject } = require("./src/lib/sanitize");
 const { normalizeText, digitsOnly, toPhoneE164 } = require("./src/lib/normalize");
@@ -328,6 +344,7 @@ io.use((socket, next) => {
       email: payload.email,
       name: payload.name,
       role: payload.role,
+      tenant_id: payload.tenant_id || null,
     };
     return next();
   } catch (error) {
@@ -391,22 +408,24 @@ async function ensureRolePermissions() {
   }
 }
 
-ensureSettings();
-ensureRolePermissions();
-
-let settingsCache = null;
-let settingsCacheAt = 0;
+const settingsCache = new Map();
 const SETTINGS_CACHE_MS = 10 * 1000;
 
 async function getSettingsCached() {
+  const tenantId = getTenantContext().tenantId;
+  if (!tenantId) {
+    throw new Error("tenant_context_missing");
+  }
+  const key = tenantId;
   const now = Date.now();
-  if (settingsCache && now - settingsCacheAt < SETTINGS_CACHE_MS) {
-    return settingsCache;
+  const cached = settingsCache.get(key);
+  if (cached && now - cached.at < SETTINGS_CACHE_MS) {
+    return cached.value;
   }
   const settings = await prisma.settings.findUnique({ where: { id: 1 } });
-  settingsCache = settings || { bot_enabled: true, auto_reply_enabled: true };
-  settingsCacheAt = now;
-  return settingsCache;
+  const value = settings || { bot_enabled: true, auto_reply_enabled: true };
+  settingsCache.set(key, { value, at: now });
+  return value;
 }
 
 if (!hasOdooConfig()) {
@@ -550,6 +569,13 @@ function isAdminPhone(waId) {
   return digitsOnly(waId) === digitsOnly(ADMIN_PHONE_E164);
 }
 
+function requireSuperAdmin(req, res, next) {
+  if (!req.user || req.user.role !== "superadmin") {
+    return res.status(403).json({ error: "forbidden" });
+  }
+  return next();
+}
+
 app.get("/privacy", (req, res) => {
   res.type("html").send(PRIVACY_HTML);
 });
@@ -574,7 +600,7 @@ app.get("/webhook", (req, res) => {
   return res.sendStatus(403);
 });
 
-app.post("/webhook", (req, res) => {
+app.post("/webhook", async (req, res) => {
   const timestamp = new Date().toISOString();
   if (!verifyWebhookSignature(req)) {
     logger.warn("webhook.signature_invalid", { timestamp });
@@ -598,155 +624,170 @@ app.post("/webhook", (req, res) => {
     return;
   }
 
-  setImmediate(() => {
-    void (async () => {
-      const contactName = extractContactName(value);
-      for (const message of messages) {
-        if (!message) {
-          continue;
-        }
-        if (isEchoMessage(message, value)) {
-          logger.info("wa.echo_ignored", { wa_id: message.from });
-          continue;
-        }
+  const phoneNumberId = value?.metadata?.phone_number_id;
+  const tenantContext = await resolveTenantContextByPhoneNumberId(phoneNumberId);
+  if (!tenantContext) {
+    logger.warn("tenant.not_resolved", { phone_number_id: phoneNumberId });
+    return;
+  }
 
-        const waId = message.from;
-        if (checkRateLimit(waId)) {
-          logger.warn("wa.rate_limit", { wa_id: waId });
-          continue;
-        }
+  prisma.runWithPrisma(
+    tenantContext.prisma,
+    () => {
+      setImmediate(() => {
+        void (async () => {
+          const contactName = extractContactName(value);
+          for (const message of messages) {
+            if (!message) {
+              continue;
+            }
+            if (isEchoMessage(message, value)) {
+              logger.info("wa.echo_ignored", { wa_id: message.from });
+              continue;
+            }
 
-        const incomingText = extractIncomingText(message);
-        logIncoming(message, incomingText);
+            const waId = message.from;
+            if (checkRateLimit(waId)) {
+              logger.warn("wa.rate_limit", { wa_id: waId });
+              continue;
+            }
 
-        const createdAt = message.timestamp
-          ? new Date(Number(message.timestamp) * 1000)
-          : new Date();
+            const incomingText = extractIncomingText(message);
+            logIncoming(message, incomingText);
 
-        let conversation = null;
-        try {
-          conversation = await upsertConversation({
-            waId,
-            phoneE164: toPhoneE164(waId),
-            displayName: contactName,
-            lastMessageAt: createdAt,
-          });
-        } catch (error) {
-          logger.error("conversation.upsert_failed", {
-            message: error.message || error,
-          });
-          continue;
-        }
+            const createdAt = message.timestamp
+              ? new Date(Number(message.timestamp) * 1000)
+              : new Date();
 
-        const messageType = mapMessageType(message.type);
-        await createMessage({
-          conversationId: conversation.id,
-          direction: "in",
-          type: messageType,
-          text: incomingText || null,
-          rawJson: {
-            message,
-            metadata: value?.metadata,
-            contacts: value?.contacts,
-          },
-        });
+            let conversation = null;
+            try {
+              conversation = await upsertConversation({
+                waId,
+                phoneE164: toPhoneE164(waId),
+                phoneNumberId: phoneNumberId,
+                displayName: contactName,
+                lastMessageAt: createdAt,
+              });
+            } catch (error) {
+              logger.error("conversation.upsert_failed", {
+                message: error.message || error,
+              });
+              continue;
+            }
 
-        const normalized = normalizeText(incomingText);
-
-        if (isAdminPhone(waId)) {
-          if (normalized === "bot") {
-            await setConversationStatus({
+            const messageType = mapMessageType(message.type);
+            await createMessage({
               conversationId: conversation.id,
-              status: "open",
-              userId: null,
+              direction: "in",
+              type: messageType,
+              text: incomingText || null,
+              rawJson: {
+                message,
+                metadata: value?.metadata,
+                contacts: value?.contacts,
+              },
             });
-            await removeTagFromConversation({
-              conversationId: conversation.id,
-              tagName: "pendiente_atencion",
-            });
-            continue;
+
+            const normalized = normalizeText(incomingText);
+
+            if (isAdminPhone(waId)) {
+              if (normalized === "bot") {
+                await setConversationStatus({
+                  conversationId: conversation.id,
+                  status: "open",
+                  userId: null,
+                });
+                await removeTagFromConversation({
+                  conversationId: conversation.id,
+                  tagName: "pendiente_atencion",
+                });
+                continue;
+              }
+              if (normalized === "cerrar") {
+                await setConversationStatus({
+                  conversationId: conversation.id,
+                  status: "closed",
+                  userId: null,
+                });
+                continue;
+              }
+            }
+
+            const settings = await getSettingsCached();
+            if (settings && (!settings.bot_enabled || !settings.auto_reply_enabled)) {
+              continue;
+            }
+
+            if (conversation.status === "pending") {
+              if (isMenuRequest(normalized)) {
+                await sendText(
+                  waId,
+                  "??????????? Est??s en atenci??n con recepci??n. Si quieres volver al bot, escribe: BOT"
+                );
+                continue;
+              }
+              continue;
+            }
+
+            if (conversation.status === "closed") {
+              await sendText(
+                waId,
+                "Conversa cerrada, escriba MENU para reabrir"
+              );
+              continue;
+            }
+
+            if (isHandoffRequest(normalized, incomingText)) {
+              await setConversationStatus({
+                conversationId: conversation.id,
+                status: "pending",
+                userId: null,
+              });
+              await addTagToConversation({
+                conversationId: conversation.id,
+                tagName: "pendiente_atencion",
+              });
+              await sendText(
+                waId,
+                "🧑‍💼 Te conecto con recepción. En breve te responderemos."
+              );
+              continue;
+            }
+
+            if (message.type === "text") {
+              void handleIncomingText(waId, incomingText);
+              continue;
+            }
+
+            if (message.type === "interactive") {
+              const selection = parseInteractiveSelection(message);
+              const selectionText = normalizeText(
+                selection?.title || selection?.id || ""
+              );
+              if (isHandoffRequest(selectionText)) {
+                await setConversationStatus({
+                  conversationId: conversation.id,
+                  status: "pending",
+                  userId: null,
+                });
+                await addTagToConversation({
+                  conversationId: conversation.id,
+                  tagName: "pendiente_atencion",
+                });
+                await sendText(
+                  waId,
+                  "🧑‍💼 Te conecto con recepción. En breve te responderemos."
+                );
+                continue;
+              }
+              void handleInteractive(waId, selection?.id);
+            }
           }
-          if (normalized === "cerrar") {
-            await setConversationStatus({
-              conversationId: conversation.id,
-              status: "closed",
-              userId: null,
-            });
-            continue;
-          }
-        }
-
-        const settings = await getSettingsCached();
-        if (settings && (!settings.bot_enabled || !settings.auto_reply_enabled)) {
-          continue;
-        }
-
-        if (conversation.status === "pending") {
-          if (isMenuRequest(normalized)) {
-            await sendText(
-              waId,
-              "🧑‍💼 Estás en atención con recepción. Si quieres volver al bot, escribe: BOT"
-            );
-          }
-          continue;
-        }
-
-        if (conversation.status === "closed") {
-          await sendText(
-            waId,
-            "Conversa cerrada, escriba MENU para reabrir"
-          );
-          continue;
-        }
-
-        if (isHandoffRequest(normalized, incomingText)) {
-          await setConversationStatus({
-            conversationId: conversation.id,
-            status: "pending",
-            userId: null,
-          });
-          await addTagToConversation({
-            conversationId: conversation.id,
-            tagName: "pendiente_atencion",
-          });
-          await sendText(
-            waId,
-            "🧑‍💼 Te conecto con recepción. En breve te responderemos."
-          );
-          continue;
-        }
-
-        if (message.type === "text") {
-          void handleIncomingText(waId, incomingText);
-          continue;
-        }
-
-        if (message.type === "interactive") {
-          const selection = parseInteractiveSelection(message);
-          const selectionText = normalizeText(
-            selection?.title || selection?.id || ""
-          );
-          if (isHandoffRequest(selectionText)) {
-            await setConversationStatus({
-              conversationId: conversation.id,
-              status: "pending",
-              userId: null,
-            });
-            await addTagToConversation({
-              conversationId: conversation.id,
-              tagName: "pendiente_atencion",
-            });
-            await sendText(
-              waId,
-              "🧑‍💼 Te conecto con recepción. En breve te responderemos."
-            );
-            continue;
-          }
-          void handleInteractive(waId, selection?.id);
-        }
-      }
-    })();
-  });
+        })();
+      });
+    },
+    { tenantId: tenantContext.tenantId, channel: tenantContext.channel }
+  );
 });
 
 app.get("/debug/last-webhook", (req, res) => {
@@ -755,8 +796,13 @@ app.get("/debug/last-webhook", (req, res) => {
 
 app.get("/debug/session/:wa", async (req, res) => {
   const waId = req.params.wa;
-  const session = await sessionStore.getSession(waId);
-  return res.json({ wa_id: waId, session });
+  const phoneNumberId = req.query.phone_number_id || null;
+  const session = await sessionStore.getSession(waId, phoneNumberId);
+  return res.json({
+    wa_id: waId,
+    phone_number_id: phoneNumberId,
+    session,
+  });
 });
 
 app.get("/health", (req, res) => {
@@ -771,32 +817,295 @@ app.post("/api/auth/login", authLimiter, async (req, res) => {
     return res.status(400).json({ error: "missing_credentials" });
   }
 
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || !user.is_active) {
-    return res.status(401).json({ error: "invalid_credentials" });
+  let controlUser = null;
+  if (process.env.CONTROL_DB_URL) {
+    try {
+      const control = getControlClient();
+      controlUser = await control.userControl.findUnique({ where: { email } });
+    } catch (error) {
+      logger.error("control.login_error", { message: error.message || error });
+    }
   }
 
-  const match = await bcrypt.compare(password, user.password_hash);
-  if (!match) {
-    return res.status(401).json({ error: "invalid_credentials" });
+  if (controlUser) {
+    if (!controlUser.is_active) {
+      return res.status(401).json({ error: "invalid_credentials" });
+    }
+    const match = await bcrypt.compare(password, controlUser.password_hash);
+    if (!match) {
+      return res.status(401).json({ error: "invalid_credentials" });
+    }
+    if (!controlUser.tenant_id) {
+      const token = signUser({
+        id: controlUser.id,
+        email: controlUser.email,
+        name: controlUser.email,
+        role: controlUser.role,
+        tenant_id: null,
+      });
+      return res.json({
+        token,
+        user: {
+          id: controlUser.id,
+          name: controlUser.email,
+          email: controlUser.email,
+          role: controlUser.role,
+        },
+      });
+    }
+
+    const tenantContext = await resolveTenantContextById(controlUser.tenant_id);
+    if (!tenantContext) {
+      return res.status(403).json({ error: "tenant_not_ready" });
+    }
+    const tenantUser = await tenantContext.prisma.user.findUnique({
+      where: { email },
+    });
+    if (!tenantUser || !tenantUser.is_active) {
+      return res.status(401).json({ error: "invalid_credentials" });
+    }
+
+    const token = signUser({
+      id: tenantUser.id,
+      email: tenantUser.email,
+      name: tenantUser.name,
+      role: tenantUser.role,
+      tenant_id: controlUser.tenant_id,
+    });
+    return res.json({
+      token,
+      user: {
+        id: tenantUser.id,
+        name: tenantUser.name,
+        email: tenantUser.email,
+        role: tenantUser.role,
+      },
+    });
   }
 
-  const token = signUser(user);
-  return res.json({
-    token,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    },
-  });
+  return res.status(401).json({ error: "invalid_credentials" });
 });
 
 app.use("/api", panelLimiter);
 
 app.get("/api/me", requireAuth, (req, res) => {
   return res.json({ user: req.user });
+});
+
+app.get("/api/superadmin/tenants", requireAuth, requireSuperAdmin, async (req, res) => {
+  const control = getControlClient();
+  const tenants = await control.tenant.findMany({
+    include: { databases: true, branding: true },
+    orderBy: { created_at: "desc" },
+  });
+  return res.json({
+    tenants: tenants.map((tenant) => ({
+      id: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      plan: tenant.plan,
+      is_active: tenant.is_active,
+      created_at: tenant.created_at,
+      has_database: Boolean(tenant.databases),
+      has_branding: Boolean(tenant.branding),
+    })),
+  });
+});
+
+app.post("/api/superadmin/tenants", requireAuth, requireSuperAdmin, async (req, res) => {
+  const name = (req.body?.name || "").trim();
+  const slug = (req.body?.slug || "").trim();
+  const plan = (req.body?.plan || "").trim() || null;
+  if (!name || !slug) {
+    return res.status(400).json({ error: "missing_fields" });
+  }
+  const control = getControlClient();
+  const tenant = await control.tenant.create({
+    data: {
+      name,
+      slug,
+      plan,
+      is_active: true,
+    },
+  });
+  return res.json({ tenant });
+});
+
+app.patch(
+  "/api/superadmin/tenants/:id",
+  requireAuth,
+  requireSuperAdmin,
+  async (req, res) => {
+    const updates = {};
+    if (req.body?.name) {
+      updates.name = req.body.name.trim();
+    }
+    if (req.body?.slug) {
+      updates.slug = req.body.slug.trim();
+    }
+    if (req.body?.plan !== undefined) {
+      updates.plan = req.body.plan ? String(req.body.plan).trim() : null;
+    }
+    if (req.body?.is_active !== undefined) {
+      updates.is_active = Boolean(req.body.is_active);
+    }
+    const control = getControlClient();
+    const tenant = await control.tenant.update({
+      where: { id: req.params.id },
+      data: updates,
+    });
+    return res.json({ tenant });
+  }
+);
+
+app.post(
+  "/api/superadmin/tenants/:id/database",
+  requireAuth,
+  requireSuperAdmin,
+  async (req, res) => {
+    const dbUrl = (req.body?.db_url || "").trim();
+    if (!dbUrl) {
+      return res.status(400).json({ error: "missing_db_url" });
+    }
+    const control = getControlClient();
+    const record = await control.tenantDatabase.upsert({
+      where: { tenant_id: req.params.id },
+      update: {
+        db_url_encrypted: encryptString(dbUrl),
+      },
+      create: {
+        tenant_id: req.params.id,
+        db_url_encrypted: encryptString(dbUrl),
+      },
+    });
+    clearTenantDbCache(req.params.id);
+    return res.json({ tenant_database: { tenant_id: record.tenant_id } });
+  }
+);
+
+app.get("/api/superadmin/channels", requireAuth, requireSuperAdmin, async (req, res) => {
+  const tenantId = req.query.tenant_id;
+  const control = getControlClient();
+  const channels = await control.channel.findMany({
+    where: tenantId ? { tenant_id: tenantId } : undefined,
+    orderBy: { created_at: "desc" },
+  });
+  return res.json({
+    channels: channels.map((channel) => ({
+      id: channel.id,
+      tenant_id: channel.tenant_id,
+      provider: channel.provider,
+      phone_number_id: channel.phone_number_id,
+      created_at: channel.created_at,
+    })),
+  });
+});
+
+app.post("/api/superadmin/channels", requireAuth, requireSuperAdmin, async (req, res) => {
+  const tenantId = req.body?.tenant_id;
+  const phoneNumberId = (req.body?.phone_number_id || "").trim();
+  const verifyToken = (req.body?.verify_token || "").trim();
+  const waToken = (req.body?.wa_token || "").trim();
+  if (!tenantId || !phoneNumberId || !verifyToken || !waToken) {
+    return res.status(400).json({ error: "missing_fields" });
+  }
+  const control = getControlClient();
+  const channel = await control.channel.create({
+    data: {
+      tenant_id: tenantId,
+      provider: "whatsapp",
+      phone_number_id: phoneNumberId,
+      verify_token: verifyToken,
+      wa_token_encrypted: encryptString(waToken),
+    },
+  });
+  clearChannelCache(channel.phone_number_id);
+  return res.json({
+    channel: {
+      id: channel.id,
+      tenant_id: channel.tenant_id,
+      provider: channel.provider,
+      phone_number_id: channel.phone_number_id,
+      created_at: channel.created_at,
+    },
+  });
+});
+
+app.patch(
+  "/api/superadmin/channels/:id",
+  requireAuth,
+  requireSuperAdmin,
+  async (req, res) => {
+    const updates = {};
+    if (req.body?.phone_number_id) {
+      updates.phone_number_id = String(req.body.phone_number_id).trim();
+    }
+    if (req.body?.verify_token) {
+      updates.verify_token = String(req.body.verify_token).trim();
+    }
+    if (req.body?.wa_token) {
+      updates.wa_token_encrypted = encryptString(String(req.body.wa_token).trim());
+    }
+    const control = getControlClient();
+    const existing = await control.channel.findUnique({
+      where: { id: req.params.id },
+    });
+    const channel = await control.channel.update({
+      where: { id: req.params.id },
+      data: updates,
+    });
+    if (existing?.phone_number_id) {
+      clearChannelCache(existing.phone_number_id);
+    }
+    clearChannelCache(channel.phone_number_id);
+    return res.json({
+      channel: {
+        id: channel.id,
+        tenant_id: channel.tenant_id,
+        provider: channel.provider,
+        phone_number_id: channel.phone_number_id,
+        created_at: channel.created_at,
+      },
+    });
+  }
+);
+
+app.get("/api/superadmin/branding", requireAuth, requireSuperAdmin, async (req, res) => {
+  const tenantId = req.query.tenant_id;
+  if (!tenantId) {
+    return res.status(400).json({ error: "missing_tenant" });
+  }
+  const control = getControlClient();
+  const branding = await control.branding.findUnique({
+    where: { tenant_id: tenantId },
+  });
+  return res.json({ branding });
+});
+
+app.patch("/api/superadmin/branding", requireAuth, requireSuperAdmin, async (req, res) => {
+  const tenantId = req.body?.tenant_id;
+  const brandName = (req.body?.brand_name || "").trim();
+  if (!tenantId || !brandName) {
+    return res.status(400).json({ error: "missing_fields" });
+  }
+  const control = getControlClient();
+  const branding = await control.branding.upsert({
+    where: { tenant_id: tenantId },
+    update: {
+      brand_name: brandName,
+      logo_url: req.body?.logo_url || null,
+      colors: req.body?.colors || null,
+      timezone: req.body?.timezone || null,
+    },
+    create: {
+      tenant_id: tenantId,
+      brand_name: brandName,
+      logo_url: req.body?.logo_url || null,
+      colors: req.body?.colors || null,
+      timezone: req.body?.timezone || null,
+    },
+  });
+  return res.json({ branding });
 });
 
 app.get("/api/role-permissions", requireAuth, async (req, res) => {
@@ -977,7 +1286,19 @@ app.post("/api/conversations/:id/messages", requireAuth, async (req, res) => {
     return res.json({ message: result.message });
   }
 
+  if (!conversation.phone_number_id) {
+    return res.status(400).json({ error: "missing_phone_number_id" });
+  }
+  const channelConfig = await resolveChannelByPhoneNumberId(
+    conversation.phone_number_id
+  );
+  const tenantId = getTenantContext().tenantId;
+  if (!channelConfig || channelConfig.tenantId !== tenantId) {
+    return res.status(400).json({ error: "missing_channel" });
+  }
+
   await sendText(conversation.wa_id, text, {
+    channel: channelConfig,
     meta: { source: "panel", by_user_id: req.user.id },
   });
   return res.json({ ok: true });
@@ -1075,9 +1396,13 @@ async function queueCampaignMessages(campaign, userId) {
       id: true,
       wa_id: true,
       phone_e164: true,
+      phone_number_id: true,
     },
   });
-  if (!conversations.length) {
+  const eligible = conversations.filter(
+    (conversation) => conversation.phone_number_id
+  );
+  if (!eligible.length) {
     return 0;
   }
 
@@ -1086,11 +1411,12 @@ async function queueCampaignMessages(campaign, userId) {
   });
 
   await prisma.campaignMessage.createMany({
-    data: conversations.map((conversation) => ({
+    data: eligible.map((conversation) => ({
       campaign_id: campaign.id,
       conversation_id: conversation.id,
       wa_id: conversation.wa_id,
       phone_e164: conversation.phone_e164,
+      phone_number_id: conversation.phone_number_id,
       status: "queued",
     })),
   });
@@ -1101,7 +1427,7 @@ async function queueCampaignMessages(campaign, userId) {
     data: { campaign_id: campaign.id, total: conversations.length },
   });
 
-  return conversations.length;
+  return eligible.length;
 }
 
 async function refreshCampaignStatus(campaignId) {
@@ -1120,7 +1446,7 @@ async function refreshCampaignStatus(campaignId) {
   });
 }
 
-async function processCampaignQueue() {
+async function processCampaignQueue(tenantId) {
   try {
     const due = await prisma.campaign.findMany({
       where: {
@@ -1157,11 +1483,37 @@ async function processCampaignQueue() {
     const processedCampaigns = new Set();
     for (const message of queuedMessages) {
       const template = message.campaign.template;
+      if (!message.phone_number_id) {
+        await prisma.campaignMessage.update({
+          where: { id: message.id },
+          data: {
+            status: "failed",
+            error_json: { error: "missing_phone_number_id" },
+          },
+        });
+        processedCampaigns.add(message.campaign_id);
+        continue;
+      }
+      const channelConfig = await resolveChannelByPhoneNumberId(
+        message.phone_number_id
+      );
+      if (!channelConfig || channelConfig.tenantId !== tenantId) {
+        await prisma.campaignMessage.update({
+          where: { id: message.id },
+          data: {
+            status: "failed",
+            error_json: { error: "missing_channel" },
+          },
+        });
+        processedCampaigns.add(message.campaign_id);
+        continue;
+      }
       const result = await sendTemplate(
         message.wa_id,
         template.name,
         template.language,
-        []
+        [],
+        { channel: channelConfig }
       );
       if (result.ok) {
         await prisma.campaignMessage.update({
@@ -1188,8 +1540,34 @@ async function processCampaignQueue() {
   }
 }
 
+async function processCampaignQueueForAllTenants() {
+  if (!process.env.CONTROL_DB_URL) {
+    return;
+  }
+  try {
+    const control = getControlClient();
+    const tenants = await control.tenant.findMany({
+      where: { is_active: true },
+      select: { id: true },
+    });
+    for (const tenant of tenants) {
+      const context = await resolveTenantContextById(tenant.id);
+      if (!context) {
+        continue;
+      }
+      await prisma.runWithPrisma(context.prisma, () =>
+        processCampaignQueue(context.tenantId)
+      );
+    }
+  } catch (error) {
+    logger.error("campaign.tenant_scan_failed", {
+      message: error.message || error,
+    });
+  }
+}
+
 setInterval(() => {
-  void processCampaignQueue();
+  void processCampaignQueueForAllTenants();
 }, CAMPAIGN_INTERVAL_MS);
 
 app.get(
@@ -1226,6 +1604,30 @@ app.post(
         is_active: true,
       },
     });
+    if (process.env.CONTROL_DB_URL && req.user.tenant_id) {
+      try {
+        const control = getControlClient();
+        await control.userControl.upsert({
+          where: { email },
+          update: {
+            password_hash: passwordHash,
+            role,
+            is_active: true,
+          },
+          create: {
+            email,
+            password_hash: passwordHash,
+            role,
+            is_active: true,
+            tenant_id: req.user.tenant_id,
+          },
+        });
+      } catch (error) {
+        logger.error("control.user_sync_failed", {
+          message: error.message || error,
+        });
+      }
+    }
     await logAudit({
       userId: req.user.id,
       action: "user.created",
@@ -1257,6 +1659,38 @@ app.patch(
       where: { id: req.params.id },
       data: updates,
     });
+    if (process.env.CONTROL_DB_URL && req.user.tenant_id) {
+      try {
+        const control = getControlClient();
+        const controlUpdates = {};
+        if (updates.role) {
+          controlUpdates.role = updates.role;
+        }
+        if (updates.is_active !== undefined) {
+          controlUpdates.is_active = updates.is_active;
+        }
+        if (updates.password_hash) {
+          controlUpdates.password_hash = updates.password_hash;
+        }
+        if (Object.keys(controlUpdates).length) {
+          await control.userControl.upsert({
+            where: { email: user.email },
+            update: controlUpdates,
+            create: {
+              email: user.email,
+              password_hash: updates.password_hash || user.password_hash,
+              role: user.role,
+              is_active: user.is_active,
+              tenant_id: req.user.tenant_id,
+            },
+          });
+        }
+      } catch (error) {
+        logger.error("control.user_sync_failed", {
+          message: error.message || error,
+        });
+      }
+    }
     await logAudit({
       userId: req.user.id,
       action: "user.updated",
@@ -1317,15 +1751,23 @@ app.patch(
   requireAuth,
   requireRole("admin"),
   async (req, res) => {
-    const settings = await prisma.settings.update({
+    const settings = await prisma.settings.upsert({
       where: { id: 1 },
-      data: {
+      update: {
+        bot_enabled: req.body?.bot_enabled,
+        auto_reply_enabled: req.body?.auto_reply_enabled,
+      },
+      create: {
+        id: 1,
         bot_enabled: req.body?.bot_enabled,
         auto_reply_enabled: req.body?.auto_reply_enabled,
       },
     });
-    settingsCache = settings;
-    settingsCacheAt = Date.now();
+    const tenantId = getTenantContext().tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ error: "missing_tenant" });
+    }
+    settingsCache.set(tenantId, { value: settings, at: Date.now() });
     await logAudit({
       userId: req.user.id,
       action: "settings.updated",
@@ -1724,7 +2166,7 @@ app.get(
     const limit = Math.min(Number(req.query.limit) || 200, 500);
     const action = req.query.action;
     const where = action ? { action } : undefined;
-    const logs = await prisma.auditLog.findMany({
+    const logs = await prisma.auditLogTenant.findMany({
       where,
       orderBy: { created_at: "desc" },
       take: limit,
@@ -1824,7 +2266,31 @@ app.use((err, req, res, next) => {
   return next(err);
 });
 
+let shutdownRegistered = false;
+
+function registerShutdown() {
+  if (shutdownRegistered) {
+    return;
+  }
+  shutdownRegistered = true;
+  const handler = async (signal) => {
+    logger.info("server.shutdown", { signal });
+    try {
+      await disconnectAllTenantClients();
+      await disconnectControlClient();
+    } catch (error) {
+      logger.error("server.shutdown_error", { message: error.message || error });
+    }
+    server.close(() => {
+      process.exit(0);
+    });
+  };
+  process.on("SIGINT", handler);
+  process.on("SIGTERM", handler);
+}
+
 function start(port = PORT) {
+  registerShutdown();
   server.listen(port, () => {
     logger.info("server.listen", { port });
   });

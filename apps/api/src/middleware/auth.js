@@ -1,4 +1,6 @@
 const { verifyToken } = require("../lib/auth");
+const prisma = require("../db");
+const { resolveTenantContextById } = require("../tenancy/tenantResolver");
 
 function extractToken(req) {
   const header = req.headers.authorization || "";
@@ -9,7 +11,7 @@ function extractToken(req) {
   return null;
 }
 
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
   try {
     const token = extractToken(req);
     if (!token) {
@@ -21,8 +23,23 @@ function requireAuth(req, res, next) {
       email: payload.email,
       name: payload.name,
       role: payload.role,
+      tenant_id: payload.tenant_id || null,
     };
-    return next();
+    if (req.user.role === "superadmin") {
+      return next();
+    }
+    if (!req.user.tenant_id) {
+      return res.status(401).json({ error: "missing_tenant" });
+    }
+    const context = await resolveTenantContextById(req.user.tenant_id);
+    if (!context) {
+      return res.status(403).json({ error: "tenant_not_ready" });
+    }
+    return prisma.runWithPrisma(
+      context.prisma,
+      () => next(),
+      { tenantId: context.tenantId, channel: context.channel }
+    );
   } catch (error) {
     return res.status(401).json({ error: "invalid_token" });
   }

@@ -13,7 +13,7 @@
     "dev:web": "npm --workspace apps/web run dev",
     "build": "npm --workspace apps/web run build",
     "start": "node server.js",
-    "postinstall": "npm run prisma:generate",
+    "postinstall": "node scripts/postinstall.js",
     "prisma:generate": "npm --workspace apps/api run prisma:generate",
     "prisma:migrate": "npm --workspace apps/api run prisma:migrate",
     "seed:admin": "node prisma/seed.js"

@@ -41,7 +41,7 @@ async function initSqlite() {
   }
   const dbPath = path.isAbsolute(SQLITE_PATH)
     ? SQLITE_PATH
-    : path.join(__dirname, "..", SQLITE_PATH);
+    : path.join(__dirname, "..", "..", "..", SQLITE_PATH);
   db = new sqlite3.Database(dbPath);
   dbRun = promisify(db.run.bind(db));
   dbGet = promisify(db.get.bind(db));

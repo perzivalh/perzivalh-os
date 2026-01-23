@@ -2,6 +2,17 @@
 
 Podopie OS incluye el webhook de WhatsApp Cloud API integrado a Odoo y una bandeja web multiusuario con conversaciones, tags y handoff bot/humano.
 
+## Estructura (monorepo)
+
+```
+/apps
+  /api        Backend Node + Express + Socket.io
+  /web        Vite + React
+/prisma       Schema + migraciones
+/infra        Infraestructura (placeholder)
+/scripts      Scripts operativos (placeholder)
+```
+
 ## Requisitos
 
 - Node.js 18+
@@ -11,24 +22,25 @@ Podopie OS incluye el webhook de WhatsApp Cloud API integrado a Odoo y una bande
 
 ## Variables de entorno
 
+Copia `.env.example` a `.env` en la raiz y completa los valores. Para el frontend crea `apps/web/.env` con `VITE_API_BASE`.
+
 ### WhatsApp Cloud API
 
-- `WHATSAPP_TOKEN`
-- `PHONE_NUMBER_ID`
-- `VERIFY_TOKEN`
-- `WHATSAPP_APP_SECRET` (opcional, valida firma webhook)
-- `ADMIN_PHONE_E164` (opcional, comandos BOT/CERRAR por WhatsApp)
-- `WHATSAPP_BUSINESS_ACCOUNT_ID` (para sincronizar templates)
+- `WHATSAPP_TOKEN`: token de acceso de la app.
+- `PHONE_NUMBER_ID`: ID del numero de telefono.
+- `VERIFY_TOKEN`: token para verificacion del webhook.
+- `WHATSAPP_APP_SECRET`: secreto para validar firma (opcional).
+- `WHATSAPP_BUSINESS_ACCOUNT_ID`: WABA para sincronizar templates.
+- `ADMIN_PHONE_E164`: telefono admin (comandos BOT/CERRAR).
 
 ### Odoo JSON-RPC
 
-- `ODOO_BASE_URL` (ej: `https://podopie.ngrok.io`)
+- `ODOO_BASE_URL`: base URL de Odoo (ej: `https://podopie.ngrok.io`).
 - `ODOO_DB`
 - `ODOO_USERNAME`
 - `ODOO_PASSWORD`
 
-Compatibilidad (legacy):
-- `ODOO_URL`, `ODOO_USER`, `ODOO_PASS`
+Compatibilidad (legacy): `ODOO_URL`, `ODOO_USER`, `ODOO_PASS`.
 
 ### Base de datos / Auth
 
@@ -39,36 +51,62 @@ Compatibilidad (legacy):
 - `ADMIN_NAME` (opcional)
 - `ADMIN_ROLE` (opcional, default `admin`)
 
-### Frontend
+### App
 
-- `FRONTEND_ORIGIN` (ej: `http://localhost:5173`)
-- `VITE_API_BASE` (en `web/.env`, ej: `http://localhost:3000`)
-
-### Opcional
-
-- `PORT` (por defecto 3000)
-- `NODE_ENV` (por defecto `production`)
+- `PORT` (default 3000)
+- `FRONTEND_ORIGIN` (CORS, ej: `http://localhost:5173`)
+- `NODE_ENV` (default `production`)
 - `SQLITE_PATH` (si queres persistir sesiones en SQLite)
-- `LOCATION_LAT`, `LOCATION_LNG`, `LOCATION_NAME`, `LOCATION_ADDRESS` (para enviar ubicacion)
+- `LOCATION_LAT`, `LOCATION_LNG`, `LOCATION_NAME`, `LOCATION_ADDRESS` (ubicacion del bot)
 - `CAMPAIGN_BATCH_SIZE` (default 8)
 - `CAMPAIGN_INTERVAL_MS` (default 1500)
+- `DEBUG_KEY` (legacy)
+
+### Frontend
+
+En `apps/web/.env`:
+
+- `VITE_API_BASE` (ej: `http://localhost:3000`)
 
 ## Instalar y correr
 
-Backend:
+En la raiz:
 
 ```bash
 npm install
 npm run dev
 ```
 
-Frontend (Vite):
+Solo API:
 
 ```bash
-cd web
-npm install
-npm run dev
+npm run dev:api
 ```
+
+Solo Web:
+
+```bash
+npm run dev:web
+```
+
+## Prisma
+
+Local:
+
+```bash
+npm run prisma:migrate
+npm run seed:admin
+```
+
+Produccion:
+
+```bash
+npm run prisma:deploy
+npm run seed:admin
+```
+
+Seed incluye catalogo base (sucursales + servicios).
+Se registra Prospect si el paciente no existe en Odoo.
 
 ## Webhook
 
@@ -80,6 +118,9 @@ npm run dev
 ## Endpoints
 
 - `GET /health` => `ok`
+- `GET /privacy` => politica de privacidad (HTML)
+- `GET /terms` => terminos y condiciones (HTML)
+- `GET /data-deletion` => instrucciones de eliminacion de datos (HTML)
 - `GET /debug/last-webhook` => ultimo body recibido
 - `GET /debug/session/:wa` => sesion por wa_id
 - `POST /api/auth/login` => login JWT
@@ -101,6 +142,14 @@ npm run dev
 - `GET /api/admin/campaigns/:id/messages`
 - `GET /api/admin/audit`
 
+## Paginas publicas para Meta
+
+Pega estas URLs en Meta:
+
+- `https://botsito-podopie-production.up.railway.app/privacy`
+- `https://botsito-podopie-production.up.railway.app/terms`
+- `https://botsito-podopie-production.up.railway.app/data-deletion`
+
 ## Flujo del bot
 
 - Siempre muestra menu principal al inicio y cuando escriben `menu`/`inicio`/`volver`.
@@ -117,40 +166,27 @@ npm run dev
   - `BOT` => status `open` + remove `pendiente_atencion`
   - `CERRAR` => status `closed`
 
-## Prisma
-
-```bash
-npx prisma migrate dev --name init
-npm run seed:admin
-```
-
-Para prod:
-
-```bash
-npx prisma migrate deploy
-npm run seed:admin
-```
-
-Seed incluye catalogo base (sucursales + servicios).
-Se registra Prospect si el paciente no existe en Odoo.
-
 ## Railway deploy
 
 1. Crea un proyecto en Railway y conecta este repo.
 2. Agrega un servicio Postgres y copia `DATABASE_URL`.
 3. Configura las variables de entorno listadas arriba.
-4. Ejecuta `npx prisma migrate deploy` y `npm run seed:admin`.
+4. Ejecuta `npm run prisma:deploy` y `npm run seed:admin`.
 5. Despliega el servicio.
 6. Usa esta URL de webhook en Meta:
    - `https://<railway-domain>/webhook`
 
 Nota: tu WABA debe estar en `subscribed_apps` para recibir eventos.
 
+## data.db (legacy)
+
+El archivo `data.db` queda como legado. Solo se usa si defines `SQLITE_PATH` apuntando a ese archivo. Caso contrario, el runtime usa memoria.
+
 ## Servidor fisico (pm2 + nginx)
 
-1. `npm install` (backend) y `cd web && npm install` (frontend).
-2. Construye el frontend: `cd web && npm run build`.
+1. `npm install`.
+2. Construye el frontend: `npm run build`.
 3. Levanta backend con pm2: `pm2 start server.js --name podopie-os`.
 4. Configura nginx:
    - Proxy `/api` y `/webhook` a `http://127.0.0.1:3000`.
-   - Sirve `web/dist` como sitio estatico.
+   - Sirve `apps/web/dist` como sitio estatico.

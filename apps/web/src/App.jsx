@@ -1446,7 +1446,7 @@ function App() {
   if (user?.role === "superadmin" && isSuperAdminRoute) {
     return (
       <main className="superadmin-page">
-        <SuperAdminView />
+        <SuperAdminView route={pathname} onNavigate={navigateTo} />
       </main>
     );
   }

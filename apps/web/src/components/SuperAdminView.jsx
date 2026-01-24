@@ -13,12 +13,40 @@ const EMPTY_PROVISION = {
   app_secret: "",
   brand_name: "",
   logo_url: "",
+  brand_primary: "#22d3ee",
+  brand_accent: "#38bdf8",
+  brand_bg: "#0b0f16",
   timezone: "",
   odoo_base_url: "",
   odoo_db_name: "",
   odoo_username: "",
   odoo_password: "",
 };
+
+const PLAN_OPTIONS = [
+  { value: "starter", label: "Starter" },
+  { value: "growth", label: "Growth" },
+  { value: "scale", label: "Scale" },
+  { value: "enterprise", label: "Enterprise" },
+];
+
+const TIMEZONE_OPTIONS = [
+  "UTC",
+  "America/La_Paz",
+  "America/Lima",
+  "America/Bogota",
+  "America/Santiago",
+  "America/Argentina/Buenos_Aires",
+  "America/Mexico_City",
+  "America/New_York",
+  "America/Los_Angeles",
+  "Europe/Madrid",
+  "Europe/London",
+  "Europe/Berlin",
+  "Asia/Tokyo",
+  "Asia/Singapore",
+  "Australia/Sydney",
+];
 
 function GridIcon(props) {
   return (
@@ -187,10 +215,14 @@ function SuperAdminView({ route = "/superadmin", onNavigate }) {
     try {
       const branding = await apiGet(`/api/superadmin/branding?tenant_id=${tenantId}`);
       if (branding.branding) {
+        const colors = branding.branding.colors || null;
         setProvisionForm((prev) => ({
           ...prev,
           brand_name: branding.branding.brand_name || "",
           logo_url: branding.branding.logo_url || "",
+          brand_primary: colors?.primary || "",
+          brand_accent: colors?.accent || "",
+          brand_bg: colors?.bg || "",
           timezone: branding.branding.timezone || "",
         }));
       }
@@ -245,6 +277,16 @@ function SuperAdminView({ route = "/superadmin", onNavigate }) {
     }
     if (!editTenantId && !dbUrl) {
       return { ok: false, message: "Tenant DB URL es requerido." };
+    }
+    const wantsBranding =
+      provisionForm.brand_name.trim() ||
+      provisionForm.logo_url.trim() ||
+      provisionForm.timezone.trim() ||
+      provisionForm.brand_primary ||
+      provisionForm.brand_accent ||
+      provisionForm.brand_bg;
+    if (wantsBranding && !provisionForm.brand_name.trim()) {
+      return { ok: false, message: "Brand name es requerido." };
     }
     const wantsChannel =
       provisionForm.phone_number_id ||
@@ -362,12 +404,29 @@ function SuperAdminView({ route = "/superadmin", onNavigate }) {
         }
       }
 
-      if (provisionForm.brand_name.trim()) {
+      const wantsBranding =
+        provisionForm.brand_name.trim() ||
+        provisionForm.logo_url.trim() ||
+        provisionForm.timezone.trim() ||
+        provisionForm.brand_primary ||
+        provisionForm.brand_accent ||
+        provisionForm.brand_bg;
+      if (wantsBranding) {
+        const colors = {};
+        if (provisionForm.brand_primary) {
+          colors.primary = provisionForm.brand_primary;
+        }
+        if (provisionForm.brand_accent) {
+          colors.accent = provisionForm.brand_accent;
+        }
+        if (provisionForm.brand_bg) {
+          colors.bg = provisionForm.brand_bg;
+        }
         await apiPatch("/api/superadmin/branding", {
           tenant_id: tenantId,
           brand_name: provisionForm.brand_name.trim(),
           logo_url: provisionForm.logo_url.trim() || null,
-          colors: null,
+          colors: Object.keys(colors).length ? colors : null,
           timezone: provisionForm.timezone.trim() || null,
         });
       }
@@ -458,7 +517,7 @@ function SuperAdminView({ route = "/superadmin", onNavigate }) {
 
             <section className="sa-kpi-grid">
               <div className="sa-kpi-card">
-                <div className="sa-kpi-label">Total de clinicas (tenants)</div>
+                <div className="sa-kpi-label">Total de empresas (tenants)</div>
                 <div className="sa-kpi-value">{totalTenants}</div>
                 <div className="sa-kpi-meta">+{activeTenants} activas</div>
               </div>
@@ -486,7 +545,7 @@ function SuperAdminView({ route = "/superadmin", onNavigate }) {
                   <input
                     value={tenantSearch}
                     onChange={(event) => setTenantSearch(event.target.value)}
-                    placeholder="Filtrar clinicas..."
+                    placeholder="Filtrar empresas..."
                   />
                 </div>
                 <div className="sa-table-actions">
@@ -502,7 +561,7 @@ function SuperAdminView({ route = "/superadmin", onNavigate }) {
               <div className="sa-table">
                 <div className="sa-table-head">
                   <div>ID referencia</div>
-                  <div>Nombre de la clinica</div>
+                  <div>Nombre de la empresa</div>
                   <div>Estado</div>
                   <div>Uso de recursos</div>
                   <div>Tiempo de actividad</div>
@@ -549,7 +608,7 @@ function SuperAdminView({ route = "/superadmin", onNavigate }) {
                 )}
               </div>
               <div className="sa-footer-note">
-                Mostrando {filteredTenants.length || 0} clinicas en produccion
+                Mostrando {filteredTenants.length || 0} empresas en produccion
               </div>
             </section>
           </>
@@ -572,13 +631,13 @@ function SuperAdminView({ route = "/superadmin", onNavigate }) {
                 <div className="sa-form-section">
                   <div className="sa-section-title">Identidad del tenant</div>
                   <div className="sa-field">
-                    <label>Nombre de la clinica</label>
+                    <label>Nombre de la empresa</label>
                     <input
                       value={provisionForm.name}
                       onChange={(event) =>
                         setProvisionForm({ ...provisionForm, name: event.target.value })
                       }
-                      placeholder="Ej. Centro Medico Alfa"
+                      placeholder="Ej. Empresa Alfa"
                     />
                   </div>
                   <div className="sa-field">
@@ -593,13 +652,19 @@ function SuperAdminView({ route = "/superadmin", onNavigate }) {
                   </div>
                   <div className="sa-field">
                     <label>Plan</label>
-                    <input
+                    <select
                       value={provisionForm.plan}
                       onChange={(event) =>
                         setProvisionForm({ ...provisionForm, plan: event.target.value })
                       }
-                      placeholder="starter"
-                    />
+                    >
+                      <option value="">Seleccionar</option>
+                      {PLAN_OPTIONS.map((plan) => (
+                        <option key={plan.value} value={plan.value}>
+                          {plan.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="sa-field">
                     <label>Brand name</label>
@@ -622,14 +687,100 @@ function SuperAdminView({ route = "/superadmin", onNavigate }) {
                     />
                   </div>
                   <div className="sa-field">
+                    <label>Paleta de colores</label>
+                    <div className="sa-color-grid">
+                      <div className="sa-color-control">
+                        <span>Primario</span>
+                        <div className="sa-color-row">
+                          <input
+                            type="color"
+                            value={provisionForm.brand_primary}
+                            onChange={(event) =>
+                              setProvisionForm({
+                                ...provisionForm,
+                                brand_primary: event.target.value,
+                              })
+                            }
+                          />
+                          <input
+                            className="sa-color-input"
+                            value={provisionForm.brand_primary}
+                            onChange={(event) =>
+                              setProvisionForm({
+                                ...provisionForm,
+                                brand_primary: event.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="sa-color-control">
+                        <span>Accent</span>
+                        <div className="sa-color-row">
+                          <input
+                            type="color"
+                            value={provisionForm.brand_accent}
+                            onChange={(event) =>
+                              setProvisionForm({
+                                ...provisionForm,
+                                brand_accent: event.target.value,
+                              })
+                            }
+                          />
+                          <input
+                            className="sa-color-input"
+                            value={provisionForm.brand_accent}
+                            onChange={(event) =>
+                              setProvisionForm({
+                                ...provisionForm,
+                                brand_accent: event.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="sa-color-control">
+                        <span>Fondo</span>
+                        <div className="sa-color-row">
+                          <input
+                            type="color"
+                            value={provisionForm.brand_bg}
+                            onChange={(event) =>
+                              setProvisionForm({
+                                ...provisionForm,
+                                brand_bg: event.target.value,
+                              })
+                            }
+                          />
+                          <input
+                            className="sa-color-input"
+                            value={provisionForm.brand_bg}
+                            onChange={(event) =>
+                              setProvisionForm({
+                                ...provisionForm,
+                                brand_bg: event.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="sa-field">
                     <label>Timezone</label>
                     <input
+                      list="timezone-options"
                       value={provisionForm.timezone}
                       onChange={(event) =>
                         setProvisionForm({ ...provisionForm, timezone: event.target.value })
                       }
                       placeholder="America/La_Paz"
                     />
+                    <datalist id="timezone-options">
+                      {TIMEZONE_OPTIONS.map((zone) => (
+                        <option key={zone} value={zone} />
+                      ))}
+                    </datalist>
                   </div>
                   <div className="sa-note">
                     Nota: al registrar un tenant se inicia el aprovisionamiento en el
@@ -639,127 +790,136 @@ function SuperAdminView({ route = "/superadmin", onNavigate }) {
 
                 <div className="sa-form-section">
                   <div className="sa-section-title">Variables de entorno (envs)</div>
-                  <div className="sa-field">
-                    <label>Tenant DB URL</label>
-                    <input
-                      value={provisionForm.db_url}
-                      onChange={(event) =>
-                        setProvisionForm({ ...provisionForm, db_url: event.target.value })
-                      }
-                      placeholder="postgresql://..."
-                    />
+                  <div className="sa-subsection">
+                    <div className="sa-subsection-title">Base de datos</div>
+                    <div className="sa-field">
+                      <label>Tenant DB URL</label>
+                      <input
+                        value={provisionForm.db_url}
+                        onChange={(event) =>
+                          setProvisionForm({ ...provisionForm, db_url: event.target.value })
+                        }
+                        placeholder="postgresql://..."
+                      />
+                    </div>
                   </div>
-                  <div className="sa-field">
-                    <label>Odoo Base URL</label>
-                    <input
-                      value={provisionForm.odoo_base_url}
-                      onChange={(event) =>
-                        setProvisionForm({
-                          ...provisionForm,
-                          odoo_base_url: event.target.value,
-                        })
-                      }
-                      placeholder="https://odoo-instancia"
-                    />
+                  <div className="sa-subsection">
+                    <div className="sa-subsection-title">Odoo (opcional)</div>
+                    <div className="sa-field">
+                      <label>Odoo Base URL</label>
+                      <input
+                        value={provisionForm.odoo_base_url}
+                        onChange={(event) =>
+                          setProvisionForm({
+                            ...provisionForm,
+                            odoo_base_url: event.target.value,
+                          })
+                        }
+                        placeholder="https://odoo-instancia"
+                      />
+                    </div>
+                    <div className="sa-field">
+                      <label>Odoo DB Name</label>
+                      <input
+                        value={provisionForm.odoo_db_name}
+                        onChange={(event) =>
+                          setProvisionForm({
+                            ...provisionForm,
+                            odoo_db_name: event.target.value,
+                          })
+                        }
+                        placeholder="db_tenant_prod"
+                      />
+                    </div>
+                    <div className="sa-field">
+                      <label>Odoo User</label>
+                      <input
+                        value={provisionForm.odoo_username}
+                        onChange={(event) =>
+                          setProvisionForm({
+                            ...provisionForm,
+                            odoo_username: event.target.value,
+                          })
+                        }
+                        placeholder="usuario@empresa.com"
+                      />
+                    </div>
+                    <div className="sa-field">
+                      <label>Odoo Password (opcional)</label>
+                      <input
+                        type="password"
+                        value={provisionForm.odoo_password}
+                        onChange={(event) =>
+                          setProvisionForm({
+                            ...provisionForm,
+                            odoo_password: event.target.value,
+                          })
+                        }
+                        placeholder="********"
+                      />
+                    </div>
                   </div>
-                  <div className="sa-field">
-                    <label>Odoo DB Name</label>
-                    <input
-                      value={provisionForm.odoo_db_name}
-                      onChange={(event) =>
-                        setProvisionForm({
-                          ...provisionForm,
-                          odoo_db_name: event.target.value,
-                        })
-                      }
-                      placeholder="db_tenant_prod"
-                    />
-                  </div>
-                  <div className="sa-field">
-                    <label>Odoo User</label>
-                    <input
-                      value={provisionForm.odoo_username}
-                      onChange={(event) =>
-                        setProvisionForm({
-                          ...provisionForm,
-                          odoo_username: event.target.value,
-                        })
-                      }
-                      placeholder="usuario@empresa.com"
-                    />
-                  </div>
-                  <div className="sa-field">
-                    <label>Odoo Password</label>
-                    <input
-                      type="password"
-                      value={provisionForm.odoo_password}
-                      onChange={(event) =>
-                        setProvisionForm({
-                          ...provisionForm,
-                          odoo_password: event.target.value,
-                        })
-                      }
-                      placeholder="********"
-                    />
-                  </div>
-                  <div className="sa-field">
-                    <label>Meta Access Token</label>
-                    <input
-                      value={provisionForm.wa_token}
-                      onChange={(event) =>
-                        setProvisionForm({ ...provisionForm, wa_token: event.target.value })
-                      }
-                      placeholder="token"
-                    />
-                  </div>
-                  <div className="sa-field">
-                    <label>Meta Business ID (WABA)</label>
-                    <input
-                      value={provisionForm.waba_id}
-                      onChange={(event) =>
-                        setProvisionForm({ ...provisionForm, waba_id: event.target.value })
-                      }
-                      placeholder="2003704870486290"
-                    />
-                  </div>
-                  <div className="sa-field">
-                    <label>WhatsApp Phone ID</label>
-                    <input
-                      value={provisionForm.phone_number_id}
-                      onChange={(event) =>
-                        setProvisionForm({
-                          ...provisionForm,
-                          phone_number_id: event.target.value,
-                        })
-                      }
-                      placeholder="123456789"
-                    />
-                  </div>
-                  <div className="sa-field">
-                    <label>Verify Token</label>
-                    <input
-                      value={provisionForm.verify_token}
-                      onChange={(event) =>
-                        setProvisionForm({
-                          ...provisionForm,
-                          verify_token: event.target.value,
-                        })
-                      }
-                      placeholder="verify-token"
-                    />
-                  </div>
-                  <div className="sa-field">
-                    <label>WhatsApp App Secret (opcional)</label>
-                    <input
-                      value={provisionForm.app_secret}
-                      onChange={(event) =>
-                        setProvisionForm({
-                          ...provisionForm,
-                          app_secret: event.target.value,
-                        })
-                      }
-                      placeholder="app-secret"
-                    />
+                  <div className="sa-subsection">
+                    <div className="sa-subsection-title">WhatsApp Cloud</div>
+                    <div className="sa-field">
+                      <label>Meta Access Token</label>
+                      <input
+                        value={provisionForm.wa_token}
+                        onChange={(event) =>
+                          setProvisionForm({ ...provisionForm, wa_token: event.target.value })
+                        }
+                        placeholder="token"
+                      />
+                    </div>
+                    <div className="sa-field">
+                      <label>Meta Business ID (WABA)</label>
+                      <input
+                        value={provisionForm.waba_id}
+                        onChange={(event) =>
+                          setProvisionForm({ ...provisionForm, waba_id: event.target.value })
+                        }
+                        placeholder="2003704870486290"
+                      />
+                    </div>
+                    <div className="sa-field">
+                      <label>WhatsApp Phone ID</label>
+                      <input
+                        value={provisionForm.phone_number_id}
+                        onChange={(event) =>
+                          setProvisionForm({
+                            ...provisionForm,
+                            phone_number_id: event.target.value,
+                          })
+                        }
+                        placeholder="123456789"
+                      />
+                    </div>
+                    <div className="sa-field">
+                      <label>Verify Token</label>
+                      <input
+                        value={provisionForm.verify_token}
+                        onChange={(event) =>
+                          setProvisionForm({
+                            ...provisionForm,
+                            verify_token: event.target.value,
+                          })
+                        }
+                        placeholder="verify-token"
+                      />
+                    </div>
+                    <div className="sa-field">
+                      <label>WhatsApp App Secret (opcional)</label>
+                      <input
+                        value={provisionForm.app_secret}
+                        onChange={(event) =>
+                          setProvisionForm({
+                            ...provisionForm,
+                            app_secret: event.target.value,
+                          })
+                        }
+                        placeholder="app-secret"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

@@ -5,7 +5,7 @@ const ROLE_LABELS = {
   recepcion: { title: "Operador", subtitle: "Atencion al cliente", tone: "info" },
   caja: { title: "Supervisor", subtitle: "Auditoria y gestion", tone: "dark" },
   marketing: { title: "Marketing", subtitle: "Crecimiento y campanas", tone: "info" },
-  doctor: { title: "Doctor", subtitle: "Atencion clinica", tone: "dark" },
+  doctor: { title: "Doctor", subtitle: "Atencion al cliente", tone: "dark" },
 };
 
 const MAIN_MODULES = [
@@ -223,7 +223,7 @@ function AdminView({
                 <div>
                   <div className="users-title">Gestion de Usuarios</div>
                   <div className="users-subtitle">
-                    Administra los accesos y roles de los operadores de tu clinica.
+                    Administra los accesos y roles de los operadores de tu empresa.
                   </div>
                 </div>
               </div>

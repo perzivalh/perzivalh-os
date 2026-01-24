@@ -233,7 +233,7 @@ const PRIVACY_HTML = renderPublicPage(
   "Politica de privacidad",
   `
     <p>
-      Esta politica describe como una clinica maneja los datos personales recibidos por
+      Esta politica describe como una empresa maneja los datos personales recibidos por
       este bot de WhatsApp y otros canales digitales.
     </p>
     <h2>Datos que recopilamos</h2>
@@ -247,12 +247,12 @@ const PRIVACY_HTML = renderPublicPage(
     <h2>Finalidad del uso</h2>
     <ul>
       <li>Agendar, confirmar o reprogramar turnos.</li>
-      <li>Responder consultas y brindar soporte al paciente.</li>
-      <li>Enviar recordatorios o avisos relacionados con la atencion.</li>
+      <li>Responder consultas y brindar soporte al cliente.</li>
+      <li>Enviar recordatorios o avisos relacionados con el servicio.</li>
       <li>Cumplir obligaciones legales, administrativas y de seguridad.</li>
     </ul>
     <h2>Base legal</h2>
-    <p>Tratamos los datos con su consentimiento y para la prestacion de servicios de salud.</p>
+    <p>Tratamos los datos con su consentimiento y para la prestacion de servicios.</p>
     <h2>Comparticion con terceros</h2>
     <p>
       Podemos compartir datos con proveedores tecnologicos (por ejemplo Meta/WhatsApp,
@@ -260,13 +260,13 @@ const PRIVACY_HTML = renderPublicPage(
     </p>
     <h2>Conservacion</h2>
     <p>
-      Conservamos los datos mientras exista la relacion con el paciente y por los plazos
+      Conservamos los datos mientras exista la relacion con el cliente y por los plazos
       exigidos por ley.
     </p>
     <h2>Contacto y eliminacion</h2>
     <p>
       Para consultas o para solicitar eliminacion, escriba a
-      <strong>privacidad@tuclinica.com</strong> o al mismo numero de WhatsApp.
+      <strong>privacidad@tuempresa.com</strong> o al mismo numero de WhatsApp.
       Tambien puede seguir las instrucciones en <a href="/data-deletion">/data-deletion</a>.
     </p>
   `
@@ -276,18 +276,18 @@ const TERMS_HTML = renderPublicPage(
   "Terminos y condiciones",
   `
     <p>
-      Estos terminos regulan el uso del bot de WhatsApp de la clinica. Al usar este canal,
+      Estos terminos regulan el uso del bot de WhatsApp de la empresa. Al usar este canal,
       usted acepta estas condiciones.
     </p>
     <h2>Uso permitido</h2>
     <ul>
-      <li>El bot es informativo y de apoyo a la atencion; no sustituye una consulta medica.</li>
-      <li>No use el bot para emergencias. En caso urgente, contacte a servicios de emergencia.</li>
+      <li>El bot es informativo y de apoyo al servicio; no sustituye una consulta profesional.</li>
+      <li>No use el bot para emergencias. En caso urgente, contacte a canales oficiales.</li>
       <li>Usted debe brindar informacion veraz y actualizada.</li>
     </ul>
     <h2>Responsabilidad</h2>
     <ul>
-      <li>La clinica no garantiza disponibilidad continua del servicio.</li>
+      <li>La empresa no garantiza disponibilidad continua del servicio.</li>
       <li>El contenido puede actualizarse sin previo aviso.</li>
     </ul>
     <h2>Privacidad</h2>
@@ -296,7 +296,7 @@ const TERMS_HTML = renderPublicPage(
       <a href="/privacy">Politica de privacidad</a>.
     </p>
     <h2>Contacto</h2>
-    <p>Para dudas sobre estos terminos, escriba a <strong>contacto@tuclinica.com</strong>.</p>
+    <p>Para dudas sobre estos terminos, escriba a <strong>contacto@tuempresa.com</strong>.</p>
   `
 );
 
@@ -308,7 +308,7 @@ const DATA_DELETION_HTML = renderPublicPage(
     </p>
     <h2>Como solicitar la eliminacion</h2>
     <ol>
-      <li>Envie un correo a <strong>privacidad@tuclinica.com</strong> o un mensaje de WhatsApp.</li>
+      <li>Envie un correo a <strong>privacidad@tuempresa.com</strong> o un mensaje de WhatsApp.</li>
       <li>Indique su nombre completo, numero de telefono y la frase "Eliminar datos".</li>
       <li>Especifique si desea eliminar todo el historial o solo mensajes recientes.</li>
     </ol>
@@ -322,7 +322,7 @@ const DATA_DELETION_HTML = renderPublicPage(
       Algunos datos pueden conservarse por obligaciones legales o administrativas.
     </p>
     <h2>Contacto</h2>
-    <p>Si tiene dudas, escriba a <strong>privacidad@tuclinica.com</strong>.</p>
+    <p>Si tiene dudas, escriba a <strong>privacidad@tuempresa.com</strong>.</p>
   `
 );
 

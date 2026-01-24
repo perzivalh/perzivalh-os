@@ -17,7 +17,7 @@ function NavRail({
 }) {
   return (
     <aside className="nav-rail">
-      <button className="rail-logo" type="button" title="Podopie">
+      <button className="rail-logo" type="button" title="Perzivalh">
         <span className="logo-mark">P</span>
       </button>
       <nav className="rail-nav">

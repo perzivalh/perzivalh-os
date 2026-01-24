@@ -319,7 +319,7 @@ function SuperAdminView() {
               onChange={(event) =>
                 setTenantForm({ ...tenantForm, name: event.target.value })
               }
-              placeholder="Podopie Clinic"
+              placeholder="Perzivalh Clinic"
             />
           </div>
           <div className="settings-field">
@@ -329,7 +329,7 @@ function SuperAdminView() {
               onChange={(event) =>
                 setTenantForm({ ...tenantForm, slug: event.target.value })
               }
-              placeholder="podopie"
+              placeholder="perzivalh"
             />
           </div>
           <div className="settings-field">
@@ -698,7 +698,7 @@ function SuperAdminView() {
                   brand_name: event.target.value,
                 })
               }
-              placeholder="Podopie"
+              placeholder="Perzivalh"
             />
           </div>
           <div className="settings-field">

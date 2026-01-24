@@ -1345,7 +1345,7 @@ function App() {
     return (
       <div className="login-shell">
         <div className="login-card">
-          <div className="login-title">Podopie OS</div>
+          <div className="login-title">Perzivalh</div>
           <div className="login-subtitle">Acceso a bandeja multiusuario</div>
           <form className="login-form" onSubmit={handleLogin}>
             <label className="field">

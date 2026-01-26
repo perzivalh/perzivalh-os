@@ -273,12 +273,7 @@ function ChatView({
                 <div>
                   <div className="chat-name">{activeName}</div>
                   {activeConversation ? (
-                    <div className="chat-status">
-                      <span
-                        className={`status-dot ${activeConversation.status}`}
-                      />
-                      {activeStatusLabel}
-                    </div>
+                    <div className="chat-status">{activeStatusLabel}</div>
                   ) : (
                     <div className="chat-status muted">
                       Elige una conversacion

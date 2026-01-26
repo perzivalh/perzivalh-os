@@ -1,6 +1,6 @@
 .superadmin-page {
   min-height: 100vh;
-  background: #050608;
+  background: #0a0a0a;
   padding: 0;
   color: #e5e7eb;
 }
@@ -11,9 +11,9 @@
   grid-template-columns: 80px minmax(0, 1fr);
   gap: 1.5rem;
   height: 100vh;
-  background: radial-gradient(900px circle at 15% 0%, rgba(34, 211, 238, 0.08), transparent 55%),
-    radial-gradient(900px circle at 90% 10%, rgba(59, 130, 246, 0.08), transparent 55%),
-    #050608;
+  background: radial-gradient(900px circle at 15% 0%, rgba(255, 255, 255, 0.04), transparent 55%),
+    radial-gradient(900px circle at 90% 10%, rgba(255, 255, 255, 0.03), transparent 55%),
+    #0a0a0a;
   border: none;
   border-radius: 0;
   overflow: hidden;
@@ -50,14 +50,14 @@
   width: 52px;
   height: 52px;
   border-radius: 16px;
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.35), rgba(34, 211, 238, 0.35));
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04));
   border: 1px solid rgba(255, 255, 255, 0.18);
   display: grid;
   place-items: center;
   font-weight: 700;
   font-size: 0.7rem;
   letter-spacing: 0.12em;
-  color: #e2f3ff;
+  color: #e5e5e5;
 }
 
 .sa-rail-btn {
@@ -77,8 +77,8 @@
 }
 
 .sa-rail-btn.active {
-  background: rgba(34, 211, 238, 0.12);
-  border-color: rgba(34, 211, 238, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
   color: #e5f9ff;
 }
 
@@ -190,9 +190,9 @@
 }
 
 .sa-btn.primary {
-  background: linear-gradient(135deg, #22d3ee, #38bdf8);
-  border-color: rgba(34, 211, 238, 0.6);
-  color: #00141f;
+  background: linear-gradient(135deg, #d8d8d8, #f0f0f0);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #0b0b0b;
 }
 
 .sa-btn.ghost {
@@ -344,7 +344,7 @@
 .sa-progress-fill {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #22d3ee, #38bdf8);
+  background: linear-gradient(90deg, #d0d0d0, #f0f0f0);
 }
 
 .sa-progress-fill.no-db {

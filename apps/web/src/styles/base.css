@@ -26,22 +26,22 @@ body,
 }
 
 body[data-theme="dark"] {
-  --bg: #0f172a;
-  --bg-soft: #0b1324;
-  --panel: #111827;
-  --panel-muted: #0d1526;
-  --ink: #e2e8f0;
-  --muted: #94a3b8;
-  --accent: #60a5fa;
-  --accent-strong: #3b82f6;
-  --accent-soft: rgba(96, 165, 250, 0.18);
-  --accent-soft-2: rgba(96, 165, 250, 0.12);
-  --danger: #f87171;
-  --success: #34d399;
-  --border: #1e293b;
-  --shadow: rgba(15, 23, 42, 0.5);
-  --scroll-thumb: rgba(148, 163, 184, 0.4);
-  --scroll-thumb-hover: rgba(148, 163, 184, 0.6);
+  --bg: #0a0a0a;
+  --bg-soft: #0e0e0e;
+  --panel: #111111;
+  --panel-muted: #151515;
+  --ink: #e6e6e6;
+  --muted: #9a9a9a;
+  --accent: #c7c7c7;
+  --accent-strong: #e2e2e2;
+  --accent-soft: rgba(255, 255, 255, 0.08);
+  --accent-soft-2: rgba(255, 255, 255, 0.05);
+  --danger: #e86b6b;
+  --success: #4bc28f;
+  --border: #1f1f1f;
+  --shadow: rgba(0, 0, 0, 0.6);
+  --scroll-thumb: rgba(255, 255, 255, 0.18);
+  --scroll-thumb-hover: rgba(255, 255, 255, 0.28);
   --scroll-track: transparent;
 }
 
@@ -75,7 +75,7 @@ body {
   margin: 0;
   font-family: "Sora", sans-serif;
   color: var(--ink);
-  background: radial-gradient(circle at top, #f8fbff 0%, #f1f5fb 45%, #e9eff8 100%);
+  background: var(--bg);
 }
 
 body[data-theme="dark"] {

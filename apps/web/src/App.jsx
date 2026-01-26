@@ -1671,7 +1671,7 @@ function App() {
   const canManageStatus = hasPermission(roleAccess, "modules", "chat", "write");
   const quickActions = ["Confirmar Cita", "Solicitar Resultados", "Urgencia"];
   const statusLabels = {
-    open: "En linea",
+    open: "Abierto",
     pending: "Pendiente",
     closed: "Cerrado",
   };

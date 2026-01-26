@@ -1388,6 +1388,7 @@ app.get("/api/conversations", requireAuth, async (req, res) => {
   const status = req.query.status;
   const assignedUser = req.query.assigned_user_id;
   const tag = req.query.tag;
+  const phoneNumberId = req.query.phone_number_id;
   const search = (req.query.search || "").trim();
   const limit = Math.min(Number(req.query.limit) || 50, 200);
 
@@ -1410,6 +1411,9 @@ app.get("/api/conversations", requireAuth, async (req, res) => {
         },
       },
     };
+  }
+  if (phoneNumberId) {
+    where.phone_number_id = phoneNumberId;
   }
   if (search) {
     where.OR = [

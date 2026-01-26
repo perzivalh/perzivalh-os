@@ -1043,6 +1043,7 @@ function App() {
         password: loginForm.password,
       });
       setTokenState(result.token);
+      setToken(result.token);
       setUser(result.user);
       setSuperadminToken("");
       localStorage.removeItem("superadmin_token");
@@ -1060,6 +1061,7 @@ function App() {
 
   function handleLogout() {
     setTokenState("");
+    setToken(null);
     setUser(null);
     setConversations([]);
     setActiveConversation(null);
@@ -1083,6 +1085,7 @@ function App() {
       setSuperadminToken(token);
     }
     setTokenState(result.token);
+    setToken(result.token);
     setUser(result.user);
     setView("chats");
     navigateTo("/", { replace: true });
@@ -1101,6 +1104,7 @@ function App() {
     localStorage.removeItem("superadmin_token");
     setSuperadminToken("");
     setTokenState(stored);
+    setToken(stored);
     setUser(null);
     setView("chats");
     navigateTo("/superadmin", { replace: true });

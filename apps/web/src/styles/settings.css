@@ -9,10 +9,10 @@
 .settings-sidebar {
   background: var(--panel);
   border-right: 1px solid var(--border);
-  padding: 2rem 1.5rem;
+  padding: 1.5rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1rem;
   min-height: 0;
   height: 100vh;
   overflow-y: auto;
@@ -22,14 +22,14 @@
 
 .settings-header {
   border-bottom: 1px solid var(--border);
-  padding-bottom: 1.2rem;
+  padding-bottom: 1rem;
   margin-bottom: 0.5rem;
 }
 
 .settings-title {
   font-weight: 800;
-  font-size: 1.4rem;
-  letter-spacing: -0.02em;
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
   color: var(--ink);
 }
 
@@ -37,90 +37,89 @@
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  font-size: 0.75rem;
-  margin-top: 0.4rem;
+  font-size: 0.7rem;
+  margin-top: 0.3rem;
   font-weight: 600;
 }
 
 .settings-group-title {
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 700;
   color: var(--muted);
-  margin-bottom: 0.8rem;
-  padding-left: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding-left: 0.6rem;
 }
 
 .settings-group {
   display: grid;
-  gap: 0.4rem;
+  gap: 0.2rem;
 }
 
 .settings-group-list {
   display: grid;
-  gap: 0.6rem;
+  gap: 0.3rem;
 }
 
 .settings-item {
   border: 1px solid transparent;
   background: transparent;
-  border-radius: 16px;
-  padding: 0.75rem 0.8rem;
+  border-radius: 12px;
+  padding: 0.6rem 0.8rem;
   text-align: left;
   font-weight: 600;
   color: var(--ink);
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.8rem;
   transition: all 0.2s ease;
   font-size: 0.95rem;
 }
 
 .settings-item:hover {
   background: var(--panel-muted);
-  transform: translateX(4px);
 }
 
 .settings-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--panel);
+  width: 24px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--muted);
   transition: all 0.2s ease;
   flex-shrink: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
 }
 
 .settings-icon-svg {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   stroke-width: 2px;
 }
 
 .settings-item:hover .settings-icon {
-  border-color: var(--border);
-  background: #fff;
   color: var(--accent);
-  box-shadow: 0 4px 12px var(--shadow);
+  box-shadow: none;
+  background: transparent;
+  border: none;
 }
 
 .settings-item.active {
-  background: var(--panel);
-  border-color: var(--accent);
-  color: var(--ink);
-  box-shadow: 0 4px 20px -4px var(--shadow);
+  background: var(--accent-active-bg, rgba(139, 92, 246, 0.15));
+  border-color: transparent;
+  color: var(--accent);
+  box-shadow: none;
 }
 
 .settings-item.active .settings-icon {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: #fff;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent);
+  box-shadow: none;
 }
 
 .settings-item:disabled {
@@ -678,8 +677,8 @@
    ========================================== */
 
 .bot-section {
-  background: rgba(8, 10, 14, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--panel);
+  border: 1px solid var(--border);
   border-radius: 18px;
   padding: 1.2rem;
   /* margin-top: 1rem; */
@@ -690,7 +689,7 @@
   justify-content: space-between;
   align-items: center;
   padding-bottom: 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border);
   margin-bottom: 1rem;
 }
 
@@ -703,24 +702,25 @@
 .bot-section-icon {
   width: 40px;
   height: 40px;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(139, 92, 246, 0.1));
-  border: 1px solid rgba(139, 92, 246, 0.4);
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
   border-radius: 12px;
   display: grid;
   place-items: center;
   font-size: 1.2rem;
+  color: var(--accent);
 }
 
 .bot-section-title {
   font-size: 1.2rem;
   font-weight: 600;
   margin: 0;
-  color: #e5e7eb;
+  color: var(--ink);
 }
 
 .bot-section-subtitle {
   font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--muted);
   margin: 0.2rem 0 0;
 }
 
@@ -734,7 +734,7 @@
   font-size: 0.65rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--muted);
 }
 
 .bot-toggle-pill {
@@ -751,13 +751,13 @@
 .bot-toggle-pill.active {
   background: rgba(34, 197, 94, 0.15);
   border: 1px solid rgba(34, 197, 94, 0.4);
-  color: #22c55e;
+  color: #16a34a;
 }
 
 .bot-toggle-pill.inactive {
   background: rgba(245, 158, 11, 0.15);
   border: 1px solid rgba(245, 158, 11, 0.4);
-  color: #f59e0b;
+  color: #d97706;
 }
 
 .bot-toggle-dot {
@@ -784,16 +784,16 @@
   font-size: 0.6rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--muted);
 }
 
 .bot-add-btn {
   width: 24px;
   height: 24px;
   border-radius: 8px;
-  border: 1px solid rgba(139, 92, 246, 0.4);
-  background: rgba(139, 92, 246, 0.15);
-  color: #a78bfa;
+  border: 1px solid var(--border);
+  background: var(--panel-muted);
+  color: var(--accent);
   font-size: 1rem;
   display: grid;
   place-items: center;
@@ -807,8 +807,8 @@
 }
 
 .bot-flow-card {
-  background: rgba(10, 12, 18, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--panel-muted);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 0.8rem;
 }
@@ -822,7 +822,7 @@
 .bot-flow-icon {
   width: 32px;
   height: 32px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--panel);
   border-radius: 8px;
   display: grid;
   place-items: center;
@@ -832,7 +832,7 @@
 .bot-flow-name {
   font-weight: 600;
   font-size: 0.85rem;
-  color: #e5e7eb;
+  color: var(--ink);
 }
 
 .bot-flow-status {
@@ -843,11 +843,11 @@
 }
 
 .bot-flow-status.active {
-  color: #22c55e;
+  color: #16a34a;
 }
 
 .bot-flow-status.inactive {
-  color: #f59e0b;
+  color: #d97706;
 }
 
 .bot-flow-actions {
@@ -858,7 +858,7 @@
 
 .bot-flow-meta {
   font-size: 0.65rem;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--muted);
   margin-top: 0.5rem;
 }
 

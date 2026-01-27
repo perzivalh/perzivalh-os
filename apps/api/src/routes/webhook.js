@@ -12,6 +12,7 @@ const { redactObject } = require("../lib/sanitize");
 const { normalizeText, digitsOnly, toPhoneE164 } = require("../lib/normalize");
 const { parseInteractiveSelection, sendText } = require("../whatsapp");
 const { handleIncomingText, handleInteractive } = require("../flows");
+const { executeDynamicFlow, executeDynamicInteractive } = require("../flows/flowExecutor");
 const sessionStore = require("../sessionStore");
 const { getTenantContext } = require("../tenancy/tenantContext");
 const {
@@ -323,9 +324,8 @@ router.post("/webhook", async (req, res) => {
                             if (activeFlow.flow.useLegacyHandler) {
                                 void handleIncomingText(waId, incomingText);
                             } else {
-                                // TODO: Implement dynamic flow execution
-                                // For now, use legacy handler for all flows
-                                void handleIncomingText(waId, incomingText);
+                                // Ejecutar flow dinámico
+                                void executeDynamicFlow(waId, incomingText, activeFlow);
                             }
                             continue;
                         }
@@ -357,10 +357,11 @@ router.post("/webhook", async (req, res) => {
                                 continue;
                             }
 
+
                             if (activeFlow.flow.useLegacyHandler) {
                                 void handleInteractive(waId, selection?.id);
                             } else {
-                                void handleInteractive(waId, selection?.id);
+                                void executeDynamicInteractive(waId, selection?.id, activeFlow);
                             }
                         }
                     }

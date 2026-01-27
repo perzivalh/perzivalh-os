@@ -9,18 +9,19 @@ datasource db {
 }
 
 model Tenant {
-  id         String          @id @default(cuid())
-  name       String
-  slug       String          @unique
-  plan       String?
-  is_active  Boolean         @default(true)
-  created_at DateTime        @default(now())
-  databases  TenantDatabase?
-  channels   Channel[]
-  users      UserControl[]
-  branding   Branding?
+  id          String          @id @default(cuid())
+  name        String
+  slug        String          @unique
+  plan        String?
+  is_active   Boolean         @default(true)
+  created_at  DateTime        @default(now())
+  databases   TenantDatabase?
+  channels    Channel[]
+  users       UserControl[]
+  branding    Branding?
   odoo_config OdooConfig?
-  audits     AuditLogControl[]
+  tenant_bots TenantBot[]
+  audits      AuditLogControl[]
 }
 
 model TenantDatabase {
@@ -97,4 +98,18 @@ model OdooConfig {
   password_encrypted String
   created_at         DateTime @default(now())
   tenant             Tenant   @relation(fields: [tenant_id], references: [id])
+}
+
+model TenantBot {
+  id         String   @id @default(cuid())
+  tenant_id  String
+  flow_id    String
+  is_active  Boolean  @default(true)
+  config     Json?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  tenant     Tenant   @relation(fields: [tenant_id], references: [id])
+
+  @@unique([tenant_id, flow_id])
+  @@index([tenant_id])
 }

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { apiGet, apiPatch, apiPost } from "../api";
+import { apiGet, apiPatch, apiPost, apiDelete } from "../api";
+import BotSection from "./superadmin/BotSection";
 
 // Importar desde módulos
 import {
@@ -33,6 +34,11 @@ function SuperAdminView({
   const [editTenantId, setEditTenantId] = useState("");
   const [editTenantActive, setEditTenantActive] = useState(true);
 
+  // Bot management state
+  const [availableFlows, setAvailableFlows] = useState([]);
+  const [tenantBots, setTenantBots] = useState([]);
+  const [botsLoading, setBotsLoading] = useState(false);
+
   const isCreateRoute = route.startsWith("/superadmin/new");
 
   const navigate = useCallback(
@@ -63,6 +69,7 @@ function SuperAdminView({
 
   useEffect(() => {
     loadData();
+    loadAvailableFlows();
   }, []);
 
   const channelsByTenant = useMemo(() => {
@@ -181,6 +188,66 @@ function SuperAdminView({
       }
     } catch (err) {
       setError(err.message || "No se pudo cargar odoo.");
+    }
+
+    // Load bots for this tenant
+    await loadTenantBots(tenantId);
+  }
+
+  async function loadAvailableFlows() {
+    try {
+      const response = await apiGet("/api/superadmin/flows");
+      setAvailableFlows(response.flows || []);
+    } catch (err) {
+      console.error("Error loading flows", err);
+    }
+  }
+
+  async function loadTenantBots(tenantId) {
+    if (!tenantId) return;
+    setBotsLoading(true);
+    try {
+      const response = await apiGet(`/api/superadmin/tenant-bots?tenant_id=${tenantId}`);
+      setTenantBots(response.tenant_bots || []);
+    } catch (err) {
+      console.error("Error loading tenant bots", err);
+    } finally {
+      setBotsLoading(false);
+    }
+  }
+
+  async function handleToggleBot(botId, newActive) {
+    try {
+      await apiPatch(`/api/superadmin/tenant-bots/${botId}`, { is_active: newActive });
+      setTenantBots((prev) =>
+        prev.map((b) => (b.id === botId ? { ...b, is_active: newActive } : b))
+      );
+    } catch (err) {
+      setError(err.message || "Error al cambiar estado del bot.");
+    }
+  }
+
+  async function handleAddBot(flowId) {
+    if (!editTenantId) return;
+    try {
+      const response = await apiPost("/api/superadmin/tenant-bots", {
+        tenant_id: editTenantId,
+        flow_id: flowId,
+      });
+      if (response.tenant_bot) {
+        setTenantBots((prev) => [response.tenant_bot, ...prev]);
+      }
+    } catch (err) {
+      setError(err.message || "Error al agregar bot.");
+    }
+  }
+
+  async function handleRemoveBot(botId) {
+    try {
+      await apiDelete(`/api/superadmin/tenant-bots/${botId}`);
+      setTenantBots((prev) => prev.filter((b) => b.id !== botId));
+    } catch (err) {
+      setError(err.message || "Error al eliminar bot.");
     }
   }
 
@@ -914,6 +981,19 @@ function SuperAdminView({
                 </div>
               </div>
             </form>
+
+            {/* Bot Section - only show when editing existing tenant */}
+            {editTenantId && (
+              <BotSection
+                tenantId={editTenantId}
+                tenantBots={tenantBots}
+                availableFlows={availableFlows}
+                loading={botsLoading}
+                onToggleBot={handleToggleBot}
+                onAddBot={handleAddBot}
+                onRemoveBot={handleRemoveBot}
+              />
+            )}
           </>
         )}
       </main>

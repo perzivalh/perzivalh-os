@@ -419,5 +419,150 @@ router.patch("/odoo", requireAuth, requireSuperAdmin, async (req, res) => {
     });
 });
 
+// ==========================================
+// BOTS / FLOWS
+// ==========================================
+
+// GET /api/superadmin/flows
+// Lista todos los flows disponibles desde la carpeta flows/
+router.get("/flows", requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+        const { getFlowsList } = require("../../../flows");
+        const flows = getFlowsList();
+        return res.json({ flows });
+    } catch (error) {
+        logger.error("Error loading flows", { message: error.message });
+        return res.status(500).json({ error: "flows_load_error" });
+    }
+});
+
+// GET /api/superadmin/tenant-bots
+// Lista bots asignados a un tenant
+router.get("/tenant-bots", requireAuth, requireSuperAdmin, async (req, res) => {
+    const tenantId = req.query.tenant_id;
+    if (!tenantId) {
+        return res.status(400).json({ error: "missing_tenant_id" });
+    }
+    const control = getControlClient();
+    const tenantBots = await control.tenantBot.findMany({
+        where: { tenant_id: tenantId },
+        orderBy: { created_at: "desc" },
+    });
+
+    // Enriquecer con metadata de flows
+    const { getFlow } = require("../../../flows");
+    const enriched = tenantBots.map((tb) => {
+        const flow = getFlow(tb.flow_id);
+        return {
+            id: tb.id,
+            tenant_id: tb.tenant_id,
+            flow_id: tb.flow_id,
+            is_active: tb.is_active,
+            config: tb.config,
+            created_at: tb.created_at,
+            updated_at: tb.updated_at,
+            flow_name: flow?.name || tb.flow_id,
+            flow_description: flow?.description || "",
+            flow_icon: flow?.icon || "🤖",
+        };
+    });
+
+    return res.json({ tenant_bots: enriched });
+});
+
+// POST /api/superadmin/tenant-bots
+// Asigna un flow a un tenant
+router.post("/tenant-bots", requireAuth, requireSuperAdmin, async (req, res) => {
+    const tenantId = req.body?.tenant_id;
+    const flowId = req.body?.flow_id;
+    const config = req.body?.config || null;
+
+    if (!tenantId || !flowId) {
+        return res.status(400).json({ error: "missing_fields" });
+    }
+
+    // Verificar que el flow existe
+    const { getFlow } = require("../../../flows");
+    const flow = getFlow(flowId);
+    if (!flow) {
+        return res.status(400).json({ error: "flow_not_found" });
+    }
+
+    const control = getControlClient();
+    try {
+        const tenantBot = await control.tenantBot.create({
+            data: {
+                tenant_id: tenantId,
+                flow_id: flowId,
+                is_active: true,
+                config,
+            },
+        });
+
+        return res.json({
+            tenant_bot: {
+                id: tenantBot.id,
+                tenant_id: tenantBot.tenant_id,
+                flow_id: tenantBot.flow_id,
+                is_active: tenantBot.is_active,
+                config: tenantBot.config,
+                created_at: tenantBot.created_at,
+                flow_name: flow.name,
+                flow_icon: flow.icon,
+            },
+        });
+    } catch (error) {
+        if (error.code === "P2002") {
+            return res.status(400).json({ error: "flow_already_assigned" });
+        }
+        throw error;
+    }
+});
+
+// PATCH /api/superadmin/tenant-bots/:id
+// Actualiza estado o config de un bot asignado
+router.patch("/tenant-bots/:id", requireAuth, requireSuperAdmin, async (req, res) => {
+    const updates = {};
+
+    if (req.body?.is_active !== undefined) {
+        updates.is_active = Boolean(req.body.is_active);
+    }
+    if (req.body?.config !== undefined) {
+        updates.config = req.body.config;
+    }
+
+    const control = getControlClient();
+    const tenantBot = await control.tenantBot.update({
+        where: { id: req.params.id },
+        data: updates,
+    });
+
+    const { getFlow } = require("../../../flows");
+    const flow = getFlow(tenantBot.flow_id);
+
+    return res.json({
+        tenant_bot: {
+            id: tenantBot.id,
+            tenant_id: tenantBot.tenant_id,
+            flow_id: tenantBot.flow_id,
+            is_active: tenantBot.is_active,
+            config: tenantBot.config,
+            updated_at: tenantBot.updated_at,
+            flow_name: flow?.name || tenantBot.flow_id,
+            flow_icon: flow?.icon || "🤖",
+        },
+    });
+});
+
+// DELETE /api/superadmin/tenant-bots/:id
+// Elimina un bot de un tenant
+router.delete("/tenant-bots/:id", requireAuth, requireSuperAdmin, async (req, res) => {
+    const control = getControlClient();
+    await control.tenantBot.delete({
+        where: { id: req.params.id },
+    });
+    return res.json({ success: true });
+});
+
 module.exports = router;
 module.exports.requireSuperAdmin = requireSuperAdmin;

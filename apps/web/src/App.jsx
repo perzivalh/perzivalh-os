@@ -9,413 +9,34 @@ import CampaignsView from "./components/CampaignsView.jsx";
 import AdminView from "./components/AdminView.jsx";
 import SuperAdminView from "./components/SuperAdminView.jsx";
 
-const STATUS_OPTIONS = ["open", "pending", "closed"];
-const BASE_ROLE_OPTIONS = ["admin", "recepcion", "caja", "marketing", "doctor"];
-const DEFAULT_ROLE_PERMISSIONS = {
-  admin: {
-    modules: {
-      chat: { read: true, write: true },
-      dashboard: { read: true, write: true },
-      campaigns: { read: true, write: true },
-      settings: { read: true, write: true },
-    },
-    settings: {
-      general: { read: true, write: true },
-      users: { read: true, write: true },
-      bot: { read: true, write: true },
-      templates: { read: true, write: true },
-      audit: { read: true, write: true },
-      odoo: { read: true, write: true },
-    },
-  },
-  recepcion: {
-    modules: {
-      chat: { read: true, write: true },
-      dashboard: { read: true, write: false },
-      campaigns: { read: false, write: false },
-      settings: { read: false, write: false },
-    },
-    settings: {
-      general: { read: false, write: false },
-      users: { read: false, write: false },
-      bot: { read: false, write: false },
-      templates: { read: false, write: false },
-      audit: { read: false, write: false },
-      odoo: { read: false, write: false },
-    },
-  },
-  caja: {
-    modules: {
-      chat: { read: true, write: false },
-      dashboard: { read: true, write: false },
-      campaigns: { read: false, write: false },
-      settings: { read: false, write: false },
-    },
-    settings: {
-      general: { read: false, write: false },
-      users: { read: false, write: false },
-      bot: { read: false, write: false },
-      templates: { read: false, write: false },
-      audit: { read: false, write: false },
-      odoo: { read: false, write: false },
-    },
-  },
-  marketing: {
-    modules: {
-      chat: { read: false, write: false },
-      dashboard: { read: true, write: false },
-      campaigns: { read: true, write: true },
-      settings: { read: true, write: false },
-    },
-    settings: {
-      general: { read: true, write: false },
-      users: { read: false, write: false },
-      bot: { read: false, write: false },
-      templates: { read: true, write: true },
-      audit: { read: false, write: false },
-      odoo: { read: false, write: false },
-    },
-  },
-  doctor: {
-    modules: {
-      chat: { read: true, write: false },
-      dashboard: { read: false, write: false },
-      campaigns: { read: false, write: false },
-      settings: { read: false, write: false },
-    },
-    settings: {
-      general: { read: false, write: false },
-      users: { read: false, write: false },
-      bot: { read: false, write: false },
-      templates: { read: false, write: false },
-      audit: { read: false, write: false },
-      odoo: { read: false, write: false },
-    },
-  },
-};
+// Importar desde módulos
+import { STATUS_OPTIONS, BASE_ROLE_OPTIONS, DEFAULT_ROLE_PERMISSIONS } from "./constants";
+import {
+  formatDate,
+  formatCompactDate,
+  formatListTime,
+  formatMessageDayLabel,
+  formatDuration,
+  normalizeError,
+} from "./utils/formatters";
+import { hasRole, hasPermission, mergeRolePermissions } from "./utils/permissions";
+import { sortConversations, buildQuery, getInitial, applyBrandingToCss } from "./utils/helpers";
+import {
+  ChatIcon,
+  DashboardIcon,
+  BellIcon,
+  SettingsIcon,
+  SunIcon,
+  MoonIcon,
+  UserIcon,
+  SearchIcon,
+  PlusIcon,
+  VideoIcon,
+  PhoneIcon,
+  InfoIcon,
+  SendIcon,
+} from "./components/icons";
 
-function formatDate(value) {
-  if (!value) {
-    return "-";
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "-";
-  }
-  return date.toLocaleString();
-}
-
-function formatCompactDate(value) {
-  if (!value) {
-    return "-";
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "-";
-  }
-  return date.toLocaleDateString();
-}
-
-function formatListTime(value) {
-  if (!value) {
-    return "-";
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "-";
-  }
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const diffDays = Math.round((today - target) / 86400000);
-  if (diffDays === 0) {
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-  if (diffDays === 1) {
-    return "Ayer";
-  }
-  const dayNames = ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"];
-  return dayNames[date.getDay()];
-}
-
-function formatMessageDayLabel(value) {
-  if (!value) {
-    return "";
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const diffDays = Math.round((today - target) / 86400000);
-  if (diffDays === 0) {
-    return "Hoy";
-  }
-  if (diffDays === 1) {
-    return "Ayer";
-  }
-  const months = [
-    "Ene",
-    "Feb",
-    "Mar",
-    "Abr",
-    "May",
-    "Jun",
-    "Jul",
-    "Ago",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dic",
-  ];
-  const label = `${date.getDate()} ${months[date.getMonth()]}`;
-  if (date.getFullYear() !== now.getFullYear()) {
-    return `${label} ${date.getFullYear()}`;
-  }
-  return label;
-}
-
-function formatDuration(seconds) {
-  if (seconds === null || seconds === undefined) {
-    return "-";
-  }
-  const minutes = Math.round(Number(seconds) / 60);
-  if (!Number.isFinite(minutes)) {
-    return "-";
-  }
-  return `${minutes} min`;
-}
-
-function normalizeError(error) {
-  if (!error) {
-    return "Error inesperado";
-  }
-  if (typeof error === "string") {
-    return error;
-  }
-  return error.message || "Error inesperado";
-}
-
-function sortConversations(list) {
-  return [...list].sort((a, b) => {
-    const aTime = new Date(a.last_message_at || a.created_at || 0).getTime();
-    const bTime = new Date(b.last_message_at || b.created_at || 0).getTime();
-    return bTime - aTime;
-  });
-}
-
-function buildQuery(params) {
-  const search = new URLSearchParams();
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value === undefined || value === null || value === "") {
-      return;
-    }
-    search.append(key, value);
-  });
-  const query = search.toString();
-  return query ? `?${query}` : "";
-}
-
-function hasRole(user, roles) {
-  if (!user) {
-    return false;
-  }
-  return roles.includes(user.role);
-}
-
-function getInitial(value) {
-  if (!value) {
-    return "?";
-  }
-  const trimmed = value.trim();
-  return trimmed ? trimmed[0].toUpperCase() : "?";
-}
-
-function mergeRolePermissions(saved) {
-  if (!saved || typeof saved !== "object") {
-    return { ...DEFAULT_ROLE_PERMISSIONS };
-  }
-  const merged = { ...DEFAULT_ROLE_PERMISSIONS };
-  Object.entries(saved).forEach(([role, value]) => {
-    if (!value || typeof value !== "object") {
-      return;
-    }
-    merged[role] = {
-      modules: {
-        ...DEFAULT_ROLE_PERMISSIONS[role]?.modules,
-        ...value.modules,
-      },
-      settings: {
-        ...DEFAULT_ROLE_PERMISSIONS[role]?.settings,
-        ...value.settings,
-      },
-    };
-  });
-  return merged;
-}
-
-function hasPermission(rolePermissions, group, key, action = "read") {
-  const entry = rolePermissions?.[group]?.[key];
-  if (!entry) {
-    return false;
-  }
-  return Boolean(entry[action]);
-}
-
-function ChatIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
-      <path
-        d="M4.5 5.5h15v10H8l-3.5 3.5V5.5Z"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-      <path d="M8 9h8" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M8 12.5h5" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function DashboardIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
-      <rect x="3" y="3" width="7" height="7" rx="1.6" strokeWidth="1.8" />
-      <rect x="14" y="3" width="7" height="7" rx="1.6" strokeWidth="1.8" />
-      <rect x="3" y="14" width="7" height="7" rx="1.6" strokeWidth="1.8" />
-      <rect x="14" y="14" width="7" height="7" rx="1.6" strokeWidth="1.8" />
-    </svg>
-  );
-}
-
-function BellIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
-      <path
-        d="M6 9a6 6 0 1 1 12 0c0 4.2 2 5.5 2 5.5H4S6 13.2 6 9Z"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-      <path d="M9.5 19a2.5 2.5 0 0 0 5 0" strokeWidth="1.8" />
-    </svg>
-  );
-}
-
-function SettingsIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
-      <circle cx="12" cy="12" r="3.2" strokeWidth="1.8" />
-      <path
-        d="M19.5 12a7.5 7.5 0 0 0-.1-1.2l2-1.4-2-3.4-2.3.8a7.5 7.5 0 0 0-1.8-1L14.9 2h-3.8l-.4 2.8a7.5 7.5 0 0 0-1.8 1l-2.3-.8-2 3.4 2 1.4a7.5 7.5 0 0 0 0 2.4l-2 1.4 2 3.4 2.3-.8a7.5 7.5 0 0 0 1.8 1l.4 2.8h3.8l.4-2.8a7.5 7.5 0 0 0 1.8-1l2.3.8 2-3.4-2-1.4c.1-.4.1-.8.1-1.2Z"
-        strokeWidth="1.2"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function SunIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
-      <circle cx="12" cy="12" r="4" strokeWidth="1.8" />
-      <path d="M12 3v2.5" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M12 18.5V21" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M3 12h2.5" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M18.5 12H21" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M5.2 5.2l1.8 1.8" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M17 17l1.8 1.8" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M5.2 18.8 7 17" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M17 7l1.8-1.8" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function MoonIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
-      <path
-        d="M20 14.2A8.5 8.5 0 1 1 9.8 4 6.5 6.5 0 0 0 20 14.2Z"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function UserIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
-      <circle cx="12" cy="8" r="3.5" strokeWidth="1.8" />
-      <path
-        d="M5 19.5a7 7 0 0 1 14 0"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function SearchIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
-      <circle cx="11" cy="11" r="6.5" strokeWidth="1.8" />
-      <path d="M16.5 16.5 21 21" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function PlusIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
-      <path d="M12 5v14" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M5 12h14" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function VideoIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
-      <rect x="3.5" y="6" width="11" height="12" rx="2" strokeWidth="1.8" />
-      <path d="m14.5 10 6-3v10l-6-3" strokeWidth="1.8" />
-    </svg>
-  );
-}
-
-function PhoneIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
-      <path
-        d="M6.5 4.5 9 3l2.5 4-2.5 1.5c1.2 2.3 3.2 4.3 5.5 5.5L16 11l4 2.5-1.5 2.5c-.7 1.2-2.2 1.7-3.6 1.3a15.9 15.9 0 0 1-7.7-7.7c-.4-1.4.1-2.9 1.3-3.6Z"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function InfoIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
-      <circle cx="12" cy="12" r="9" strokeWidth="1.8" />
-      <path d="M12 10v6" strokeWidth="1.8" strokeLinecap="round" />
-      <circle cx="12" cy="7.5" r="1" fill="currentColor" />
-    </svg>
-  );
-}
-
-function SendIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
-      <path
-        d="m4 12 15-7-6 14-2.5-5.2L4 12Z"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 function App() {
   const [token, setTokenState] = useState(localStorage.getItem("token") || "");
@@ -556,71 +177,6 @@ function App() {
     is_active: true,
   });
   const [auditLogs, setAuditLogs] = useState([]);
-
-  function hexToRgb(input) {
-    const hex = String(input || "").replace("#", "").trim();
-    if (hex.length !== 6) {
-      return null;
-    }
-    const num = Number.parseInt(hex, 16);
-    if (Number.isNaN(num)) {
-      return null;
-    }
-    return {
-      r: (num >> 16) & 255,
-      g: (num >> 8) & 255,
-      b: num & 255,
-    };
-  }
-
-  function clamp(value, min = 0, max = 255) {
-    return Math.min(max, Math.max(min, value));
-  }
-
-  function rgba(color, alpha) {
-    return `rgba(${color.r}, ${color.g}, ${color.b}, ${alpha})`;
-  }
-
-  function darken(color, amount = 0.18) {
-    return {
-      r: clamp(Math.round(color.r * (1 - amount))),
-      g: clamp(Math.round(color.g * (1 - amount))),
-      b: clamp(Math.round(color.b * (1 - amount))),
-    };
-  }
-
-  function applyBrandingToCss(nextBranding) {
-    if (typeof document === "undefined") {
-      return;
-    }
-    const style = document.documentElement.style;
-    if (!nextBranding?.colors) {
-      style.removeProperty("--accent");
-      style.removeProperty("--accent-strong");
-      style.removeProperty("--accent-soft");
-      style.removeProperty("--accent-soft-2");
-      style.removeProperty("--scroll-thumb");
-      style.removeProperty("--scroll-thumb-hover");
-      return;
-    }
-    const primaryHex = nextBranding.colors?.primary || nextBranding.colors?.accent;
-    const accentHex = nextBranding.colors?.accent || primaryHex;
-    const primary = hexToRgb(primaryHex);
-    const accent = hexToRgb(accentHex);
-    if (!primary || !accent) {
-      return;
-    }
-    const accentStrong = darken(accent, 0.22);
-    style.setProperty("--accent", `#${primaryHex.replace("#", "")}`);
-    style.setProperty(
-      "--accent-strong",
-      `#${accentHex.replace("#", "")}`
-    );
-    style.setProperty("--accent-soft", rgba(accent, 0.18));
-    style.setProperty("--accent-soft-2", rgba(accent, 0.12));
-    style.setProperty("--scroll-thumb", rgba(accentStrong, 0.45));
-    style.setProperty("--scroll-thumb-hover", rgba(accentStrong, 0.65));
-  }
 
   const navigateTo = useCallback((nextPath, options = {}) => {
     if (typeof window === "undefined") {
@@ -1758,8 +1314,8 @@ function App() {
   };
   const activeName = activeConversation
     ? activeConversation.display_name ||
-      activeConversation.phone_e164 ||
-      activeConversation.wa_id
+    activeConversation.phone_e164 ||
+    activeConversation.wa_id
     : "Selecciona un chat";
   const activePhone = activeConversation?.phone_e164 || activeConversation?.wa_id || "";
   const activeStatusLabel = activeConversation
@@ -1805,9 +1361,8 @@ function App() {
     messageBlocks.push(
       <div
         key={message.id}
-        className={`message ${message.direction} ${
-          message.type === "note" ? "note" : ""
-        }`}
+        className={`message ${message.direction} ${message.type === "note" ? "note" : ""
+          }`}
       >
         <div className="message-text">{message.text || `[${message.type}]`}</div>
         <div className="message-meta">{formatDate(message.created_at)}</div>

@@ -1,110 +1,26 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { apiGet, apiPatch, apiPost } from "../api";
 
-const EMPTY_PROVISION = {
-  name: "",
-  slug: "",
-  plan: "",
-  db_url: "",
-  phone_number_id: "",
-  line_name: "",
-  waba_id: "",
-  verify_token: "",
-  wa_token: "",
-  app_secret: "",
-  brand_name: "",
-  logo_url: "",
-  brand_primary: "#22d3ee",
-  brand_accent: "#38bdf8",
-  brand_bg: "#0b0f16",
-  timezone: "",
-  odoo_base_url: "",
-  odoo_db_name: "",
-  odoo_username: "",
-  odoo_password: "",
-};
+// Importar desde módulos
+import {
+  EMPTY_PROVISION,
+  PLAN_OPTIONS,
+  TIMEZONE_OPTIONS,
+} from "./superadmin/constants";
+import {
+  GridIcon,
+  PlusIcon,
+  GearIcon,
+  SearchIcon,
+  ArrowRightIcon,
+} from "./superadmin/icons";
 
-const PLAN_OPTIONS = [
-  { value: "starter", label: "Starter" },
-  { value: "growth", label: "Growth" },
-  { value: "scale", label: "Scale" },
-  { value: "enterprise", label: "Enterprise" },
-];
-
-const TIMEZONE_OPTIONS = [
-  "UTC",
-  "America/La_Paz",
-  "America/Lima",
-  "America/Bogota",
-  "America/Santiago",
-  "America/Argentina/Buenos_Aires",
-  "America/Mexico_City",
-  "America/New_York",
-  "America/Los_Angeles",
-  "Europe/Madrid",
-  "Europe/London",
-  "Europe/Berlin",
-  "Asia/Tokyo",
-  "Asia/Singapore",
-  "Australia/Sydney",
-];
-
-function GridIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
-      <rect x="4" y="4" width="6" height="6" rx="1.5" strokeWidth="1.6" />
-      <rect x="14" y="4" width="6" height="6" rx="1.5" strokeWidth="1.6" />
-      <rect x="4" y="14" width="6" height="6" rx="1.5" strokeWidth="1.6" />
-      <rect x="14" y="14" width="6" height="6" rx="1.5" strokeWidth="1.6" />
-    </svg>
-  );
-}
-
-function PlusIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
-      <path d="M12 5v14" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M5 12h14" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function GearIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
-      <circle cx="12" cy="12" r="3.5" strokeWidth="1.6" />
-      <path
-        d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.5-2.4.7a7.2 7.2 0 0 0-2-1.2L12 2 9.5 4.3a7.2 7.2 0 0 0-2 1.2l-2.4-.7-2 3.5 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.5 2.4-.7a7.2 7.2 0 0 0 2 1.2L12 22l2.5-2.3a7.2 7.2 0 0 0 2-1.2l2.4.7 2-3.5-2-1.5c.1-.4.1-.8.1-1.2Z"
-        strokeWidth="1.2"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function SearchIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
-      <circle cx="11" cy="11" r="6.5" strokeWidth="1.6" />
-      <path d="M16.5 16.5 20 20" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function ArrowRightIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
-      <path d="M6 12h12" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="m13 6 6 6-6 6" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 function SuperAdminView({
   route = "/superadmin",
   onNavigate,
   onImpersonateTenant,
-  onLogout = () => {},
+  onLogout = () => { },
 }) {
   const [tenants, setTenants] = useState([]);
   const [channels, setChannels] = useState([]);
@@ -632,8 +548,8 @@ function SuperAdminView({
                               {!canEnter
                                 ? "Sin DB"
                                 : impersonateBusyId === tenant.id
-                                ? "Entrando..."
-                                : "Entrar"}
+                                  ? "Entrando..."
+                                  : "Entrar"}
                             </button>
                             <button
                               className="sa-link"

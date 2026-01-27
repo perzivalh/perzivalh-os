@@ -1,0 +1,347 @@
+/**
+ * Rutas de conversaciones
+ */
+const express = require("express");
+const router = express.Router();
+
+const { requireAuth } = require("../middleware/auth");
+const { panelLimiter } = require("../middleware/rateLimit");
+const prisma = require("../db");
+const { getControlClient } = require("../control/controlClient");
+const { getTenantContext } = require("../tenancy/tenantContext");
+const { resolveChannelByPhoneNumberId } = require("../tenancy/tenantResolver");
+const { sendText } = require("../whatsapp");
+const {
+    getConversationById,
+    formatConversation,
+    CONVERSATION_SELECT,
+    setConversationStatus,
+    assignConversation,
+    addTagToConversation,
+    removeTagFromConversation,
+    logAudit,
+} = require("../services/conversations");
+
+// Aplicar rate limiter a todas las rutas /api
+router.use(panelLimiter);
+
+// GET /api/me
+router.get("/me", requireAuth, (req, res) => {
+    return res.json({ user: req.user });
+});
+
+// GET /api/tenant
+router.get("/tenant", requireAuth, async (req, res) => {
+    if (!req.user?.tenant_id) {
+        return res.json({ tenant: null });
+    }
+    if (!process.env.CONTROL_DB_URL) {
+        return res.json({ tenant: null });
+    }
+    const control = getControlClient();
+    const tenant = await control.tenant.findUnique({
+        where: { id: req.user.tenant_id },
+        select: { id: true, name: true, slug: true, plan: true, is_active: true },
+    });
+    return res.json({ tenant });
+});
+
+// GET /api/branding
+router.get("/branding", requireAuth, async (req, res) => {
+    if (!req.user?.tenant_id) {
+        return res.json({ branding: null });
+    }
+    if (!process.env.CONTROL_DB_URL) {
+        return res.json({ branding: null });
+    }
+    const control = getControlClient();
+    const branding = await control.branding.findUnique({
+        where: { tenant_id: req.user.tenant_id },
+    });
+    return res.json({ branding });
+});
+
+// GET /api/channels
+router.get("/channels", requireAuth, async (req, res) => {
+    if (!req.user?.tenant_id) {
+        return res.status(403).json({ error: "missing_tenant" });
+    }
+    if (!process.env.CONTROL_DB_URL) {
+        return res.status(500).json({ error: "control_db_missing" });
+    }
+    const control = getControlClient();
+    const channels = await control.channel.findMany({
+        where: { tenant_id: req.user.tenant_id },
+        orderBy: { created_at: "asc" },
+    });
+    return res.json({
+        channels: channels.map((channel) => ({
+            id: channel.id,
+            phone_number_id: channel.phone_number_id,
+            display_name: channel.display_name || null,
+            waba_id: channel.waba_id || null,
+            created_at: channel.created_at,
+        })),
+    });
+});
+
+// PATCH /api/channels/:id
+router.patch("/channels/:id", requireAuth, async (req, res) => {
+    if (!req.user?.tenant_id) {
+        return res.status(403).json({ error: "missing_tenant" });
+    }
+    const control = getControlClient();
+    const existing = await control.channel.findUnique({
+        where: { id: req.params.id },
+    });
+    if (!existing || existing.tenant_id !== req.user.tenant_id) {
+        return res.status(404).json({ error: "not_found" });
+    }
+    const displayName = String(req.body?.display_name || "").trim();
+    const { clearChannelCache } = require("../tenancy/tenantResolver");
+    const channel = await control.channel.update({
+        where: { id: req.params.id },
+        data: { display_name: displayName || null },
+    });
+    clearChannelCache(channel.phone_number_id);
+    return res.json({
+        channel: {
+            id: channel.id,
+            phone_number_id: channel.phone_number_id,
+            display_name: channel.display_name || null,
+            waba_id: channel.waba_id || null,
+            created_at: channel.created_at,
+        },
+    });
+});
+
+// GET /api/role-permissions
+router.get("/role-permissions", requireAuth, async (req, res) => {
+    const entries = await prisma.rolePermission.findMany();
+    const permissions = entries.reduce((acc, entry) => {
+        acc[entry.role] = entry.permissions_json || {};
+        return acc;
+    }, {});
+    if (req.user.role !== "admin") {
+        return res.json({
+            permissions: {
+                [req.user.role]: permissions[req.user.role] || null,
+            },
+        });
+    }
+    return res.json({ permissions });
+});
+
+// GET /api/users
+router.get("/users", requireAuth, async (req, res) => {
+    const users = await prisma.user.findMany({
+        where: { is_active: true },
+        select: { id: true, name: true, email: true, role: true },
+        orderBy: { name: "asc" },
+    });
+    return res.json({ users });
+});
+
+// GET /api/tags
+router.get("/tags", requireAuth, async (req, res) => {
+    const tags = await prisma.tag.findMany({
+        select: { id: true, name: true, color: true },
+        orderBy: { name: "asc" },
+    });
+    return res.json({ tags });
+});
+
+// GET /api/conversations
+router.get("/conversations", requireAuth, async (req, res) => {
+    const status = req.query.status;
+    const assignedUser = req.query.assigned_user_id;
+    const tag = req.query.tag;
+    const phoneNumberId = req.query.phone_number_id;
+    const search = (req.query.search || "").trim();
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+
+    const where = {};
+    if (status) {
+        where.status = status;
+    }
+    if (assignedUser) {
+        if (assignedUser === "unassigned") {
+            where.assigned_user_id = null;
+        } else {
+            where.assigned_user_id = assignedUser;
+        }
+    }
+    if (tag) {
+        where.tags = {
+            some: {
+                tag: {
+                    name: tag,
+                },
+            },
+        };
+    }
+    if (phoneNumberId) {
+        where.phone_number_id = phoneNumberId;
+    }
+    if (search) {
+        where.OR = [
+            { phone_e164: { contains: search } },
+            { wa_id: { contains: search } },
+            { display_name: { contains: search, mode: "insensitive" } },
+        ];
+    }
+
+    const conversations = await prisma.conversation.findMany({
+        where,
+        select: CONVERSATION_SELECT,
+        orderBy: [{ last_message_at: "desc" }, { created_at: "desc" }],
+        take: limit,
+    });
+
+    const ids = conversations.map((entry) => entry.id);
+    let lastMessages = [];
+    if (ids.length) {
+        lastMessages = await prisma.message.findMany({
+            where: { conversation_id: { in: ids } },
+            select: {
+                conversation_id: true,
+                text: true,
+                type: true,
+                direction: true,
+                created_at: true,
+            },
+            orderBy: { created_at: "desc" },
+            distinct: ["conversation_id"],
+        });
+    }
+    const lastMessageMap = new Map(
+        lastMessages.map((message) => [message.conversation_id, message])
+    );
+
+    return res.json({
+        conversations: conversations.map((entry) => {
+            const formatted = formatConversation(entry);
+            const lastMessage = lastMessageMap.get(entry.id);
+            if (!lastMessage) {
+                return formatted;
+            }
+            return {
+                ...formatted,
+                last_message_text: lastMessage.text,
+                last_message_type: lastMessage.type,
+                last_message_direction: lastMessage.direction,
+                last_message_at: lastMessage.created_at || formatted.last_message_at,
+            };
+        }),
+    });
+});
+
+// GET /api/conversations/:id
+router.get("/conversations/:id", requireAuth, async (req, res) => {
+    const conversationId = req.params.id;
+    const conversation = await getConversationById(conversationId);
+    if (!conversation) {
+        return res.status(404).json({ error: "not_found" });
+    }
+
+    const messages = await prisma.message.findMany({
+        where: { conversation_id: conversationId },
+        orderBy: { created_at: "asc" },
+        take: 500,
+    });
+
+    return res.json({ conversation, messages });
+});
+
+// PATCH /api/conversations/:id/status
+router.patch("/conversations/:id/status", requireAuth, async (req, res) => {
+    const status = req.body?.status;
+    const ALLOWED_STATUS = new Set(["open", "pending", "closed"]);
+    if (!status || !ALLOWED_STATUS.has(status)) {
+        return res.status(400).json({ error: "invalid_status" });
+    }
+    try {
+        const conversation = await setConversationStatus({
+            conversationId: req.params.id,
+            status,
+            userId: req.user.id,
+        });
+        return res.json({ conversation });
+    } catch (error) {
+        return res.status(404).json({ error: "not_found" });
+    }
+});
+
+// PATCH /api/conversations/:id/assign
+router.patch("/conversations/:id/assign", requireAuth, async (req, res) => {
+    const userId = req.body?.user_id || null;
+    try {
+        const conversation = await assignConversation({
+            conversationId: req.params.id,
+            userId,
+            byUserId: req.user.id,
+        });
+        return res.json({ conversation });
+    } catch (error) {
+        return res.status(404).json({ error: "not_found" });
+    }
+});
+
+// POST /api/conversations/:id/tags
+router.post("/conversations/:id/tags", requireAuth, async (req, res) => {
+    const adds = Array.isArray(req.body?.add) ? req.body.add : [];
+    const removes = Array.isArray(req.body?.remove) ? req.body.remove : [];
+    let conversation = null;
+
+    try {
+        for (const name of adds) {
+            conversation = await addTagToConversation({
+                conversationId: req.params.id,
+                tagName: name,
+            });
+        }
+        for (const name of removes) {
+            conversation = await removeTagFromConversation({
+                conversationId: req.params.id,
+                tagName: name,
+            });
+        }
+    } catch (error) {
+        return res.status(400).json({ error: "tag_update_failed" });
+    }
+
+    return res.json({ conversation });
+});
+
+// POST /api/conversations/:id/messages
+router.post("/conversations/:id/messages", requireAuth, async (req, res) => {
+    const text = (req.body?.text || "").trim();
+    const type = req.body?.type || "text";
+    if (!text) {
+        return res.status(400).json({ error: "missing_text" });
+    }
+
+    const conversation = await getConversationById(req.params.id);
+    if (!conversation) {
+        return res.status(404).json({ error: "not_found" });
+    }
+
+    const phoneNumberId = conversation.phone_number_id;
+    if (!phoneNumberId) {
+        return res.status(400).json({ error: "missing_phone_number_id" });
+    }
+
+    const channelConfig = await resolveChannelByPhoneNumberId(phoneNumberId);
+    const tenantId = getTenantContext().tenantId;
+    if (!channelConfig || channelConfig.tenantId !== tenantId) {
+        return res.status(400).json({ error: "missing_channel" });
+    }
+
+    await sendText(conversation.wa_id, text, {
+        channel: channelConfig,
+        meta: { source: "panel", by_user_id: req.user.id },
+    });
+    return res.json({ ok: true });
+});
+
+module.exports = router;

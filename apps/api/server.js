@@ -340,7 +340,17 @@ setInterval(() => {
 // ERROR HANDLER
 // ==========================================
 
+// Log CORS config on startup
+logger.info("cors.config", { FRONTEND_ORIGINS, allowAll: FRONTEND_ORIGINS.includes("*") });
+
 app.use((err, req, res, next) => {
+    // Always set CORS headers on errors
+    const origin = req.headers.origin;
+    if (origin && (FRONTEND_ORIGINS.includes("*") || isAllowedOrigin(origin))) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+    }
+
     if (err instanceof SyntaxError && err.type === "entity.parse.failed") {
         const timestamp = new Date().toISOString();
         logger.error("webhook.parse_error", {
@@ -350,7 +360,15 @@ app.use((err, req, res, next) => {
         });
         return res.status(400).send("INVALID_JSON");
     }
-    return next(err);
+
+    // Log all unhandled errors
+    logger.error("unhandled_error", {
+        message: err.message,
+        stack: err.stack,
+        path: req.path,
+    });
+
+    return res.status(500).json({ error: "internal_error", message: err.message });
 });
 
 // ==========================================

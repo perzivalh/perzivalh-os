@@ -335,10 +335,11 @@ async function callKwViaJsonRpc(state, model, method, args = [], kwargs = {}) {
   return response.data?.result;
 }
 
-async function searchRead(model, domain, fields, limit = 10, order = null) {
+async function searchRead(model, domain, fields, limit = 10, order = null, offset = 0) {
   const kwargs = {
     fields,
     limit,
+    offset,
   };
   if (order) {
     kwargs.order = order;
@@ -346,9 +347,9 @@ async function searchRead(model, domain, fields, limit = 10, order = null) {
   return callKw(model, "search_read", [domain], kwargs);
 }
 
-async function safeSearchRead(model, domain, fields, limit, order) {
+async function safeSearchRead(model, domain, fields, limit, order, offset) {
   try {
-    return await searchRead(model, domain, fields, limit, order);
+    return await searchRead(model, domain, fields, limit, order, offset);
   } catch (error) {
     const message = error?.data?.message || error?.message || "";
     if (message.toLowerCase().includes("field")) {

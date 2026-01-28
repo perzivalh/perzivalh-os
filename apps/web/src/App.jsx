@@ -1,6 +1,6 @@
 ﻿
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { apiDelete, apiGet, apiPatch, apiPost, setToken } from "./api";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut, setToken } from "./api";
 import { connectSocket } from "./socket";
 import NavRail from "./components/NavRail.jsx";
 import ChatView from "./components/ChatView.jsx";
@@ -999,7 +999,7 @@ function App() {
 
   async function handleSyncTemplates() {
     try {
-      await apiPost("/api/admin/templates/sync", {});
+      await apiGet("/api/templates/sync");
       await loadTemplates();
     } catch (error) {
       setPageError(normalizeError(error));
@@ -1260,33 +1260,54 @@ function App() {
     }
   }
 
-  async function handleTemplateSubmit(event) {
-    event.preventDefault();
-    if (!templateForm.name.trim()) {
+  async function handleTemplateSubmit(event, overrideData) {
+    if (event?.preventDefault) {
+      event.preventDefault();
+    }
+    const data = overrideData || templateForm || {};
+    const name = typeof data.name === "string" ? data.name.trim() : "";
+    if (!name) {
       setPageError("Completa el nombre");
-      return;
+      return null;
     }
     const payload = {
-      name: templateForm.name.trim(),
-      language: templateForm.language.trim() || "es",
-      category: templateForm.category.trim() || null,
-      body_preview: templateForm.body_preview.trim(),
-      is_active: templateForm.is_active,
+      name,
+      category: data.category || "UTILITY",
+      language: data.language || "es",
+      body_text: data.body_text || data.body_preview || "",
+      header_type: data.header_type || null,
+      header_content: data.header_content || null,
+      footer_text: data.footer_text || null,
+      buttons: data.buttons || data.buttons_json || [],
     };
+    const variableMappings = data.variable_mappings || data.variableMappings || [];
     try {
-      if (templateForm.id) {
-        await apiPatch(`/api/admin/templates/${templateForm.id}`, payload);
+      let result = null;
+      if (data.id) {
+        result = await apiPut(`/api/templates/${data.id}`, payload);
+        await apiPut(`/api/templates/${data.id}/mappings`, {
+          mappings: variableMappings,
+        });
       } else {
-        await apiPost("/api/admin/templates", payload);
+        result = await apiPost("/api/templates/draft", {
+          ...payload,
+          variable_mappings: variableMappings,
+        });
       }
-      setTemplateForm({
-        id: "",
-        name: "",
-        language: "es",
-        category: "",
-        body_preview: "",
-        is_active: true,
-      });
+      await loadTemplates();
+      return result?.template || null;
+    } catch (error) {
+      setPageError(normalizeError(error));
+      return null;
+    }
+  }
+
+  async function handleTemplateSubmitToMeta(templateId) {
+    if (!templateId) {
+      return;
+    }
+    try {
+      await apiPost(`/api/templates/${templateId}/submit`, {});
       await loadTemplates();
     } catch (error) {
       setPageError(normalizeError(error));
@@ -1502,6 +1523,7 @@ function App() {
           templateForm={templateForm}
           setTemplateForm={setTemplateForm}
           handleTemplateSubmit={handleTemplateSubmit}
+          handleTemplateSubmitToMeta={handleTemplateSubmitToMeta}
           handleSyncTemplates={handleSyncTemplates}
           auditLogs={auditLogs}
           formatDate={formatDate}
@@ -1610,4 +1632,3 @@ function App() {
 }
 
 export default App;
-

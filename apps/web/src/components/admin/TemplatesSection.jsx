@@ -30,6 +30,7 @@ function TemplatesSection({
     templateForm,
     setTemplateForm,
     handleTemplateSubmit,
+    handleTemplateSubmitToMeta,
     handleSyncTemplates,
     onLoadTemplates,
 }) {
@@ -38,6 +39,7 @@ function TemplatesSection({
     const [search, setSearch] = useState("");
     const [syncing, setSyncing] = useState(false);
     const [filterStatus, setFilterStatus] = useState("");
+    const [submitting, setSubmitting] = useState(false);
 
     // New form state for editor
     const [editorForm, setEditorForm] = useState({
@@ -113,9 +115,39 @@ function TemplatesSection({
             setTemplateForm(formData);
         }
         if (handleTemplateSubmit) {
-            await handleTemplateSubmit(e);
+            const saved = await handleTemplateSubmit(null, formData);
+            if (saved) {
+                setEditingTemplate(saved);
+            }
         }
-        setView("list");
+    };
+
+    const handleSubmitTemplate = async () => {
+        if (!handleTemplateSubmitToMeta) {
+            return;
+        }
+        setSubmitting(true);
+        try {
+            let targetId = editingTemplate?.id;
+            if (!targetId) {
+                const formData = {
+                    ...editorForm,
+                    variable_mappings: variableMappings,
+                };
+                const saved = await handleTemplateSubmit(null, formData);
+                targetId = saved?.id;
+                if (saved) {
+                    setEditingTemplate(saved);
+                }
+            }
+            if (targetId) {
+                await handleTemplateSubmitToMeta(targetId);
+                setView("list");
+                setEditingTemplate(null);
+            }
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     const handleDiscard = () => {
@@ -261,6 +293,15 @@ function TemplatesSection({
                     <button className="btn-save-draft" onClick={handleSaveTemplate}>
                         💾 Guardar Borrador
                     </button>
+                    {(editingTemplate?.status === "DRAFT" || editingTemplate?.status === "REJECTED" || !editingTemplate) && (
+                        <button
+                            className="btn-primary"
+                            onClick={handleSubmitTemplate}
+                            disabled={submitting || !editorForm.name || !editorForm.body_text}
+                        >
+                            {submitting ? "Enviando..." : "Enviar a Meta"}
+                        </button>
+                    )}
                     <button className="btn-discard" onClick={handleDiscard}>
                         🗑 Descartar
                     </button>
@@ -278,7 +319,14 @@ function TemplatesSection({
                                 type="text"
                                 placeholder="patient_appointment_reminder"
                                 value={editorForm.name}
-                                onChange={(e) => setEditorForm({ ...editorForm, name: e.target.value.toLowerCase().replace(/\s/g, "_") })}
+                                onChange={(e) =>
+                                    setEditorForm({
+                                        ...editorForm,
+                                        name: e.target.value
+                                            .toLowerCase()
+                                            .replace(/[^a-z0-9_]/g, "_"),
+                                    })
+                                }
                             />
                         </label>
                         <div className="form-row">

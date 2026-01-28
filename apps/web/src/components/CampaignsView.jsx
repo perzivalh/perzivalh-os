@@ -74,6 +74,7 @@ function CampaignsView({
   // Contacts list state
   const [contacts, setContacts] = useState([]);
   const [loadingContacts, setLoadingContacts] = useState(false);
+  const [odooStats, setOdooStats] = useState(null);
 
   // Custom segments from API
   const [customSegments, setCustomSegments] = useState([]);
@@ -81,6 +82,7 @@ function CampaignsView({
   // Load segments on mount
   useEffect(() => {
     loadSegments();
+    loadOdooStats();
   }, []);
 
   async function loadSegments() {
@@ -94,6 +96,16 @@ function CampaignsView({
     }
   }
 
+  async function loadOdooStats() {
+    try {
+      const res = await apiGet("/api/contacts/stats");
+      setOdooStats(res || null);
+    } catch (err) {
+      console.error("Failed to load Odoo stats", err);
+      setOdooStats(null);
+    }
+  }
+
   async function handleImportContacts() {
     setImporting(true);
     setImportResult(null);
@@ -101,6 +113,7 @@ function CampaignsView({
       const res = await apiPost("/api/contacts/import-odoo", { source: "odoo" });
       setImportResult(res);
       loadSegments(); // Refresh segments
+      loadOdooStats();
     } catch (err) {
       setImportResult({ error: err.message || "Error al importar" });
     } finally {
@@ -146,6 +159,14 @@ function CampaignsView({
   }
 
   const segments = useMemo(() => {
+    const odooSegment = {
+      id: "odoo",
+      name: "odoo",
+      subtitle: "Origen: Odoo",
+      count: odooStats?.total || 0,
+      type: "odoo",
+    };
+
     // Combine custom segments with tag-based segments
     const tagSegments = (tags || []).slice(0, 6).map((tag, index) => ({
       id: tag.id || `tag-${tag.name}-${index}`,
@@ -163,8 +184,8 @@ function CampaignsView({
       type: "custom",
     }));
 
-    return [...apiSegments, ...tagSegments];
-  }, [tags, customSegments]);
+    return [odooSegment, ...apiSegments, ...tagSegments];
+  }, [tags, customSegments, odooStats]);
 
   const filteredTemplates = useMemo(() => {
     const query = templateSearch.trim().toLowerCase();
@@ -416,12 +437,16 @@ function CampaignsView({
                 type="button"
                 className={`audience-card ${campaignFilter.tag === segment.name ? "active" : ""
                   }`}
-                onClick={() =>
+                onClick={() => {
+                  if (segment.type === "odoo") {
+                    openContactsModal();
+                    return;
+                  }
                   setCampaignFilter((prev) => ({
                     ...prev,
                     tag: segment.name,
-                  }))
-                }
+                  }));
+                }}
               >
                 <div className="audience-title">
                   <span>{segment.name}</span>
@@ -507,11 +532,13 @@ function CampaignsView({
                 onChange={(event) => handleAudienceChange(event.target.value)}
               >
                 <option value="">Selecciona un segmento...</option>
-                {segments.map((segment) => (
-                  <option value={`tag:${segment.name}`} key={`seg-${segment.id}`}>
-                    {segment.name}
-                  </option>
-                ))}
+                {segments
+                  .filter((segment) => segment.type !== "odoo")
+                  .map((segment) => (
+                    <option value={`tag:${segment.name}`} key={`seg-${segment.id}`}>
+                      {segment.name}
+                    </option>
+                  ))}
                 <option value="verified">Solo verificados</option>
                 <option value="assigned:unassigned">Sin asignar</option>
                 {statusOptions.map((status) => (

@@ -25,9 +25,17 @@ async function importAllFromOdoo(options = {}) {
 
     logger.info("Starting full Odoo contact import");
 
-    const limit = options.limit || 5000;
+    const parsedLimit =
+        options.limit !== undefined && options.limit !== null
+            ? Number(options.limit)
+            : null;
+    const totalLimit =
+        Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : null;
+    const batchSize = 500;
     let offset = 0;
     let totalImported = 0;
+    let totalCreated = 0;
+    let totalUpdated = 0;
     let totalSkipped = 0;
     let hasMore = true;
 
@@ -40,8 +48,9 @@ async function importAllFromOdoo(options = {}) {
                 "res.partner",
                 [["active", "=", true]],
                 ["id", "name", "phone", "mobile", "email", "vat"],
-                500, // batch size
-                "id asc"
+                batchSize,
+                "id asc",
+                offset
             );
 
             if (!partners || partners.length === 0) {
@@ -54,6 +63,11 @@ async function importAllFromOdoo(options = {}) {
                 const result = await importSinglePartner(partner);
                 if (result.imported) {
                     totalImported++;
+                    if (result.created) {
+                        totalCreated++;
+                    } else if (result.updated) {
+                        totalUpdated++;
+                    }
                 } else {
                     totalSkipped++;
                 }
@@ -62,7 +76,7 @@ async function importAllFromOdoo(options = {}) {
             offset += partners.length;
 
             // Check if we've reached the limit or no more records
-            if (partners.length < 500 || offset >= limit) {
+            if (partners.length < batchSize || (totalLimit && offset >= totalLimit)) {
                 hasMore = false;
             }
 
@@ -89,6 +103,8 @@ async function importAllFromOdoo(options = {}) {
     return {
         totalProcessed: offset,
         imported: totalImported,
+        new: totalCreated,
+        updated: totalUpdated,
         skipped: totalSkipped,
     };
 }
@@ -114,18 +130,26 @@ async function importSinglePartner(partner) {
         `+591${phoneVariants[0]}`;
 
     try {
-        // Upsert by odoo_partner_id
-        await prisma.odooContact.upsert({
+        const existing = await prisma.odooContact.findUnique({
             where: { odoo_partner_id: partner.id },
-            update: {
-                name: partner.name || "Sin nombre",
-                phone_e164: phoneE164,
-                phone_raw: phoneRaw,
-                email: partner.email || null,
-                vat: partner.vat || null,
-                last_synced_at: new Date(),
-            },
-            create: {
+            select: { id: true },
+        });
+        if (existing) {
+            await prisma.odooContact.update({
+                where: { odoo_partner_id: partner.id },
+                data: {
+                    name: partner.name || "Sin nombre",
+                    phone_e164: phoneE164,
+                    phone_raw: phoneRaw,
+                    email: partner.email || null,
+                    vat: partner.vat || null,
+                    last_synced_at: new Date(),
+                },
+            });
+            return { imported: true, updated: true, created: false };
+        }
+        await prisma.odooContact.create({
+            data: {
                 odoo_partner_id: partner.id,
                 name: partner.name || "Sin nombre",
                 phone_e164: phoneE164,
@@ -136,8 +160,7 @@ async function importSinglePartner(partner) {
                 last_synced_at: new Date(),
             },
         });
-
-        return { imported: true };
+        return { imported: true, created: true, updated: false };
     } catch (error) {
         logger.error("Failed to import partner", {
             partnerId: partner.id,

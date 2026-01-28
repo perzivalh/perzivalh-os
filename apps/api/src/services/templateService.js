@@ -222,15 +222,15 @@ async function createDraft(data, userId = null) {
     // Log audit
     await prisma.auditLogTenant.create({
         data: {
-            user_id: userId,
             action: "template_draft_created",
-            entity: "template",
-            entity_id: template.id,
             data_json: {
+                entity: "template",
+                entity_id: template.id,
                 name: template.name,
                 category: template.category,
                 language: template.language,
             },
+            ...(userId ? { user: { connect: { id: userId } } } : {}),
         },
     });
 
@@ -268,11 +268,9 @@ async function updateDraft(id, data, userId = null) {
     // Log audit
     await prisma.auditLogTenant.create({
         data: {
-            user_id: userId,
             action: "template_draft_updated",
-            entity: "template",
-            entity_id: id,
-            data_json: { changes: Object.keys(data) },
+            data_json: { entity: "template", entity_id: id, changes: Object.keys(data) },
+            ...(userId ? { user: { connect: { id: userId } } } : {}),
         },
     });
 
@@ -306,11 +304,13 @@ async function updateVariableMappings(templateId, mappings, userId = null) {
     // Log audit
     await prisma.auditLogTenant.create({
         data: {
-            user_id: userId,
             action: "template_mappings_updated",
-            entity: "template",
-            entity_id: templateId,
-            data_json: { mappings_count: mappings?.length || 0 },
+            data_json: {
+                entity: "template",
+                entity_id: templateId,
+                mappings_count: mappings?.length || 0,
+            },
+            ...(userId ? { user: { connect: { id: userId } } } : {}),
         },
     });
 
@@ -363,11 +363,13 @@ async function submitToMeta(templateId, userId = null) {
         // Log audit
         await prisma.auditLogTenant.create({
             data: {
-                user_id: userId,
                 action: "template_submit_failed",
-                entity: "template",
-                entity_id: templateId,
-                data_json: result.error,
+                data_json: {
+                    entity: "template",
+                    entity_id: templateId,
+                    error: result.error,
+                },
+                ...(userId ? { user: { connect: { id: userId } } } : {}),
             },
         });
 
@@ -389,14 +391,14 @@ async function submitToMeta(templateId, userId = null) {
     // Log audit
     await prisma.auditLogTenant.create({
         data: {
-            user_id: userId,
             action: "template_submitted",
-            entity: "template",
-            entity_id: templateId,
             data_json: {
+                entity: "template",
+                entity_id: templateId,
                 meta_template_id: result.data.id,
                 name: template.name,
             },
+            ...(userId ? { user: { connect: { id: userId } } } : {}),
         },
     });
 
@@ -436,11 +438,13 @@ async function deleteTemplateLocal(templateId, userId = null) {
     // Log audit
     await prisma.auditLogTenant.create({
         data: {
-            user_id: userId,
             action: "template_deleted",
-            entity: "template",
-            entity_id: templateId,
-            data_json: { name: template.name },
+            data_json: {
+                entity: "template",
+                entity_id: templateId,
+                name: template.name,
+            },
+            ...(userId ? { user: { connect: { id: userId } } } : {}),
         },
     });
 
@@ -513,9 +517,13 @@ async function handleTemplateStatusUpdate(event) {
     await prisma.auditLogTenant.create({
         data: {
             action: "template_status_webhook",
-            entity: "template",
-            entity_id: template.id,
-            data_json: { event: eventType, newStatus, reason },
+            data_json: {
+                entity: "template",
+                entity_id: template.id,
+                event: eventType,
+                newStatus,
+                reason,
+            },
         },
     });
 

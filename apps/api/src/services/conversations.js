@@ -155,9 +155,9 @@ async function createMessage({
 async function logAudit({ userId, action, data }) {
   await prisma.auditLogTenant.create({
     data: {
-      user_id: userId || null,
       action,
       data_json: data || {},
+      ...(userId ? { user: { connect: { id: userId } } } : {}),
     },
   });
 }

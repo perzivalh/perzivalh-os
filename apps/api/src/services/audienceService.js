@@ -29,11 +29,14 @@ async function createSegment(data, userId = null) {
     // Audit log
     await prisma.auditLogTenant.create({
         data: {
-            user_id: userId,
             action: "audience_created",
-            entity: "audience",
-            entity_id: segment.id,
-            data_json: { name: segment.name, rules: data.rules },
+            data_json: {
+                entity: "audience",
+                entity_id: segment.id,
+                name: segment.name,
+                rules: data.rules,
+            },
+            ...(userId ? { user: { connect: { id: userId } } } : {}),
         },
     });
 
@@ -107,11 +110,9 @@ async function updateSegment(id, data, userId = null) {
     // Audit log
     await prisma.auditLogTenant.create({
         data: {
-            user_id: userId,
             action: "audience_updated",
-            entity: "audience",
-            entity_id: id,
-            data_json: { changes: Object.keys(data) },
+            data_json: { entity: "audience", entity_id: id, changes: Object.keys(data) },
+            ...(userId ? { user: { connect: { id: userId } } } : {}),
         },
     });
 
@@ -129,11 +130,9 @@ async function deleteSegment(id, userId = null) {
 
     await prisma.auditLogTenant.create({
         data: {
-            user_id: userId,
             action: "audience_deleted",
-            entity: "audience",
-            entity_id: id,
-            data_json: {},
+            data_json: { entity: "audience", entity_id: id },
+            ...(userId ? { user: { connect: { id: userId } } } : {}),
         },
     });
 

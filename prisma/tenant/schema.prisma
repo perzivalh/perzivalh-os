@@ -57,6 +57,28 @@ enum CampaignMessageStatus {
   failed
 }
 
+// Template-related enums
+enum TemplateStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  PAUSED
+  DISABLED
+}
+
+enum TemplateCategory {
+  MARKETING
+  UTILITY
+  AUTHENTICATION
+}
+
+enum VariableSourceType {
+  odoo
+  db
+  static
+}
+
 model User {
   id            String     @id @default(cuid())
   name          String
@@ -68,6 +90,8 @@ model User {
   AuditLogTenant      AuditLogTenant[]    @relation("UserAuditLogs")
   Conversation  Conversation[] @relation("AssignedConversations")
   Campaign      Campaign[] @relation("CampaignCreatedBy")
+  MetaTemplate  MetaTemplate[] @relation("MetaTemplateCreatedBy")
+  AudienceSegment AudienceSegment[] @relation("AudienceCreatedBy")
 }
 
 model Conversation {
@@ -249,4 +273,100 @@ model Prospect {
   updated_at   DateTime @updatedAt
 
   @@index([created_at])
+}
+
+// ==================== META TEMPLATES ====================
+
+model MetaTemplate {
+  id                 String           @id @default(cuid())
+  name               String
+  meta_template_id   String?          // ID from Meta API (null if draft)
+  category           TemplateCategory @default(UTILITY)
+  language           String           @default("es")
+  status             TemplateStatus   @default(DRAFT)
+  quality_score      String?          // HIGH, MEDIUM, LOW, UNKNOWN
+  components_json    Json             @default("[]")
+  body_text          String?
+  header_type        String?
+  header_content     String?
+  footer_text        String?
+  buttons_json       Json?
+  last_synced_at     DateTime?
+  meta_response_json Json?
+  rejection_reason   String?
+  created_by_user_id String?
+  is_deleted         Boolean          @default(false)
+  created_at         DateTime         @default(now())
+  updated_at         DateTime         @updatedAt
+
+  variable_mappings MetaTemplateVariableMapping[]
+  created_by_user   User?                         @relation("MetaTemplateCreatedBy", fields: [created_by_user_id], references: [id])
+
+  @@unique([name, language])
+  @@index([status])
+  @@index([is_deleted])
+}
+
+model MetaTemplateVariableMapping {
+  id            String             @id @default(cuid())
+  template_id   String
+  var_index     Int
+  display_name  String?
+  source_type   VariableSourceType
+  source_path   String
+  default_value String?
+  transform     String?
+
+  template MetaTemplate @relation(fields: [template_id], references: [id], onDelete: Cascade)
+
+  @@unique([template_id, var_index])
+}
+
+model TemplateWebhookLog {
+  id            String   @id @default(cuid())
+  event_type    String
+  template_name String?
+  template_id   String?
+  raw_json      Json
+  processed_at  DateTime @default(now())
+
+  @@index([template_name])
+  @@index([processed_at])
+}
+
+// ==================== AUDIENCES & CONTACTS ====================
+
+model AudienceSegment {
+  id                 String   @id @default(cuid())
+  name               String
+  description        String?
+  rules_json         Json
+  estimated_count    Int      @default(0)
+  is_active          Boolean  @default(true)
+  created_by_user_id String?
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+
+  created_by_user User? @relation("AudienceCreatedBy", fields: [created_by_user_id], references: [id])
+
+  @@index([is_active])
+}
+
+model OdooContact {
+  id              String   @id @default(cuid())
+  odoo_partner_id Int      @unique
+  name            String
+  phone_e164      String?
+  phone_raw       String?
+  email           String?
+  vat             String?
+  is_patient      Boolean  @default(false)
+  odoo_patient_id Int?
+  tags_json       Json?
+  extra_data_json Json?
+  last_synced_at  DateTime @default(now())
+  created_at      DateTime @default(now())
+
+  @@index([phone_e164])
+  @@index([is_patient])
 }

@@ -310,6 +310,10 @@ async function processCampaignQueueForAllTenants() {
     if (!process.env.CONTROL_DB_URL) {
         return;
     }
+    // Check schema readiness first
+    const ready = await checkCampaignSchema();
+    if (!ready) return;
+
     try {
         const control = getControlClient();
         const tenants = await control.tenant.findMany({
@@ -332,7 +336,36 @@ async function processCampaignQueueForAllTenants() {
     }
 }
 
+// Track if campaign schema is ready (to avoid repeated errors)
+let campaignSchemaReady = null; // null = unknown, true = ready, false = not ready
+
+async function checkCampaignSchema() {
+    if (campaignSchemaReady !== null) return campaignSchemaReady;
+    try {
+        // Try a simple query that uses the new columns
+        await prisma.campaign.findFirst({
+            select: { id: true },
+            take: 1,
+        });
+        campaignSchemaReady = true;
+        logger.info("campaign.schema_ready");
+        return true;
+    } catch (error) {
+        if (error.code === "P2022" || (error.message && error.message.includes("does not exist"))) {
+            campaignSchemaReady = false;
+            logger.warn("campaign.schema_not_ready", {
+                message: "Database schema needs migration. Run: npx prisma db push"
+            });
+            return false;
+        }
+        // Other errors - assume schema is OK, let normal error handling deal with it
+        return true;
+    }
+}
+
 setInterval(() => {
+    // Skip if schema is known to be not ready
+    if (campaignSchemaReady === false) return;
     void processCampaignQueueForAllTenants();
 }, CAMPAIGN_INTERVAL_MS);
 

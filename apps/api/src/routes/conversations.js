@@ -326,7 +326,33 @@ router.post("/conversations/:id/messages", requireAuth, async (req, res) => {
         return res.status(404).json({ error: "not_found" });
     }
 
-    const phoneNumberId = conversation.phone_number_id;
+    let phoneNumberId = conversation.phone_number_id;
+
+    // If phone_number_id is missing, try to get it from tenant's channels
+    if (!phoneNumberId) {
+        const tenantId = req.user?.tenant_id;
+        if (tenantId && process.env.CONTROL_DB_URL) {
+            const control = getControlClient();
+            const channels = await control.channel.findMany({
+                where: { tenant_id: tenantId },
+                orderBy: { created_at: "asc" },
+                take: 1,
+            });
+
+            if (channels.length > 0) {
+                phoneNumberId = channels[0].phone_number_id;
+
+                // Update the conversation with the correct phone_number_id
+                await prisma.conversation.update({
+                    where: { id: conversation.id },
+                    data: { phone_number_id: phoneNumberId },
+                });
+
+                console.log(`[FIX] Updated conversation ${conversation.id} with phone_number_id ${phoneNumberId}`);
+            }
+        }
+    }
+
     if (!phoneNumberId) {
         return res.status(400).json({ error: "missing_phone_number_id" });
     }

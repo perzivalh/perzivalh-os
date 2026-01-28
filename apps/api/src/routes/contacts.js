@@ -4,7 +4,7 @@
  */
 const express = require("express");
 const router = express.Router();
-const { requireAuth, requireRoles } = require("../middleware/auth");
+const { requireAuth, requireRole } = require("../middleware/auth");
 const logger = require("../lib/logger");
 
 const contactImportService = require("../services/contactImportService");
@@ -59,7 +59,7 @@ router.get("/contacts/odoo-fields", (req, res) => {
  * POST /api/contacts/import-odoo
  * Initial full import from Odoo
  */
-router.post("/contacts/import-odoo", requireRoles(["admin", "marketing"]), async (req, res) => {
+router.post("/contacts/import-odoo", requireRole(["admin", "marketing"]), async (req, res) => {
     try {
         const { limit } = req.body;
         const result = await contactImportService.importAllFromOdoo({ limit });
@@ -74,7 +74,7 @@ router.post("/contacts/import-odoo", requireRoles(["admin", "marketing"]), async
  * POST /api/contacts/refresh-odoo
  * Incremental refresh from Odoo (only new contacts)
  */
-router.post("/contacts/refresh-odoo", requireRoles(["admin", "marketing"]), async (req, res) => {
+router.post("/contacts/refresh-odoo", requireRole(["admin", "marketing"]), async (req, res) => {
     try {
         const result = await contactImportService.refreshFromOdoo();
         res.json(result);

@@ -5,7 +5,7 @@
 const express = require("express");
 const router = express.Router();
 const prisma = require("../db");
-const { requireAuth, requireRoles } = require("../middleware/auth");
+const { requireAuth, requireRole } = require("../middleware/auth");
 const logger = require("../lib/logger");
 
 const {
@@ -138,7 +138,7 @@ router.get("/campaigns/:id/recipients", async (req, res) => {
  * POST /api/campaigns
  * Create a new campaign
  */
-router.post("/campaigns", requireRoles(["admin", "marketing"]), async (req, res) => {
+router.post("/campaigns", requireRole(["admin", "marketing"]), async (req, res) => {
     try {
         const { name, template_id, segment_id, scheduled_at } = req.body;
         const userId = req.user?.id || null;
@@ -209,7 +209,7 @@ router.post("/campaigns", requireRoles(["admin", "marketing"]), async (req, res)
  * PUT /api/campaigns/:id
  * Update a draft campaign
  */
-router.put("/campaigns/:id", requireRoles(["admin", "marketing"]), async (req, res) => {
+router.put("/campaigns/:id", requireRole(["admin", "marketing"]), async (req, res) => {
     try {
         const { name, template_id, segment_id, scheduled_at } = req.body;
 
@@ -254,7 +254,7 @@ router.put("/campaigns/:id", requireRoles(["admin", "marketing"]), async (req, r
  * POST /api/campaigns/:id/launch
  * Launch a campaign (start sending)
  */
-router.post("/campaigns/:id/launch", requireRoles(["admin", "marketing"]), async (req, res) => {
+router.post("/campaigns/:id/launch", requireRole(["admin", "marketing"]), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         const campaign = await prisma.campaign.findUnique({
@@ -306,7 +306,7 @@ router.post("/campaigns/:id/launch", requireRoles(["admin", "marketing"]), async
  * POST /api/campaigns/:id/pause
  * Pause a running campaign
  */
-router.post("/campaigns/:id/pause", requireRoles(["admin", "marketing"]), async (req, res) => {
+router.post("/campaigns/:id/pause", requireRole(["admin", "marketing"]), async (req, res) => {
     try {
         await pauseCampaign(req.params.id);
         res.json({ paused: true });
@@ -320,7 +320,7 @@ router.post("/campaigns/:id/pause", requireRoles(["admin", "marketing"]), async 
  * POST /api/campaigns/:id/resume
  * Resume a paused campaign
  */
-router.post("/campaigns/:id/resume", requireRoles(["admin", "marketing"]), async (req, res) => {
+router.post("/campaigns/:id/resume", requireRole(["admin", "marketing"]), async (req, res) => {
     try {
         await resumeCampaign(req.params.id);
         res.json({ resumed: true });
@@ -334,7 +334,7 @@ router.post("/campaigns/:id/resume", requireRoles(["admin", "marketing"]), async
  * DELETE /api/campaigns/:id
  * Delete a draft campaign
  */
-router.delete("/campaigns/:id", requireRoles(["admin"]), async (req, res) => {
+router.delete("/campaigns/:id", requireRole(["admin"]), async (req, res) => {
     try {
         const campaign = await prisma.campaign.findUnique({
             where: { id: req.params.id },

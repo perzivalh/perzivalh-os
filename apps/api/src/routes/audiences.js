@@ -4,7 +4,7 @@
  */
 const express = require("express");
 const router = express.Router();
-const { requireAuth, requireRoles } = require("../middleware/auth");
+const { requireAuth, requireRole } = require("../middleware/auth");
 const logger = require("../lib/logger");
 
 const audienceService = require("../services/audienceService");
@@ -63,7 +63,7 @@ router.get("/audiences/:id/preview", async (req, res) => {
  * POST /api/audiences
  * Create a new audience segment
  */
-router.post("/audiences", requireRoles(["admin", "marketing"]), async (req, res) => {
+router.post("/audiences", requireRole(["admin", "marketing"]), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         const segment = await audienceService.createSegment(req.body, userId);
@@ -78,7 +78,7 @@ router.post("/audiences", requireRoles(["admin", "marketing"]), async (req, res)
  * PUT /api/audiences/:id
  * Update an audience segment
  */
-router.put("/audiences/:id", requireRoles(["admin", "marketing"]), async (req, res) => {
+router.put("/audiences/:id", requireRole(["admin", "marketing"]), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         const segment = await audienceService.updateSegment(req.params.id, req.body, userId);
@@ -93,7 +93,7 @@ router.put("/audiences/:id", requireRoles(["admin", "marketing"]), async (req, r
  * DELETE /api/audiences/:id
  * Soft delete an audience segment
  */
-router.delete("/audiences/:id", requireRoles(["admin", "marketing"]), async (req, res) => {
+router.delete("/audiences/:id", requireRole(["admin", "marketing"]), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         await audienceService.deleteSegment(req.params.id, userId);
@@ -108,7 +108,7 @@ router.delete("/audiences/:id", requireRoles(["admin", "marketing"]), async (req
  * POST /api/audiences/refresh-counts
  * Refresh estimated counts for all segments
  */
-router.post("/audiences/refresh-counts", requireRoles(["admin", "marketing"]), async (req, res) => {
+router.post("/audiences/refresh-counts", requireRole(["admin", "marketing"]), async (req, res) => {
     try {
         await audienceService.refreshAllSegmentCounts();
         res.json({ refreshed: true });

@@ -4,7 +4,7 @@
  */
 const express = require("express");
 const router = express.Router();
-const { requireAuth, requireRoles } = require("../middleware/auth");
+const { requireAuth, requireRole } = require("../middleware/auth");
 const logger = require("../lib/logger");
 
 const templateService = require("../services/templateService");
@@ -35,7 +35,7 @@ router.get("/templates", async (req, res) => {
  * GET /api/templates/sync
  * Force sync templates from Meta API
  */
-router.get("/templates/sync", requireRoles(["admin", "marketing"]), async (req, res) => {
+router.get("/templates/sync", requireRole(["admin", "marketing"]), async (req, res) => {
     try {
         const result = await templateService.syncTemplatesFromMeta();
         res.json(result);
@@ -66,7 +66,7 @@ router.get("/templates/:id", async (req, res) => {
  * POST /api/templates/draft
  * Create a local draft template
  */
-router.post("/templates/draft", requireRoles(["admin", "marketing"]), async (req, res) => {
+router.post("/templates/draft", requireRole(["admin", "marketing"]), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         const template = await templateService.createDraft(req.body, userId);
@@ -81,7 +81,7 @@ router.post("/templates/draft", requireRoles(["admin", "marketing"]), async (req
  * PUT /api/templates/:id
  * Update a draft template
  */
-router.put("/templates/:id", requireRoles(["admin", "marketing"]), async (req, res) => {
+router.put("/templates/:id", requireRole(["admin", "marketing"]), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         const template = await templateService.updateDraft(req.params.id, req.body, userId);
@@ -96,7 +96,7 @@ router.put("/templates/:id", requireRoles(["admin", "marketing"]), async (req, r
  * PUT /api/templates/:id/mappings
  * Update variable mappings for a template
  */
-router.put("/templates/:id/mappings", requireRoles(["admin", "marketing"]), async (req, res) => {
+router.put("/templates/:id/mappings", requireRole(["admin", "marketing"]), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         const { mappings } = req.body;
@@ -116,7 +116,7 @@ router.put("/templates/:id/mappings", requireRoles(["admin", "marketing"]), asyn
  * POST /api/templates/:id/submit
  * Submit a draft template to Meta for review
  */
-router.post("/templates/:id/submit", requireRoles(["admin", "marketing"]), async (req, res) => {
+router.post("/templates/:id/submit", requireRole(["admin", "marketing"]), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         const template = await templateService.submitToMeta(req.params.id, userId);
@@ -131,7 +131,7 @@ router.post("/templates/:id/submit", requireRoles(["admin", "marketing"]), async
  * DELETE /api/templates/:id
  * Soft delete a template
  */
-router.delete("/templates/:id", requireRoles(["admin"]), async (req, res) => {
+router.delete("/templates/:id", requireRole(["admin"]), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         await templateService.deleteTemplateLocal(req.params.id, userId);

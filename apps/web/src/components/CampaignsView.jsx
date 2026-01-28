@@ -98,7 +98,7 @@ function CampaignsView({
     setImporting(true);
     setImportResult(null);
     try {
-      const res = await apiPost("/contacts/import", { source: "odoo" });
+      const res = await apiPost("/contacts/import-odoo", { source: "odoo" });
       setImportResult(res);
       loadSegments(); // Refresh segments
     } catch (err) {

@@ -85,7 +85,7 @@ function CampaignsView({
 
   async function loadSegments() {
     try {
-      const res = await apiGet("/audiences");
+      const res = await apiGet("/api/audiences");
       if (res && res.segments) {
         setCustomSegments(res.segments);
       }
@@ -98,7 +98,7 @@ function CampaignsView({
     setImporting(true);
     setImportResult(null);
     try {
-      const res = await apiPost("/contacts/import-odoo", { source: "odoo" });
+      const res = await apiPost("/api/contacts/import-odoo", { source: "odoo" });
       setImportResult(res);
       loadSegments(); // Refresh segments
     } catch (err) {
@@ -113,7 +113,7 @@ function CampaignsView({
     if (!segmentForm.name.trim()) return;
     setSavingSegment(true);
     try {
-      await apiPost("/audiences", {
+      await apiPost("/api/audiences", {
         name: segmentForm.name,
         description: segmentForm.description,
         rules_json: segmentForm.rules.length ? segmentForm.rules : [{ field: "all", operator: "eq", value: true }],
@@ -131,7 +131,7 @@ function CampaignsView({
   async function loadContacts() {
     setLoadingContacts(true);
     try {
-      const res = await apiGet("/contacts");
+      const res = await apiGet("/api/contacts");
       setContacts(res?.contacts || []);
     } catch (err) {
       console.error("Failed to load contacts", err);

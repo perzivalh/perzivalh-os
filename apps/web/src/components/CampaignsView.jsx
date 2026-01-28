@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
+import { apiGet, apiPost } from "../api";
 
 const FALLBACK_SEGMENTS = [
   {
@@ -57,17 +58,113 @@ function CampaignsView({
   const [templateSearch, setTemplateSearch] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const segments = useMemo(() => {
-    if (tags && tags.length) {
-      return tags.slice(0, 6).map((tag, index) => ({
-        id: tag.id || `${tag.name}-${index}`,
-        name: tag.name,
-        subtitle: "Segmento por etiqueta",
-        count: tag.count || tag.total || 0,
-      }));
+  // Modal states
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showSegmentModal, setShowSegmentModal] = useState(false);
+  const [showContactsModal, setShowContactsModal] = useState(false);
+
+  // Import contacts state
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+
+  // Segment form state
+  const [segmentForm, setSegmentForm] = useState({ name: "", description: "", rules: [] });
+  const [savingSegment, setSavingSegment] = useState(false);
+
+  // Contacts list state
+  const [contacts, setContacts] = useState([]);
+  const [loadingContacts, setLoadingContacts] = useState(false);
+
+  // Custom segments from API
+  const [customSegments, setCustomSegments] = useState([]);
+
+  // Load segments on mount
+  useEffect(() => {
+    loadSegments();
+  }, []);
+
+  async function loadSegments() {
+    try {
+      const res = await apiGet("/audiences");
+      if (res && res.segments) {
+        setCustomSegments(res.segments);
+      }
+    } catch (err) {
+      console.error("Failed to load segments", err);
     }
-    return FALLBACK_SEGMENTS;
-  }, [tags]);
+  }
+
+  async function handleImportContacts() {
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const res = await apiPost("/contacts/import", { source: "odoo" });
+      setImportResult(res);
+      loadSegments(); // Refresh segments
+    } catch (err) {
+      setImportResult({ error: err.message || "Error al importar" });
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function handleCreateSegment(e) {
+    e.preventDefault();
+    if (!segmentForm.name.trim()) return;
+    setSavingSegment(true);
+    try {
+      await apiPost("/audiences", {
+        name: segmentForm.name,
+        description: segmentForm.description,
+        rules_json: segmentForm.rules.length ? segmentForm.rules : [{ field: "all", operator: "eq", value: true }],
+      });
+      setShowSegmentModal(false);
+      setSegmentForm({ name: "", description: "", rules: [] });
+      loadSegments();
+    } catch (err) {
+      alert("Error: " + (err.message || "No se pudo crear el segmento"));
+    } finally {
+      setSavingSegment(false);
+    }
+  }
+
+  async function loadContacts() {
+    setLoadingContacts(true);
+    try {
+      const res = await apiGet("/contacts");
+      setContacts(res?.contacts || []);
+    } catch (err) {
+      console.error("Failed to load contacts", err);
+    } finally {
+      setLoadingContacts(false);
+    }
+  }
+
+  function openContactsModal() {
+    setShowContactsModal(true);
+    loadContacts();
+  }
+
+  const segments = useMemo(() => {
+    // Combine custom segments with tag-based segments
+    const tagSegments = (tags || []).slice(0, 6).map((tag, index) => ({
+      id: tag.id || `tag-${tag.name}-${index}`,
+      name: tag.name,
+      subtitle: "Segmento por etiqueta",
+      count: tag.count || tag.total || 0,
+      type: "tag",
+    }));
+
+    const apiSegments = customSegments.map((seg) => ({
+      id: seg.id,
+      name: seg.name,
+      subtitle: seg.description || "Segmento personalizado",
+      count: seg.estimated_count || 0,
+      type: "custom",
+    }));
+
+    return [...apiSegments, ...tagSegments];
+  }, [tags, customSegments]);
 
   const filteredTemplates = useMemo(() => {
     const query = templateSearch.trim().toLowerCase();
@@ -147,14 +244,167 @@ function CampaignsView({
           </div>
         </div>
         <div className="campaigns-actions">
-          <button className="campaigns-ghost" type="button">
+          <button
+            className="campaigns-ghost"
+            type="button"
+            onClick={() => setShowImportModal(true)}
+          >
             Importar Contactos
           </button>
-          <button className="campaigns-danger" type="button">
+          <button
+            className="campaigns-danger"
+            type="button"
+            onClick={() => setShowSegmentModal(true)}
+          >
             + Nuevo Segmento
           </button>
         </div>
       </header>
+
+      {/* Import Contacts Modal */}
+      {showImportModal && (
+        <div className="modal-overlay" onClick={() => setShowImportModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Importar Contactos</h2>
+              <button className="modal-close" onClick={() => setShowImportModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>Importar contactos desde Odoo (pacientes y partners)</p>
+              {importResult && (
+                <div className={`import-result ${importResult.error ? "error" : "success"}`}>
+                  {importResult.error ? (
+                    <span>❌ {importResult.error}</span>
+                  ) : (
+                    <span>✅ Importados: {importResult.imported || 0} contactos ({importResult.new || 0} nuevos, {importResult.updated || 0} actualizados)</span>
+                  )}
+                </div>
+              )}
+              <div className="modal-actions">
+                <button
+                  className="btn-primary"
+                  onClick={handleImportContacts}
+                  disabled={importing}
+                >
+                  {importing ? "Importando..." : "🔄 Importar desde Odoo"}
+                </button>
+                <button className="btn-secondary" onClick={openContactsModal}>
+                  📋 Ver Contactos Existentes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Segment Modal */}
+      {showSegmentModal && (
+        <div className="modal-overlay" onClick={() => setShowSegmentModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Nuevo Segmento</h2>
+              <button className="modal-close" onClick={() => setShowSegmentModal(false)}>×</button>
+            </div>
+            <form className="modal-body" onSubmit={handleCreateSegment}>
+              <label className="form-field">
+                <span>Nombre del Segmento</span>
+                <input
+                  type="text"
+                  placeholder="Ej: Pacientes Onicomicosis"
+                  value={segmentForm.name}
+                  onChange={(e) => setSegmentForm({ ...segmentForm, name: e.target.value })}
+                  required
+                />
+              </label>
+              <label className="form-field">
+                <span>Descripción</span>
+                <textarea
+                  placeholder="Descripción opcional..."
+                  value={segmentForm.description}
+                  onChange={(e) => setSegmentForm({ ...segmentForm, description: e.target.value })}
+                  rows="2"
+                />
+              </label>
+              <div className="form-field">
+                <span>Reglas de Filtro</span>
+                <select
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setSegmentForm({
+                        ...segmentForm,
+                        rules: [...segmentForm.rules, { field: e.target.value, operator: "eq", value: "" }]
+                      });
+                    }
+                  }}
+                >
+                  <option value="">+ Agregar filtro...</option>
+                  <option value="is_patient">Es paciente</option>
+                  <option value="has_phone">Tiene teléfono</option>
+                  <option value="tag">Tiene etiqueta</option>
+                </select>
+                {segmentForm.rules.map((rule, idx) => (
+                  <div key={idx} className="filter-rule">
+                    <span className="rule-badge">{rule.field}</span>
+                    <button type="button" onClick={() => {
+                      setSegmentForm({
+                        ...segmentForm,
+                        rules: segmentForm.rules.filter((_, i) => i !== idx)
+                      });
+                    }}>×</button>
+                  </div>
+                ))}
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn-ghost" onClick={() => setShowSegmentModal(false)}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn-primary" disabled={savingSegment}>
+                  {savingSegment ? "Guardando..." : "Crear Segmento"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Contacts List Modal */}
+      {showContactsModal && (
+        <div className="modal-overlay" onClick={() => setShowContactsModal(false)}>
+          <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Contactos ({contacts.length})</h2>
+              <button className="modal-close" onClick={() => setShowContactsModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              {loadingContacts ? (
+                <div className="loading">Cargando contactos...</div>
+              ) : contacts.length === 0 ? (
+                <div className="empty-state">No hay contactos. Importa desde Odoo.</div>
+              ) : (
+                <div className="contacts-table">
+                  <div className="contacts-header">
+                    <span>Nombre</span>
+                    <span>Teléfono</span>
+                    <span>Email</span>
+                    <span>Tipo</span>
+                  </div>
+                  {contacts.slice(0, 50).map((contact) => (
+                    <div key={contact.id} className="contacts-row">
+                      <span>{contact.name}</span>
+                      <span>{contact.phone_e164 || "-"}</span>
+                      <span>{contact.email || "-"}</span>
+                      <span className="contact-type">{contact.is_patient ? "Paciente" : "Contacto"}</span>
+                    </div>
+                  ))}
+                  {contacts.length > 50 && (
+                    <div className="contacts-more">...y {contacts.length - 50} más</div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="campaigns-layout">
         <aside className="campaigns-audiences">
@@ -164,9 +414,8 @@ function CampaignsView({
               <button
                 key={segment.id}
                 type="button"
-                className={`audience-card ${
-                  campaignFilter.tag === segment.name ? "active" : ""
-                }`}
+                className={`audience-card ${campaignFilter.tag === segment.name ? "active" : ""
+                  }`}
                 onClick={() =>
                   setCampaignFilter((prev) => ({
                     ...prev,

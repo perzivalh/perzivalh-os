@@ -11,7 +11,7 @@ const { requireAuth } = require("../../middleware/auth");
 const logger = require("../../lib/logger");
 const { signUser } = require("../../lib/auth");
 const { getControlClient } = require("../../control/controlClient");
-const { encryptString } = require("../../core/crypto");
+const { encryptString, decryptString } = require("../../core/crypto");
 const {
     resolveTenantContextById,
     clearTenantDbCache,
@@ -50,6 +50,67 @@ router.get("/tenants", requireAuth, requireSuperAdmin, async (req, res) => {
             has_branding: Boolean(tenant.branding),
             has_odoo: Boolean(tenant.odoo_config),
         })),
+    });
+});
+
+// GET /api/superadmin/tenants/:id/details
+router.get("/tenants/:id/details", requireAuth, requireSuperAdmin, async (req, res) => {
+    const control = getControlClient();
+    const tenant = await control.tenant.findUnique({
+        where: { id: req.params.id },
+        include: { databases: true, branding: true, odoo_config: true, channels: true },
+    });
+    if (!tenant) {
+        return res.status(404).json({ error: "tenant_not_found" });
+    }
+    const channel =
+        tenant.channels?.find((item) => item.provider === "whatsapp") ||
+        tenant.channels?.[0] ||
+        null;
+    return res.json({
+        tenant: {
+            id: tenant.id,
+            name: tenant.name,
+            slug: tenant.slug,
+            plan: tenant.plan,
+            is_active: tenant.is_active,
+            created_at: tenant.created_at,
+        },
+        database: tenant.databases
+            ? { db_url: decryptString(tenant.databases.db_url_encrypted) }
+            : null,
+        branding: tenant.branding
+            ? {
+                brand_name: tenant.branding.brand_name,
+                logo_url: tenant.branding.logo_url,
+                colors: tenant.branding.colors,
+                timezone: tenant.branding.timezone,
+            }
+            : null,
+        odoo: tenant.odoo_config
+            ? {
+                base_url: tenant.odoo_config.base_url,
+                db_name: tenant.odoo_config.db_name,
+                username: tenant.odoo_config.username,
+                password: decryptString(tenant.odoo_config.password_encrypted),
+            }
+            : null,
+        channel: channel
+            ? {
+                id: channel.id,
+                provider: channel.provider,
+                phone_number_id: channel.phone_number_id,
+                display_name: channel.display_name || null,
+                waba_id: channel.waba_id || null,
+                verify_token: channel.verify_token,
+                wa_token: channel.wa_token_encrypted
+                    ? decryptString(channel.wa_token_encrypted)
+                    : "",
+                app_secret: channel.app_secret_encrypted
+                    ? decryptString(channel.app_secret_encrypted)
+                    : "",
+            }
+            : null,
     });
 });
 

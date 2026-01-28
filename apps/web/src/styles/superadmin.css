@@ -201,6 +201,12 @@
   color: #0b0b0b;
 }
 
+.sa-btn.danger {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #fecaca;
+}
+
 .sa-btn.ghost {
   background: transparent;
 }

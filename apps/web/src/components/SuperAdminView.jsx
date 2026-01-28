@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiGet, apiPatch, apiPost, apiDelete } from "../api";
 import BotSection from "./superadmin/BotSection";
 
@@ -33,13 +33,29 @@ function SuperAdminView({
   const [impersonateBusyId, setImpersonateBusyId] = useState("");
   const [editTenantId, setEditTenantId] = useState("");
   const [editTenantActive, setEditTenantActive] = useState(true);
+  const [baselineForm, setBaselineForm] = useState(EMPTY_PROVISION);
+  const [baselineActive, setBaselineActive] = useState(true);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const latestTenantRequest = useRef("");
 
   // Bot management state
   const [availableFlows, setAvailableFlows] = useState([]);
   const [tenantBots, setTenantBots] = useState([]);
   const [botsLoading, setBotsLoading] = useState(false);
 
+  const routeTenantId = useMemo(() => {
+    if (!route) {
+      return "";
+    }
+    const match =
+      route.match(/^\/superadmin\/tenants\/([^/]+)\/?$/) ||
+      route.match(/^\/superadmin\/tenant\/([^/]+)\/?$/) ||
+      route.match(/^\/superadmin\/edit\/([^/]+)\/?$/);
+    return match ? match[1] : "";
+  }, [route]);
   const isCreateRoute = route.startsWith("/superadmin/new");
+  const isEditRoute = Boolean(routeTenantId);
+  const isFormRoute = isCreateRoute || isEditRoute;
 
   const navigate = useCallback(
     (path) => {
@@ -127,8 +143,13 @@ function SuperAdminView({
 
   function resetProvisionForm() {
     setProvisionForm(EMPTY_PROVISION);
+    setBaselineForm(EMPTY_PROVISION);
     setEditTenantId("");
     setEditTenantActive(true);
+    setBaselineActive(true);
+    setTenantBots([]);
+    setStatusNote("Verificacion de red: sistema ok");
+    latestTenantRequest.current = "";
   }
 
   function handleNewTenantClick() {
@@ -138,6 +159,7 @@ function SuperAdminView({
   }
 
   function handleDashboardClick() {
+    latestTenantRequest.current = "";
     navigate("/superadmin");
   }
 
@@ -156,42 +178,74 @@ function SuperAdminView({
     }
   }
 
-  async function loadTenantExtras(tenantId) {
-    try {
-      const branding = await apiGet(`/api/superadmin/branding?tenant_id=${tenantId}`);
-      if (branding.branding) {
-        const colors = branding.branding.colors || null;
-        setProvisionForm((prev) => ({
-          ...prev,
-          brand_name: branding.branding.brand_name || "",
-          logo_url: branding.branding.logo_url || "",
-          brand_primary: colors?.primary || "",
-          brand_accent: colors?.accent || "",
-          brand_bg: colors?.bg || "",
-          timezone: branding.branding.timezone || "",
-        }));
-      }
-    } catch (err) {
-      setError(err.message || "No se pudo cargar branding.");
-    }
+  function normalizeProvision(form) {
+    const next = {};
+    Object.keys(EMPTY_PROVISION).forEach((key) => {
+      const value = form[key];
+      next[key] = typeof value === "string" ? value.trim() : value || "";
+    });
+    return { ...EMPTY_PROVISION, ...next };
+  }
 
-    try {
-      const response = await apiGet(`/api/superadmin/odoo?tenant_id=${tenantId}`);
-      if (response.odoo) {
-        setProvisionForm((prev) => ({
-          ...prev,
-          odoo_base_url: response.odoo.base_url || "",
-          odoo_db_name: response.odoo.db_name || "",
-          odoo_username: response.odoo.username || "",
-          odoo_password: "",
-        }));
-      }
-    } catch (err) {
-      setError(err.message || "No se pudo cargar odoo.");
+  async function loadTenantDetails(tenantId) {
+    if (!tenantId) {
+      return;
     }
-
-    // Load bots for this tenant
-    await loadTenantBots(tenantId);
+    latestTenantRequest.current = tenantId;
+    setEditTenantId(tenantId);
+    setProvisionForm(EMPTY_PROVISION);
+    setBaselineForm(EMPTY_PROVISION);
+    setEditTenantActive(true);
+    setBaselineActive(true);
+    setTenantBots([]);
+    setDetailsLoading(true);
+    setError("");
+    try {
+      const response = await apiGet(`/api/superadmin/tenants/${tenantId}/details`);
+      if (latestTenantRequest.current !== tenantId) {
+        return;
+      }
+      const tenant = response.tenant || {};
+      const branding = response.branding || null;
+      const odoo = response.odoo || null;
+      const database = response.database || null;
+      const channel = response.channel || null;
+      const colors = branding?.colors || {};
+      const nextForm = normalizeProvision({
+        ...EMPTY_PROVISION,
+        name: tenant.name || "",
+        slug: tenant.slug || "",
+        plan: tenant.plan || "",
+        db_url: database?.db_url || "",
+        line_name: channel?.display_name || "",
+        phone_number_id: channel?.phone_number_id || "",
+        waba_id: channel?.waba_id || "",
+        verify_token: channel?.verify_token || "",
+        wa_token: channel?.wa_token || "",
+        app_secret: channel?.app_secret || "",
+        brand_name: branding?.brand_name || "",
+        logo_url: branding?.logo_url || "",
+        brand_primary: colors?.primary || EMPTY_PROVISION.brand_primary,
+        brand_accent: colors?.accent || EMPTY_PROVISION.brand_accent,
+        brand_bg: colors?.bg || EMPTY_PROVISION.brand_bg,
+        timezone: branding?.timezone || "",
+        odoo_base_url: odoo?.base_url || "",
+        odoo_db_name: odoo?.db_name || "",
+        odoo_username: odoo?.username || "",
+        odoo_password: odoo?.password || "",
+      });
+      setProvisionForm(nextForm);
+      setBaselineForm(nextForm);
+      setEditTenantId(tenant.id || tenantId);
+      setEditTenantActive(Boolean(tenant.is_active));
+      setBaselineActive(Boolean(tenant.is_active));
+      setStatusNote("Modo edicion: cambios pendientes");
+      await loadTenantBots(tenantId);
+    } catch (err) {
+      setError(err.message || "No se pudo cargar tenant.");
+    } finally {
+      setDetailsLoading(false);
+    }
   }
 
   async function loadAvailableFlows() {
@@ -253,25 +307,7 @@ function SuperAdminView({
 
   async function handleManageTenant(tenant) {
     setError("");
-    setEditTenantId(tenant.id);
-    setEditTenantActive(Boolean(tenant.is_active));
-    setProvisionForm({
-      ...EMPTY_PROVISION,
-      name: tenant.name || "",
-      slug: tenant.slug || "",
-      plan: tenant.plan || "",
-    });
-    const channel = channels.find((item) => item.tenant_id === tenant.id);
-    if (channel) {
-      setProvisionForm((prev) => ({
-        ...prev,
-        phone_number_id: channel.phone_number_id || "",
-        line_name: channel.display_name || "",
-        waba_id: channel.waba_id || "",
-      }));
-    }
-    await loadTenantExtras(tenant.id);
-    navigate("/superadmin/new");
+    navigate(`/superadmin/tenants/${tenant.id}`);
   }
 
   function validateProvision() {
@@ -299,10 +335,14 @@ function SuperAdminView({
       provisionForm.verify_token ||
       provisionForm.wa_token ||
       provisionForm.waba_id ||
-      provisionForm.app_secret;
+      provisionForm.app_secret ||
+      provisionForm.line_name;
+    const hasExistingChannel = Boolean(
+      editTenantId && channels.find((item) => item.tenant_id === editTenantId)
+    );
     if (
       wantsChannel &&
-      !editTenantId &&
+      (!hasExistingChannel || !editTenantId) &&
       (!provisionForm.phone_number_id ||
         !provisionForm.verify_token ||
         !provisionForm.wa_token)
@@ -344,6 +384,9 @@ function SuperAdminView({
 
   async function handleProvisionTenant(event) {
     event.preventDefault();
+    if (isEditRoute && !hasChanges) {
+      return;
+    }
     const validation = validateProvision();
     if (!validation.ok) {
       setError(validation.message);
@@ -459,7 +502,13 @@ function SuperAdminView({
       }
 
       await loadData();
-      if (!editTenantId) {
+      if (editTenantId) {
+        const normalized = normalizeProvision(provisionForm);
+        setProvisionForm(normalized);
+        setBaselineForm(normalized);
+        setBaselineActive(editTenantActive);
+        setStatusNote("Cambios guardados");
+      } else {
         resetProvisionForm();
       }
     } catch (err) {
@@ -469,13 +518,59 @@ function SuperAdminView({
     }
   }
 
+  async function handleToggleTenantActive() {
+    if (!editTenantId) {
+      return;
+    }
+    const nextActive = !editTenantActive;
+    try {
+      setProvisionBusy(true);
+      setError("");
+      await apiPatch(`/api/superadmin/tenants/${editTenantId}`, {
+        is_active: nextActive,
+      });
+      setEditTenantActive(nextActive);
+      setBaselineActive(nextActive);
+      setStatusNote(nextActive ? "Tenant reactivado" : "Tenant bloqueado");
+      await loadData();
+    } catch (err) {
+      setError(err.message || "No se pudo cambiar estado del tenant.");
+    } finally {
+      setProvisionBusy(false);
+    }
+  }
+
+  const hasChanges = useMemo(() => {
+    if (!editTenantId && !isEditRoute) {
+      return true;
+    }
+    if (editTenantActive !== baselineActive) {
+      return true;
+    }
+    return Object.keys(baselineForm).some((key) => {
+      const a = String(provisionForm[key] ?? "");
+      const b = String(baselineForm[key] ?? "");
+      return a !== b;
+    });
+  }, [baselineActive, baselineForm, editTenantActive, editTenantId, isEditRoute, provisionForm]);
+
+  useEffect(() => {
+    if (isEditRoute && routeTenantId && routeTenantId !== editTenantId) {
+      void loadTenantDetails(routeTenantId);
+      return;
+    }
+    if (isCreateRoute && (editTenantId || detailsLoading)) {
+      resetProvisionForm();
+    }
+  }, [detailsLoading, editTenantId, isCreateRoute, isEditRoute, routeTenantId]);
+
   return (
     <div className="sa-shell">
       <aside className="sa-rail">
         <div className="sa-rail-logo">PRZV</div>
         <button
           type="button"
-          className={`sa-rail-btn ${!isCreateRoute ? "active" : ""}`}
+          className={`sa-rail-btn ${!isFormRoute ? "active" : ""}`}
           onClick={handleDashboardClick}
         >
           <GridIcon className="sa-rail-icon" />
@@ -503,7 +598,7 @@ function SuperAdminView({
       </aside>
 
       <main className="sa-main">
-        {!isCreateRoute && (
+        {!isFormRoute && (
           <>
             <header className="sa-topbar">
               <div>
@@ -641,13 +736,15 @@ function SuperAdminView({
           </>
         )}
 
-        {isCreateRoute && (
+        {isFormRoute && (
           <>
             <header className="sa-create-header">
               <button className="sa-back" type="button" onClick={handleDashboardClick}>
                 Volver al dashboard
               </button>
-              <div className="sa-create-title">Registrar nuevo tenant</div>
+              <div className="sa-create-title">
+                {isEditRoute ? "Editar tenant" : "Registrar nuevo tenant"}
+              </div>
               <div className="sa-create-actions">
                 <div className="sa-create-meta">Modo: superadmin</div>
                 <button className="sa-btn ghost" type="button" onClick={onLogout}>
@@ -698,6 +795,20 @@ function SuperAdminView({
                       ))}
                     </select>
                   </div>
+                  {isEditRoute && (
+                    <div className="sa-field">
+                      <label>Estado del tenant</label>
+                      <select
+                        value={editTenantActive ? "active" : "inactive"}
+                        onChange={(event) =>
+                          setEditTenantActive(event.target.value === "active")
+                        }
+                      >
+                        <option value="active">Activo</option>
+                        <option value="inactive">Bloqueado</option>
+                      </select>
+                    </div>
+                  )}
                   <div className="sa-field">
                     <label>Brand name</label>
                     <input
@@ -814,10 +925,12 @@ function SuperAdminView({
                       ))}
                     </datalist>
                   </div>
-                  <div className="sa-note">
-                    Nota: al registrar un tenant se inicia el aprovisionamiento en el
-                    entorno de produccion.
-                  </div>
+                  {!isEditRoute && (
+                    <div className="sa-note">
+                      Nota: al registrar un tenant se inicia el aprovisionamiento en el
+                      entorno de produccion.
+                    </div>
+                  )}
                 </div>
 
                 <div className="sa-form-section">
@@ -970,14 +1083,46 @@ function SuperAdminView({
               </div>
 
               <div className="sa-form-actions">
-                <div className="sa-status-note">{statusNote}</div>
+                <div className="sa-status-note">
+                  {isEditRoute
+                    ? detailsLoading
+                      ? "Cargando datos..."
+                      : hasChanges
+                        ? "Cambios pendientes"
+                        : "Sin cambios"
+                    : statusNote}
+                </div>
                 <div className="sa-form-buttons">
-                  <button className="sa-btn ghost" type="button" onClick={handleValidateProvision}>
-                    Validar conexion
-                  </button>
-                  <button className="sa-btn primary" type="submit" disabled={provisionBusy}>
-                    {provisionBusy ? "Guardando..." : "Desplegar instancia"}
-                  </button>
+                  {isEditRoute ? (
+                    <>
+                      {hasChanges && (
+                        <button className="sa-btn primary" type="submit" disabled={provisionBusy}>
+                          {provisionBusy ? "Guardando..." : "Guardar cambios"}
+                        </button>
+                      )}
+                      <button
+                        className="sa-btn danger"
+                        type="button"
+                        onClick={handleToggleTenantActive}
+                        disabled={provisionBusy || !editTenantId}
+                      >
+                        {editTenantActive ? "Bloquear tenant" : "Reactivar tenant"}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        className="sa-btn ghost"
+                        type="button"
+                        onClick={handleValidateProvision}
+                      >
+                        Validar conexion
+                      </button>
+                      <button className="sa-btn primary" type="submit" disabled={provisionBusy}>
+                        {provisionBusy ? "Guardando..." : "Desplegar instancia"}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </form>

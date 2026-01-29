@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { XIcon, LoaderIcon, EyeIcon, EyeOffIcon } from "./icons";
 
 const EMPTY_CHANNEL = {
@@ -35,7 +35,7 @@ export function WhatsAppLineModal({ isOpen, onClose, initialData, onSave, tenant
 
         // Basic validation
         if (!form.phone_number_id || !form.verify_token || (!initialData && !form.wa_token)) {
-            setError("Los campos ID de Teléfono, Verify Token y Access Token son obligatorios.");
+            setError("Los campos ID de TelÃ©fono, Verify Token y Access Token son obligatorios.");
             setLoading(false);
             return;
         }
@@ -45,7 +45,7 @@ export function WhatsAppLineModal({ isOpen, onClose, initialData, onSave, tenant
             onClose();
         } catch (err) {
             console.error("Error saving channel:", err);
-            setError(err.message || "Error al guardar la línea.");
+            setError(err.message || "Error al guardar la lÃ­nea.");
         } finally {
             setLoading(false);
         }
@@ -56,7 +56,7 @@ export function WhatsAppLineModal({ isOpen, onClose, initialData, onSave, tenant
             <div className="sa-modal-content" onClick={(e) => e.stopPropagation()}>
                 <div className="sa-modal-header">
                     <div className="sa-modal-title">
-                        {initialData ? "Editar Línea WhatsApp" : "Nueva Línea WhatsApp"}
+                        {initialData ? "Editar LÃ­nea WhatsApp" : "Nueva LÃ­nea WhatsApp"}
                     </div>
                     <button className="sa-modal-close" onClick={onClose}>
                         <XIcon width={24} height={24} />
@@ -85,7 +85,7 @@ export function WhatsAppLineModal({ isOpen, onClose, initialData, onSave, tenant
                             <input
                                 value={form.phone_number_id || ""}
                                 onChange={(e) => setForm({ ...form, phone_number_id: e.target.value })}
-                                placeholder="Identificador del número de teléfono"
+                                placeholder="Identificador del nÃºmero de telÃ©fono"
                             />
                         </div>
 
@@ -103,7 +103,7 @@ export function WhatsAppLineModal({ isOpen, onClose, initialData, onSave, tenant
                             <input
                                 value={form.verify_token || ""}
                                 onChange={(e) => setForm({ ...form, verify_token: e.target.value })}
-                                placeholder="Token de verificación webhook"
+                                placeholder="Token de verificaciÃ³n webhook"
                             />
                         </div>
 
@@ -114,7 +114,7 @@ export function WhatsAppLineModal({ isOpen, onClose, initialData, onSave, tenant
                                     type={showToken ? "text" : "password"}
                                     value={form.wa_token || ""}
                                     onChange={(e) => setForm({ ...form, wa_token: e.target.value })}
-                                    placeholder={initialData ? "(Dejar vacío para no cambiar)" : "Token de acceso permanente"}
+                                    placeholder={initialData ? "(Dejar vacÃ­o para no cambiar)" : "Token de acceso permanente"}
                                     style={{ width: "100%", paddingRight: "40px" }}
                                 />
                                 <button
@@ -143,7 +143,7 @@ export function WhatsAppLineModal({ isOpen, onClose, initialData, onSave, tenant
                                     type={showSecret ? "text" : "password"}
                                     value={form.app_secret || ""}
                                     onChange={(e) => setForm({ ...form, app_secret: e.target.value })}
-                                    placeholder={initialData ? "(Dejar vacío para no cambiar)" : "App Secret de Meta"}
+                                    placeholder={initialData ? "(Dejar vacÃ­o para no cambiar)" : "App Secret de Meta"}
                                     style={{ width: "100%", paddingRight: "40px" }}
                                 />
                                 <button
@@ -170,21 +170,21 @@ export function WhatsAppLineModal({ isOpen, onClose, initialData, onSave, tenant
                         <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", color: "#e5e7eb", fontSize: "0.8rem" }}>
                             <input
                                 type="checkbox"
-                                checked={form.is_active}
+                                checked={Boolean(form.is_active)}
                                 onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
                                 style={{ width: "16px", height: "16px" }}
                             />
-                            Línea Activa
+                            LÃ­nea Activa
                         </label>
 
                         <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", color: "#e5e7eb", fontSize: "0.8rem" }}>
                             <input
                                 type="checkbox"
-                                checked={form.is_default}
+                                checked={Boolean(form.is_default)}
                                 onChange={(e) => setForm({ ...form, is_default: e.target.checked })}
                                 style={{ width: "16px", height: "16px" }}
                             />
-                            Línea Principal (Por Defecto)
+                            LÃ­nea Principal (Por Defecto)
                         </label>
                     </div>
                 </div>
@@ -199,7 +199,7 @@ export function WhatsAppLineModal({ isOpen, onClose, initialData, onSave, tenant
                                 <LoaderIcon width={16} height={16} className="animate-spin" /> Guardando...
                             </span>
                         ) : (
-                            "Guardar Línea"
+                            "Guardar LÃ­nea"
                         )}
                     </button>
                 </div>
@@ -207,3 +207,5 @@ export function WhatsAppLineModal({ isOpen, onClose, initialData, onSave, tenant
         </div>
     );
 }
+
+

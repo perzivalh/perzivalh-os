@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiGet, apiPatch, apiPost, apiDelete } from "../api";
 import BotSection from "./superadmin/BotSection";
 import { useToast } from "./ToastProvider.jsx";
 
-// Importar desde módulos
+// Importar desde mÃ³dulos
 import {
   EMPTY_PROVISION,
   PLAN_OPTIONS,
@@ -31,12 +31,12 @@ function SuperAdminView({
   const [tenantSearch, setTenantSearch] = useState("");
   const [error, setError] = useState("");
   const [statusNote, setStatusNote] = useState("Verificacion de red: sistema ok");
-  const [provisionForm, setProvisionForm] = useState(EMPTY_PROVISION);
+    const [provisionForm, setProvisionForm] = useState(EMPTY_PROVISION);
   const [provisionBusy, setProvisionBusy] = useState(false);
   const [impersonateBusyId, setImpersonateBusyId] = useState("");
   const [editTenantId, setEditTenantId] = useState("");
   const [editTenantActive, setEditTenantActive] = useState(true);
-  const [baselineForm, setBaselineForm] = useState(EMPTY_PROVISION);
+    const [baselineForm, setBaselineForm] = useState(EMPTY_PROVISION);
   const [baselineActive, setBaselineActive] = useState(true);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const latestTenantRequest = useRef("");
@@ -227,7 +227,6 @@ function SuperAdminView({
         brand_primary: colors?.primary || EMPTY_PROVISION.brand_primary,
         brand_accent: colors?.accent || EMPTY_PROVISION.brand_accent,
         brand_bg: colors?.bg || EMPTY_PROVISION.brand_bg,
-        timezone: branding?.timezone || "",
         odoo_base_url: odoo?.base_url || "",
         odoo_db_name: odoo?.db_name || "",
         odoo_username: odoo?.username || "",
@@ -354,7 +353,6 @@ function SuperAdminView({
     const wantsBranding =
       provisionForm.brand_name.trim() ||
       provisionForm.logo_url.trim() ||
-      provisionForm.timezone.trim() ||
       provisionForm.brand_primary ||
       provisionForm.brand_accent ||
       provisionForm.brand_bg;
@@ -434,7 +432,6 @@ function SuperAdminView({
       const wantsBranding =
         provisionForm.brand_name.trim() ||
         provisionForm.logo_url.trim() ||
-        provisionForm.timezone.trim() ||
         provisionForm.brand_primary ||
         provisionForm.brand_accent ||
         provisionForm.brand_bg;
@@ -454,7 +451,6 @@ function SuperAdminView({
           brand_name: provisionForm.brand_name.trim(),
           logo_url: provisionForm.logo_url.trim() || null,
           colors: Object.keys(colors).length ? colors : null,
-          timezone: provisionForm.timezone.trim() || null,
         });
       }
 
@@ -734,7 +730,7 @@ function SuperAdminView({
             {error ? <div className="sa-alert">{error}</div> : null}
 
             <form className="sa-form" onSubmit={handleProvisionTenant}>
-              <div className="sa-form-grid">
+              <div className="sa-form-grid sa-form-grid-2">
                 <div className="sa-form-section">
                   <div className="sa-section-title">Identidad del tenant</div>
                   <div className="sa-field">
@@ -757,36 +753,38 @@ function SuperAdminView({
                       placeholder="alfa-salud"
                     />
                   </div>
-                  <div className="sa-field">
-                    <label>Plan</label>
-                    <select
-                      value={provisionForm.plan}
-                      onChange={(event) =>
-                        setProvisionForm({ ...provisionForm, plan: event.target.value })
-                      }
-                    >
-                      <option value="">Seleccionar</option>
-                      {PLAN_OPTIONS.map((plan) => (
-                        <option key={plan.value} value={plan.value}>
-                          {plan.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  {isEditRoute && (
+                  <div className="sa-field sa-field-row">
                     <div className="sa-field">
-                      <label>Estado del tenant</label>
+                      <label>Plan</label>
                       <select
-                        value={editTenantActive ? "active" : "inactive"}
+                        value={provisionForm.plan}
                         onChange={(event) =>
-                          setEditTenantActive(event.target.value === "active")
+                          setProvisionForm({ ...provisionForm, plan: event.target.value })
                         }
                       >
-                        <option value="active">Activo</option>
-                        <option value="inactive">Bloqueado</option>
+                        <option value="">Seleccionar</option>
+                        {PLAN_OPTIONS.map((plan) => (
+                          <option key={plan.value} value={plan.value}>
+                            {plan.label}
+                          </option>
+                        ))}
                       </select>
                     </div>
-                  )}
+                    {isEditRoute && (
+                      <div className="sa-field">
+                        <label>Estado del tenant</label>
+                        <select
+                          value={editTenantActive ? "active" : "inactive"}
+                          onChange={(event) =>
+                            setEditTenantActive(event.target.value === "active")
+                          }
+                        >
+                          <option value="active">Activo</option>
+                          <option value="inactive">Bloqueado</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
                   <div className="sa-field">
                     <label>Brand name</label>
                     <input
@@ -887,22 +885,6 @@ function SuperAdminView({
                       </div>
                     </div>
                   </div>
-                  <div className="sa-field">
-                    <label>Timezone</label>
-                    <input
-                      list="timezone-options"
-                      value={provisionForm.timezone}
-                      onChange={(event) =>
-                        setProvisionForm({ ...provisionForm, timezone: event.target.value })
-                      }
-                      placeholder="America/La_Paz"
-                    />
-                    <datalist id="timezone-options">
-                      {TIMEZONE_OPTIONS.map((zone) => (
-                        <option key={zone} value={zone} />
-                      ))}
-                    </datalist>
-                  </div>
                   {!isEditRoute && (
                     <div className="sa-note">
                       Nota: al registrar un tenant se inicia el aprovisionamiento en el
@@ -984,8 +966,8 @@ function SuperAdminView({
                   </div>
                 </div>
 
-
-                <div className="sa-form-actions">
+              </div>
+              <div className="sa-form-actions">
                   <div className="sa-status-note">
                     {isEditRoute
                       ? detailsLoading
@@ -1040,7 +1022,7 @@ function SuperAdminView({
               />
             ) : (
               <div style={{ marginTop: "2rem", padding: "1rem", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: "12px", color: "rgba(255,255,255,0.5)", fontSize: "0.8rem", textAlign: "center" }}>
-                Crea el tenant primero para configurar las líneas de WhatsApp.
+                Crea el tenant primero para configurar las lÃ­neas de WhatsApp.
               </div>
             )}
 
@@ -1064,3 +1046,4 @@ function SuperAdminView({
 }
 
 export default SuperAdminView;
+

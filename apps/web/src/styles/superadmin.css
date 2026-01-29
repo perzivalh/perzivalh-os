@@ -467,9 +467,20 @@
   gap: 1.5rem;
 }
 
+.sa-form-grid-2 {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  align-items: start;
+}
+
 .sa-form-section {
   display: flex;
   flex-direction: column;
+  gap: 0.9rem;
+}
+
+.sa-field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 0.9rem;
 }
 
@@ -580,6 +591,10 @@
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
+}
+
+.sa-form-actions {
+  margin-top: 1rem;
 }
 
 .sa-status-note {

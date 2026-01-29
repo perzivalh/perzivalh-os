@@ -30,10 +30,11 @@ function UsersSection({
 
     const filteredUsers = useMemo(() => {
         const query = userSearch.trim().toLowerCase();
+        const baseList = adminUsers || [];
         if (!query) {
-            return adminUsers;
+            return baseList;
         }
-        return adminUsers.filter((user) => {
+        return baseList.filter((user) => {
             const name = user.name?.toLowerCase() || "";
             const email = user.email?.toLowerCase() || "";
             return name.includes(query) || email.includes(query);

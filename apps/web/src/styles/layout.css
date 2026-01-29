@@ -264,6 +264,12 @@
   font-weight: 700;
   background: #16a34a;
   color: #0f172a;
+  flex-shrink: 0;
+}
+
+.toast-icon svg {
+  width: 16px;
+  height: 16px;
 }
 
 .toast-info .toast-icon {
@@ -304,10 +310,10 @@
   left: 0;
   bottom: 0;
   height: 3px;
-  width: 0;
-  animation-name: toast-progress;
-  animation-timing-function: linear;
-  animation-fill-mode: forwards;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: toast-progress linear forwards;
 }
 
 .toast-progress-success {
@@ -324,10 +330,10 @@
 
 @keyframes toast-progress {
   from {
-    width: 0;
+    transform: scaleX(0);
   }
   to {
-    width: 100%;
+    transform: scaleX(1);
   }
 }
 

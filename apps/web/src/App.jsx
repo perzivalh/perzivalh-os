@@ -116,6 +116,10 @@ function App() {
   const [loadingConversation, setLoadingConversation] = useState(false);
   const [pageError, setPageError] = useState("");
   const { pushToast } = useToast();
+  const pendingUserDeletesRef = useRef(new Map());
+  const pendingRoleDeletesRef = useRef(new Map());
+  const pendingTemplateDeletesRef = useRef(new Map());
+  const pendingTagDeletesRef = useRef(new Map());
 
   const [metrics, setMetrics] = useState(null);
   const [templates, setTemplates] = useState([]);
@@ -823,6 +827,59 @@ function App() {
     }
     const hasTag =
       activeConversation.tags?.some((tag) => tag.name === tagName) || false;
+    if (hasTag) {
+      const key = `${activeConversation.id}:${tagName}`;
+      if (pendingTagDeletesRef.current.has(key)) {
+        return;
+      }
+      const snapshot = activeConversation;
+      const nextConversation = {
+        ...activeConversation,
+        tags: (activeConversation.tags || []).filter((tag) => tag.name !== tagName),
+      };
+      setActiveConversation(nextConversation);
+      const timer = setTimeout(async () => {
+        try {
+          const data = await apiPost(`/api/conversations/${snapshot.id}/tags`, {
+            add: [],
+            remove: [tagName],
+          });
+          if (activeConversation?.id === snapshot.id) {
+            setActiveConversation(data.conversation);
+          }
+        } catch (error) {
+          if (activeConversation?.id === snapshot.id) {
+            setActiveConversation(snapshot);
+          }
+          pushToast({
+            type: "error",
+            message: normalizeError(error) || "No se pudo eliminar el tag",
+          });
+        } finally {
+          pendingTagDeletesRef.current.delete(key);
+        }
+      }, 8000);
+      pendingTagDeletesRef.current.set(key, { timer, snapshot });
+      pushToast({
+        message: "Tag eliminado. Deshacer disponible",
+        actionLabel: "DESHACER",
+        duration: 8000,
+        onAction: async () => {
+          const pending = pendingTagDeletesRef.current.get(key);
+          if (pending?.timer) {
+            clearTimeout(pending.timer);
+          }
+          if (pending?.snapshot) {
+            setActiveConversation(pending.snapshot);
+          } else {
+            setActiveConversation(snapshot);
+          }
+          pendingTagDeletesRef.current.delete(key);
+          pushToast({ message: "Eliminación cancelada" });
+        },
+      });
+      return;
+    }
     try {
       const data = await apiPost(`/api/conversations/${activeConversation.id}/tags`, {
         add: hasTag ? [] : [tagName],
@@ -1062,24 +1119,51 @@ function App() {
     if (!userId) {
       return;
     }
+    if (pendingUserDeletesRef.current.has(userId)) {
+      return;
+    }
+    let snapshot = null;
     try {
-      await apiDelete(`/api/admin/users/${userId}`);
-      await loadAdminUsers();
+      snapshot = adminUsers.slice();
+      setAdminUsers((prev) => prev.filter((user) => user.id !== userId));
+      const timer = setTimeout(async () => {
+        try {
+          await apiDelete(`/api/admin/users/${userId}`);
+          await loadAdminUsers();
+          pushToast({ message: "Usuario eliminado definitivamente" });
+        } catch (err) {
+          if (snapshot) {
+            setAdminUsers(snapshot);
+          } else {
+            await loadAdminUsers();
+          }
+          pushToast({
+            type: "error",
+            message: normalizeError(err) || "No se pudo eliminar el usuario",
+          });
+        } finally {
+          pendingUserDeletesRef.current.delete(userId);
+        }
+      }, 8000);
+      pendingUserDeletesRef.current.set(userId, { timer, snapshot });
       pushToast({
-        message: "Usuario eliminado correctamente",
+        message: "Usuario eliminado. Deshacer disponible",
         actionLabel: "DESHACER",
         duration: 8000,
         onAction: async () => {
-          try {
-            await apiPatch(`/api/admin/users/${userId}`, { is_active: true });
-            await loadAdminUsers();
-            pushToast({ message: "Usuario restaurado" });
-          } catch (err) {
-            pushToast({
-              type: "error",
-              message: normalizeError(err) || "No se pudo restaurar el usuario",
-            });
+          const pending = pendingUserDeletesRef.current.get(userId);
+          if (pending?.timer) {
+            clearTimeout(pending.timer);
           }
+          if (pending?.snapshot) {
+            setAdminUsers(pending.snapshot);
+          } else if (snapshot) {
+            setAdminUsers(snapshot);
+          } else {
+            await loadAdminUsers();
+          }
+          pendingUserDeletesRef.current.delete(userId);
+          pushToast({ message: "Eliminación cancelada" });
         },
       });
     } catch (error) {
@@ -1161,33 +1245,46 @@ function App() {
 
   async function handleRoleDelete(role) {
     const currentPermissions = rolePermissions?.[role];
+    if (!role || pendingRoleDeletesRef.current.has(role)) {
+      return;
+    }
     try {
-      await apiDelete(`/api/admin/role-permissions/${role}`);
       setRolePermissions((prev) => {
         const next = { ...prev };
         delete next[role];
         return next;
       });
+      const timer = setTimeout(async () => {
+        try {
+          await apiDelete(`/api/admin/role-permissions/${role}`);
+          pushToast({ message: "Rol eliminado definitivamente" });
+        } catch (err) {
+          if (currentPermissions) {
+            setRolePermissions((prev) => ({ ...prev, [role]: currentPermissions }));
+          }
+          pushToast({
+            type: "error",
+            message: normalizeError(err) || "No se pudo eliminar el rol",
+          });
+        } finally {
+          pendingRoleDeletesRef.current.delete(role);
+        }
+      }, 8000);
+      pendingRoleDeletesRef.current.set(role, { timer, currentPermissions });
       pushToast({
-        message: "Rol eliminado correctamente",
+        message: "Rol eliminado. Deshacer disponible",
         actionLabel: "DESHACER",
         duration: 8000,
         onAction: async () => {
-          if (!currentPermissions) {
-            return;
+          const pending = pendingRoleDeletesRef.current.get(role);
+          if (pending?.timer) {
+            clearTimeout(pending.timer);
           }
-          try {
-            await apiPatch("/api/admin/role-permissions", {
-              permissions: { [role]: currentPermissions },
-            });
-            setRolePermissions((prev) => ({ ...prev, [role]: currentPermissions }));
-            pushToast({ message: "Rol restaurado" });
-          } catch (err) {
-            pushToast({
-              type: "error",
-              message: normalizeError(err) || "No se pudo restaurar el rol",
-            });
+          if (pending?.currentPermissions) {
+            setRolePermissions((prev) => ({ ...prev, [role]: pending.currentPermissions }));
           }
+          pendingRoleDeletesRef.current.delete(role);
+          pushToast({ message: "Eliminación cancelada" });
         },
       });
     } catch (error) {
@@ -1416,24 +1513,44 @@ function App() {
     if (!templateId) {
       return;
     }
+    if (pendingTemplateDeletesRef.current.has(templateId)) {
+      return;
+    }
     try {
-      await apiDelete(`/api/templates/${templateId}`);
-      await loadTemplates();
+      const snapshot = templates.slice();
+      setTemplates((prev) => prev.filter((template) => template.id !== templateId));
+      const timer = setTimeout(async () => {
+        try {
+          await apiDelete(`/api/templates/${templateId}`);
+          await loadTemplates();
+          pushToast({ message: "Plantilla eliminada definitivamente" });
+        } catch (err) {
+          setTemplates(snapshot);
+          pushToast({
+            type: "error",
+            message: normalizeError(err) || "No se pudo eliminar la plantilla",
+          });
+        } finally {
+          pendingTemplateDeletesRef.current.delete(templateId);
+        }
+      }, 8000);
+      pendingTemplateDeletesRef.current.set(templateId, { timer, snapshot });
       pushToast({
-        message: "Plantilla eliminada correctamente",
+        message: "Plantilla eliminada. Deshacer disponible",
         actionLabel: "DESHACER",
         duration: 8000,
         onAction: async () => {
-          try {
-            await apiPost(`/api/templates/${templateId}/restore`, {});
-            await loadTemplates();
-            pushToast({ message: "Plantilla restaurada" });
-          } catch (err) {
-            pushToast({
-              type: "error",
-              message: normalizeError(err) || "No se pudo restaurar la plantilla",
-            });
+          const pending = pendingTemplateDeletesRef.current.get(templateId);
+          if (pending?.timer) {
+            clearTimeout(pending.timer);
           }
+          if (pending?.snapshot) {
+            setTemplates(pending.snapshot);
+          } else {
+            setTemplates(snapshot);
+          }
+          pendingTemplateDeletesRef.current.delete(templateId);
+          pushToast({ message: "Eliminación cancelada" });
         },
       });
     } catch (error) {

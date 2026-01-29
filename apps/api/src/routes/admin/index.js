@@ -143,16 +143,39 @@ router.patch("/users/:id", requireAuth, requireRole("admin"), async (req, res) =
 
 // DELETE /api/admin/users/:id
 router.delete("/users/:id", requireAuth, requireRole("admin"), async (req, res) => {
-    const user = await prisma.user.update({
-        where: { id: req.params.id },
-        data: { is_active: false },
-    });
+    const userId = req.params.id;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+        return res.status(404).json({ error: "user_not_found" });
+    }
+    await prisma.$transaction([
+        prisma.auditLogTenant.updateMany({
+            where: { user_id: userId },
+            data: { user_id: null },
+        }),
+        prisma.conversation.updateMany({
+            where: { assigned_user_id: userId },
+            data: { assigned_user_id: null },
+        }),
+        prisma.campaign.updateMany({
+            where: { created_by_user_id: userId },
+            data: { created_by_user_id: null },
+        }),
+        prisma.metaTemplate.updateMany({
+            where: { created_by_user_id: userId },
+            data: { created_by_user_id: null },
+        }),
+        prisma.audienceSegment.updateMany({
+            where: { created_by_user_id: userId },
+            data: { created_by_user_id: null },
+        }),
+        prisma.user.delete({ where: { id: userId } }),
+    ]);
     if (process.env.CONTROL_DB_URL && req.user.tenant_id) {
         try {
             const control = getControlClient();
-            await control.userControl.updateMany({
+            await control.userControl.deleteMany({
                 where: { email: user.email },
-                data: { is_active: false },
             });
         } catch (error) {
             logger.error("control.user_sync_failed", {
@@ -163,7 +186,7 @@ router.delete("/users/:id", requireAuth, requireRole("admin"), async (req, res) 
     await logAudit({
         userId: req.user.id,
         action: "user.disabled",
-        data: { user_id: user.id, email: user.email },
+        data: { user_id: user.id, email: user.email, hard_delete: true },
     });
     return res.json({ user });
 });

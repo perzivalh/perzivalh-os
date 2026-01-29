@@ -309,11 +309,12 @@
   position: absolute;
   left: 0;
   bottom: 0;
-  height: 3px;
+  height: 4px;
   width: 100%;
   transform: scaleX(0);
   transform-origin: left;
-  animation: toast-progress linear forwards;
+  animation: toast-progress var(--toast-duration, 6000ms) linear forwards;
+  z-index: 1;
 }
 
 .toast-progress-success {

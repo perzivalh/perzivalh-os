@@ -70,7 +70,11 @@ export function ToastProvider({ children }) {
       {children}
       <div className="toast-container">
         {toasts.map((toast) => (
-          <div key={toast.id} className={`toast toast-${toast.type}`}>
+          <div
+            key={toast.id}
+            className={`toast toast-${toast.type}`}
+            style={{ "--toast-duration": `${toast.duration}ms` }}
+          >
             <div className="toast-icon">{renderIcon(toast.type)}</div>
             <div className="toast-message">{toast.message}</div>
             {toast.actionLabel && (
@@ -95,10 +99,7 @@ export function ToastProvider({ children }) {
               x
             </button>
             {toast.duration > 0 && (
-              <div
-                className={`toast-progress toast-progress-${toast.type}`}
-                style={{ animationDuration: `${toast.duration}ms` }}
-              />
+              <div className={`toast-progress toast-progress-${toast.type}`} />
             )}
           </div>
         ))}

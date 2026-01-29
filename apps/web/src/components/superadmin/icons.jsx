@@ -53,3 +53,93 @@ export function ArrowRightIcon(props) {
         </svg>
     );
 }
+
+export function XIcon(props) {
+    return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+            <path d="M18 6 6 18" strokeWidth="1.8" strokeLinecap="round" />
+            <path d="m6 6 12 12" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+    );
+}
+
+export function LoaderIcon(props) {
+    return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+    );
+}
+
+export function EyeIcon(props) {
+    return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+            <path
+                d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+            <circle cx="12" cy="12" r="3" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+    );
+}
+
+export function EyeOffIcon(props) {
+    return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+            <path
+                d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+            <path
+                d="M14.084 14.158a3 3 0 0 1-4.242-4.242"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+            <path
+                d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+            <path d="m2 2 20 20" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+    );
+}
+
+export function SmartphoneIcon(props) {
+    return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+            <rect width="14" height="20" x="5" y="2" rx="2" ry="2" strokeWidth="1.8" />
+            <path d="M12 18h.01" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+    );
+}
+
+export function EditIcon(props) {
+    return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+            <path
+                d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+            <path d="m15 5 4 4" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+    );
+}
+
+export function TrashIcon(props) {
+    return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+            <path d="M3 6h18" strokeWidth="1.8" strokeLinecap="round" />
+            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" strokeWidth="1.8" strokeLinecap="round" />
+            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+    );
+}

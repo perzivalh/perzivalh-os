@@ -42,6 +42,8 @@ model Channel {
   verify_token     String
   wa_token_encrypted String
   app_secret_encrypted String?
+  is_active        Boolean  @default(true)
+  is_default       Boolean  @default(false)
   created_at       DateTime @default(now())
   tenant           Tenant   @relation(fields: [tenant_id], references: [id])
 

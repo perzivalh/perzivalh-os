@@ -14,8 +14,10 @@ import {
   PlusIcon,
   GearIcon,
   SearchIcon,
+  SearchIcon,
   ArrowRightIcon,
 } from "./superadmin/icons";
+import { WhatsAppLinesSection } from "./superadmin/WhatsAppLinesSection";
 
 
 function SuperAdminView({
@@ -219,12 +221,7 @@ function SuperAdminView({
         slug: tenant.slug || "",
         plan: tenant.plan || "",
         db_url: database?.db_url || "",
-        line_name: channel?.display_name || "",
-        phone_number_id: channel?.phone_number_id || "",
-        waba_id: channel?.waba_id || "",
-        verify_token: channel?.verify_token || "",
-        wa_token: channel?.wa_token || "",
-        app_secret: channel?.app_secret || "",
+        db_url: database?.db_url || "",
         brand_name: branding?.brand_name || "",
         logo_url: branding?.logo_url || "",
         brand_primary: colors?.primary || EMPTY_PROVISION.brand_primary,
@@ -364,29 +361,6 @@ function SuperAdminView({
     if (wantsBranding && !provisionForm.brand_name.trim()) {
       return { ok: false, message: "Brand name es requerido." };
     }
-    const wantsChannel =
-      provisionForm.phone_number_id ||
-      provisionForm.verify_token ||
-      provisionForm.wa_token ||
-      provisionForm.waba_id ||
-      provisionForm.app_secret ||
-      provisionForm.line_name;
-    const hasExistingChannel = Boolean(
-      editTenantId && channels.find((item) => item.tenant_id === editTenantId)
-    );
-    if (
-      wantsChannel &&
-      (!hasExistingChannel || !editTenantId) &&
-      (!provisionForm.phone_number_id ||
-        !provisionForm.verify_token ||
-        !provisionForm.wa_token)
-    ) {
-      return {
-        ok: false,
-        message: "Canal incompleto: phone_number_id, verify_token y wa_token.",
-      };
-    }
-
     const wantsOdoo =
       provisionForm.odoo_base_url ||
       provisionForm.odoo_db_name ||
@@ -455,39 +429,6 @@ function SuperAdminView({
         await apiPost(`/api/superadmin/tenants/${tenantId}/database`, {
           db_url: provisionForm.db_url.trim(),
         });
-      }
-
-      const channelPayload = {
-        phone_number_id: provisionForm.phone_number_id.trim(),
-        display_name: provisionForm.line_name.trim(),
-        waba_id: provisionForm.waba_id.trim(),
-        verify_token: provisionForm.verify_token.trim(),
-        wa_token: provisionForm.wa_token.trim(),
-        app_secret: provisionForm.app_secret.trim(),
-      };
-      const wantsChannel = Object.values(channelPayload).some(Boolean);
-      if (wantsChannel) {
-        const existingChannel = channels.find((item) => item.tenant_id === tenantId);
-        if (existingChannel) {
-          await apiPatch(`/api/superadmin/channels/${existingChannel.id}`, {
-            phone_number_id: channelPayload.phone_number_id || undefined,
-            display_name: channelPayload.display_name || undefined,
-            waba_id: channelPayload.waba_id || undefined,
-            verify_token: channelPayload.verify_token || undefined,
-            wa_token: channelPayload.wa_token || undefined,
-            app_secret: channelPayload.app_secret || undefined,
-          });
-        } else {
-          await apiPost("/api/superadmin/channels", {
-            tenant_id: tenantId,
-            phone_number_id: channelPayload.phone_number_id,
-            display_name: channelPayload.display_name,
-            waba_id: channelPayload.waba_id,
-            verify_token: channelPayload.verify_token,
-            wa_token: channelPayload.wa_token,
-            app_secret: channelPayload.app_secret,
-          });
-        }
       }
 
       const wantsBranding =
@@ -1041,128 +982,66 @@ function SuperAdminView({
                       />
                     </div>
                   </div>
-                  <div className="sa-subsection">
-                    <div className="sa-subsection-title">WhatsApp Cloud</div>
-                    <div className="sa-field">
-                      <label>Nombre de linea (opcional)</label>
-                      <input
-                        value={provisionForm.line_name}
-                        onChange={(event) =>
-                          setProvisionForm({
-                            ...provisionForm,
-                            line_name: event.target.value,
-                          })
-                        }
-                        placeholder="Linea principal"
-                      />
-                    </div>
-                    <div className="sa-field">
-                      <label>Meta Access Token</label>
-                      <input
-                        value={provisionForm.wa_token}
-                        onChange={(event) =>
-                          setProvisionForm({ ...provisionForm, wa_token: event.target.value })
-                        }
-                        placeholder="token"
-                      />
-                    </div>
-                    <div className="sa-field">
-                      <label>Meta Business ID (WABA)</label>
-                      <input
-                        value={provisionForm.waba_id}
-                        onChange={(event) =>
-                          setProvisionForm({ ...provisionForm, waba_id: event.target.value })
-                        }
-                        placeholder="2003704870486290"
-                      />
-                    </div>
-                    <div className="sa-field">
-                      <label>WhatsApp Phone ID</label>
-                      <input
-                        value={provisionForm.phone_number_id}
-                        onChange={(event) =>
-                          setProvisionForm({
-                            ...provisionForm,
-                            phone_number_id: event.target.value,
-                          })
-                        }
-                        placeholder="123456789"
-                      />
-                    </div>
-                    <div className="sa-field">
-                      <label>Verify Token</label>
-                      <input
-                        value={provisionForm.verify_token}
-                        onChange={(event) =>
-                          setProvisionForm({
-                            ...provisionForm,
-                            verify_token: event.target.value,
-                          })
-                        }
-                        placeholder="verify-token"
-                      />
-                    </div>
-                    <div className="sa-field">
-                      <label>WhatsApp App Secret (opcional)</label>
-                      <input
-                        value={provisionForm.app_secret}
-                        onChange={(event) =>
-                          setProvisionForm({
-                            ...provisionForm,
-                            app_secret: event.target.value,
-                          })
-                        }
-                        placeholder="app-secret"
-                      />
-                    </div>
+                </div>
+
+
+                <div className="sa-form-actions">
+                  <div className="sa-status-note">
+                    {isEditRoute
+                      ? detailsLoading
+                        ? "Cargando datos..."
+                        : hasChanges
+                          ? "Cambios pendientes"
+                          : "Sin cambios"
+                      : statusNote}
+                  </div>
+                  <div className="sa-form-buttons">
+                    {isEditRoute ? (
+                      <>
+                        {hasChanges && (
+                          <button className="sa-btn primary" type="submit" disabled={provisionBusy}>
+                            {provisionBusy ? "Guardando..." : "Guardar cambios"}
+                          </button>
+                        )}
+                        <button
+                          className="sa-btn danger"
+                          type="button"
+                          onClick={handleToggleTenantActive}
+                          disabled={provisionBusy || !editTenantId}
+                        >
+                          {editTenantActive ? "Bloquear tenant" : "Reactivar tenant"}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          className="sa-btn ghost"
+                          type="button"
+                          onClick={handleValidateProvision}
+                        >
+                          Validar conexion
+                        </button>
+                        <button className="sa-btn primary" type="submit" disabled={provisionBusy}>
+                          {provisionBusy ? "Guardando..." : "Desplegar instancia"}
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
-              </div>
-
-              <div className="sa-form-actions">
-                <div className="sa-status-note">
-                  {isEditRoute
-                    ? detailsLoading
-                      ? "Cargando datos..."
-                      : hasChanges
-                        ? "Cambios pendientes"
-                        : "Sin cambios"
-                    : statusNote}
-                </div>
-                <div className="sa-form-buttons">
-                  {isEditRoute ? (
-                    <>
-                      {hasChanges && (
-                        <button className="sa-btn primary" type="submit" disabled={provisionBusy}>
-                          {provisionBusy ? "Guardando..." : "Guardar cambios"}
-                        </button>
-                      )}
-                      <button
-                        className="sa-btn danger"
-                        type="button"
-                        onClick={handleToggleTenantActive}
-                        disabled={provisionBusy || !editTenantId}
-                      >
-                        {editTenantActive ? "Bloquear tenant" : "Reactivar tenant"}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        className="sa-btn ghost"
-                        type="button"
-                        onClick={handleValidateProvision}
-                      >
-                        Validar conexion
-                      </button>
-                      <button className="sa-btn primary" type="submit" disabled={provisionBusy}>
-                        {provisionBusy ? "Guardando..." : "Desplegar instancia"}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
             </form>
+
+            {/* WhatsApp Lines Section - only show when editing existing tenant */}
+            {editTenantId ? (
+              <WhatsAppLinesSection
+                channels={channels.filter((c) => c.tenant_id === editTenantId)}
+                tenantId={editTenantId}
+                onRefresh={loadData}
+              />
+            ) : (
+              <div style={{ marginTop: "2rem", padding: "1rem", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: "12px", color: "rgba(255,255,255,0.5)", fontSize: "0.8rem", textAlign: "center" }}>
+                Crea el tenant primero para configurar las líneas de WhatsApp.
+              </div>
+            )}
 
             {/* Bot Section - only show when editing existing tenant */}
             {editTenantId && (
@@ -1179,7 +1058,7 @@ function SuperAdminView({
           </>
         )}
       </main>
-    </div>
+    </div >
   );
 }
 

@@ -95,6 +95,22 @@ router.get("/tenants/:id/details", requireAuth, requireSuperAdmin, async (req, r
                 password: decryptString(tenant.odoo_config.password_encrypted),
             }
             : null,
+        channels: tenant.channels
+            ? tenant.channels.map((ch) => ({
+                id: ch.id,
+                provider: ch.provider,
+                phone_number_id: ch.phone_number_id,
+                display_name: ch.display_name || null,
+                waba_id: ch.waba_id || null,
+                verify_token: ch.verify_token,
+                is_active: ch.is_active,
+                is_default: ch.is_default,
+                wa_token: ch.wa_token_encrypted ? decryptString(ch.wa_token_encrypted) : "",
+                app_secret: ch.app_secret_encrypted
+                    ? decryptString(ch.app_secret_encrypted)
+                    : "",
+            }))
+            : [],
         channel: channel
             ? {
                 id: channel.id,
@@ -109,6 +125,8 @@ router.get("/tenants/:id/details", requireAuth, requireSuperAdmin, async (req, r
                 app_secret: channel.app_secret_encrypted
                     ? decryptString(channel.app_secret_encrypted)
                     : "",
+                is_active: channel.is_active,
+                is_default: channel.is_default,
             }
             : null,
     });
@@ -241,15 +259,16 @@ router.get("/channels", requireAuth, requireSuperAdmin, async (req, res) => {
         orderBy: { created_at: "desc" },
     });
     return res.json({
-        channels: channels.map((channel) => ({
-            id: channel.id,
-            tenant_id: channel.tenant_id,
-            provider: channel.provider,
-            phone_number_id: channel.phone_number_id,
-            display_name: channel.display_name || null,
-            waba_id: channel.waba_id || null,
-            created_at: channel.created_at,
-        })),
+        id: channel.id,
+        tenant_id: channel.tenant_id,
+        provider: channel.provider,
+        phone_number_id: channel.phone_number_id,
+        display_name: channel.display_name || null,
+        waba_id: channel.waba_id || null,
+        is_active: channel.is_active,
+        is_default: channel.is_default,
+        created_at: channel.created_at,
+    })),
     });
 });
 
@@ -276,8 +295,35 @@ router.post("/channels", requireAuth, requireSuperAdmin, async (req, res) => {
             verify_token: verifyToken,
             wa_token_encrypted: encryptString(waToken),
             app_secret_encrypted: appSecret ? encryptString(appSecret) : null,
+            is_active: req.body.is_active !== undefined ? Boolean(req.body.is_active) : true,
+            is_default: req.body.is_default !== undefined ? Boolean(req.body.is_default) : false,
         },
     });
+
+    // If marked as default, unset others
+    if (channel.is_default) {
+        await control.channel.updateMany({
+            where: {
+                tenant_id: tenantId,
+                id: { not: channel.id },
+            },
+            data: { is_default: false },
+        });
+    }
+
+    // Audit log
+    await control.auditLogControl.create({
+        data: {
+            tenant_id: tenantId,
+            user_id: req.user?.id,
+            action: "create_channel",
+            data_json: {
+                channel_id: channel.id,
+                phone_number_id: channel.phone_number_id,
+            },
+        },
+    });
+
     clearChannelCache(channel.phone_number_id);
     return res.json({
         channel: {
@@ -287,6 +333,8 @@ router.post("/channels", requireAuth, requireSuperAdmin, async (req, res) => {
             phone_number_id: channel.phone_number_id,
             display_name: channel.display_name || null,
             waba_id: channel.waba_id || null,
+            is_active: channel.is_active,
+            is_default: channel.is_default,
             created_at: channel.created_at,
         },
     });
@@ -316,6 +364,12 @@ router.patch("/channels/:id", requireAuth, requireSuperAdmin, async (req, res) =
         const raw = String(req.body.app_secret || "").trim();
         updates.app_secret_encrypted = raw ? encryptString(raw) : null;
     }
+    if (req.body?.is_active !== undefined) {
+        updates.is_active = Boolean(req.body.is_active);
+    }
+    if (req.body?.is_default !== undefined) {
+        updates.is_default = Boolean(req.body.is_default);
+    }
     const control = getControlClient();
     const existing = await control.channel.findUnique({
         where: { id: req.params.id },
@@ -324,10 +378,36 @@ router.patch("/channels/:id", requireAuth, requireSuperAdmin, async (req, res) =
         where: { id: req.params.id },
         data: updates,
     });
+
+    // If marked as default, unset others
+    if (updates.is_default === true) {
+        await control.channel.updateMany({
+            where: {
+                tenant_id: channel.tenant_id,
+                id: { not: channel.id },
+            },
+            data: { is_default: false },
+        });
+    }
+
     if (existing?.phone_number_id) {
         clearChannelCache(existing.phone_number_id);
     }
     clearChannelCache(channel.phone_number_id);
+
+    // Audit log
+    await control.auditLogControl.create({
+        data: {
+            tenant_id: channel.tenant_id,
+            user_id: req.user?.id,
+            action: "update_channel",
+            data_json: {
+                channel_id: channel.id,
+                updates: Object.keys(updates),
+            },
+        },
+    });
+
     return res.json({
         channel: {
             id: channel.id,
@@ -336,9 +416,45 @@ router.patch("/channels/:id", requireAuth, requireSuperAdmin, async (req, res) =
             phone_number_id: channel.phone_number_id,
             display_name: channel.display_name || null,
             waba_id: channel.waba_id || null,
+            is_active: channel.is_active,
+            is_default: channel.is_default,
             created_at: channel.created_at,
         },
     });
+});
+
+// DELETE /api/superadmin/channels/:id
+router.delete("/channels/:id", requireAuth, requireSuperAdmin, async (req, res) => {
+    const control = getControlClient();
+    const existing = await control.channel.findUnique({
+        where: { id: req.params.id },
+    });
+    if (!existing) {
+        return res.status(404).json({ error: "channel_not_found" });
+    }
+
+    await control.channel.delete({
+        where: { id: req.params.id },
+    });
+
+    if (existing.phone_number_id) {
+        clearChannelCache(existing.phone_number_id);
+    }
+
+    // Audit log
+    await control.auditLogControl.create({
+        data: {
+            tenant_id: existing.tenant_id,
+            user_id: req.user?.id,
+            action: "delete_channel",
+            data_json: {
+                channel_id: existing.id,
+                phone_number_id: existing.phone_number_id,
+            },
+        },
+    });
+
+    return res.json({ success: true });
 });
 
 // ==========================================

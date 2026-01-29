@@ -56,7 +56,7 @@ async function resolveChannelByPhoneNumberId(phoneNumberId) {
   const channel = await control.channel.findUnique({
     where: { phone_number_id: phoneNumberId },
   });
-  if (!channel) {
+  if (!channel || !channel.is_active) {
     return null;
   }
   const value = {
@@ -87,23 +87,30 @@ async function resolveTenantContextById(tenantId) {
     }
     const control = getControlClient();
     const channel = await control.channel.findFirst({
-      where: { tenant_id: tenantId, provider: "whatsapp" },
-      orderBy: { created_at: "desc" },
+      where: {
+        tenant_id: tenantId,
+        provider: "whatsapp",
+        is_active: true,
+      },
+      orderBy: [
+        { is_default: "desc" },
+        { created_at: "desc" }
+      ],
     });
     return {
       tenantId,
       prisma: getTenantClient(tenantId, dbUrl),
       channel: channel
         ? {
-            tenantId,
-            phone_number_id: channel.phone_number_id,
-            waba_id: channel.waba_id || null,
-            verify_token: channel.verify_token,
-            wa_token: decryptString(channel.wa_token_encrypted),
-            app_secret: channel.app_secret_encrypted
-              ? decryptString(channel.app_secret_encrypted)
-              : null,
-          }
+          tenantId,
+          phone_number_id: channel.phone_number_id,
+          waba_id: channel.waba_id || null,
+          verify_token: channel.verify_token,
+          wa_token: decryptString(channel.wa_token_encrypted),
+          app_secret: channel.app_secret_encrypted
+            ? decryptString(channel.app_secret_encrypted)
+            : null,
+        }
         : null,
     };
   } catch (error) {

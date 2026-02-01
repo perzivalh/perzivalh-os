@@ -99,7 +99,8 @@ function ChatView({
   }
 
   return (
-    <section className={`chat-shell ${activeConversation ? "has-active" : ""}`}>
+    <>
+      <section className={`chat-shell ${activeConversation ? "has-active" : ""}`}>
       <aside className="chat-list-panel">
         <div className="chat-list-header">
           <div>
@@ -475,7 +476,7 @@ function ChatView({
                       title="Quitar etiqueta"
                       onClick={() => handleToggleTag(tag.name)}
                     >
-                      ×
+                      x
                     </button>
                   </span>
                 ))
@@ -492,7 +493,7 @@ function ChatView({
                 {tags
                   .filter(
                     (tag) =>
-                      !activeConversation?.tags?.some(
+                      !activeConversation?.tagsx.some(
                         (item) => item.name === tag.name
                       )
                   )
@@ -593,14 +594,14 @@ function ChatView({
           )}
         </aside>
       </div>
-    </section>
-    {showTagManager && (
+      </section>
+      {showTagManager && (
       <div className="modal-overlay" onClick={handleCloseTagManager}>
         <div className="modal-card" onClick={(event) => event.stopPropagation()}>
           <div className="modal-header">
             <div className="modal-title">Gestion de etiquetas</div>
             <button className="modal-close" type="button" onClick={handleCloseTagManager}>
-              ×
+              x
             </button>
           </div>
           <div className="modal-body">
@@ -655,6 +656,7 @@ function ChatView({
         </div>
       </div>
     )}
+    </>
   );
 }
 

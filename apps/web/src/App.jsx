@@ -496,13 +496,16 @@ function App() {
         const ctx = new AudioContext();
         const oscillator = ctx.createOscillator();
         const gain = ctx.createGain();
-        oscillator.type = "sine";
-        oscillator.frequency.value = 880;
-        gain.gain.value = 0.08;
+        oscillator.type = "triangle";
+        oscillator.frequency.setValueAtTime(660, ctx.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.6);
+        gain.gain.setValueAtTime(0.001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.9);
         oscillator.connect(gain);
         gain.connect(ctx.destination);
         oscillator.start();
-        oscillator.stop(ctx.currentTime + 0.2);
+        oscillator.stop(ctx.currentTime + 0.9);
         oscillator.onended = () => ctx.close();
       } catch (error) {
         // ignore audio errors

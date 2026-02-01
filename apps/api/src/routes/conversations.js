@@ -404,17 +404,27 @@ router.patch("/conversations/:id/assign", requireAuth, async (req, res) => {
 router.post("/conversations/:id/tags", requireAuth, async (req, res) => {
     const adds = Array.isArray(req.body?.add) ? req.body.add : [];
     const removes = Array.isArray(req.body?.remove) ? req.body.remove : [];
+    const normalizedAdds = adds.map((name) => String(name || "").trim()).filter(Boolean);
+    const normalizedRemoves = removes.map((name) => String(name || "").trim()).filter(Boolean);
     let conversation = null;
 
+    if (!normalizedAdds.length && !normalizedRemoves.length) {
+        const current = await getConversationById(req.params.id);
+        if (!current) {
+            return res.status(404).json({ error: "not_found" });
+        }
+        return res.json({ conversation: current });
+    }
+
     try {
-        for (const name of adds) {
+        for (const name of normalizedAdds) {
             conversation = await addTagToConversation({
                 conversationId: req.params.id,
                 tagName: name,
                 userId: req.user.id,
             });
         }
-        for (const name of removes) {
+        for (const name of normalizedRemoves) {
             conversation = await removeTagFromConversation({
                 conversationId: req.params.id,
                 tagName: name,

@@ -19,6 +19,8 @@ function ChatView({
   messageMode,
   quickActions,
   tagInput,
+  noteInput,
+  notesList,
   latestNote,
   loadingConversation,
   isInfoOpen,
@@ -27,6 +29,7 @@ function ChatView({
   activePhone,
   activeStatusLabel,
   canManageStatus,
+  currentUser,
   messageInputRef,
   chatBodyRef,
   setShowFilters,
@@ -39,6 +42,18 @@ function ChatView({
   handleStatusChange,
   handleToggleTag,
   handleAddTag,
+  setNoteInput,
+  handleAddNote,
+  reassignUserId,
+  setReassignUserId,
+  handleReassignConversation,
+  handleOpenTagManager,
+  handleCloseTagManager,
+  showTagManager,
+  tagManagerForm,
+  setTagManagerForm,
+  handleCreateTag,
+  handleDeleteTag,
   handleQuickAction,
   handleSendMessage,
   setMessageMode,
@@ -61,6 +76,9 @@ function ChatView({
           : ""),
     ])
   );
+  const isAssignedToOther =
+    activeConversation?.assigned_user_id &&
+    activeConversation.assigned_user_id !== currentUser?.id;
 
   function getPreview(conversation) {
     if (!conversation) {
@@ -221,6 +239,9 @@ function ChatView({
                 0
             );
             const topTag = conversation.tags?.[0]?.name || "";
+            const assignedLabel = conversation.assigned_user?.name
+              ? `Tomada por ${conversation.assigned_user.name}`
+              : "";
             const lineLabel = conversation.phone_number_id
               ? channelMap.get(conversation.phone_number_id) ||
                 `Linea ${String(conversation.phone_number_id).slice(-4)}`
@@ -261,6 +282,9 @@ function ChatView({
                   <div className="conversation-meta">
                     {lineLabel && (
                       <span className="status-pill line-pill">{lineLabel}</span>
+                    )}
+                    {assignedLabel && (
+                      <span className="status-pill assignee-pill">{assignedLabel}</span>
                     )}
                     {topTag && (
                       <span className="status-pill tag-pill">{topTag}</span>
@@ -352,6 +376,11 @@ function ChatView({
             )}
 
             <form className="chat-composer" onSubmit={handleSendMessage}>
+              {isAssignedToOther && (
+                <div className="assign-warning">
+                  Conversacion tomada por otro operador.
+                </div>
+              )}
               <div className="quick-actions">
                 {quickActions.map((action) => (
                   <button
@@ -359,6 +388,7 @@ function ChatView({
                     className="quick-action"
                     type="button"
                     onClick={() => handleQuickAction(action)}
+                    disabled={isAssignedToOther}
                   >
                     {action}
                   </button>
@@ -369,6 +399,7 @@ function ChatView({
                   className="message-mode"
                   value={messageMode}
                   onChange={(event) => setMessageMode(event.target.value)}
+                  disabled={isAssignedToOther}
                 >
                   <option value="text">WhatsApp</option>
                   <option value="note">Nota interna</option>
@@ -379,8 +410,9 @@ function ChatView({
                   placeholder="Escribe un mensaje..."
                   value={messageDraft}
                   onChange={(event) => setMessageDraft(event.target.value)}
+                  disabled={isAssignedToOther}
                 />
-                <button className="send-button" type="submit">
+                <button className="send-button" type="submit" disabled={isAssignedToOther}>
                   <SendIcon className="icon" />
                 </button>
               </div>
@@ -428,34 +460,48 @@ function ChatView({
           <div className="info-section">
             <div className="section-header">
               <div className="section-title">Etiquetas</div>
-              <button className="link-button" type="button">
+              <button className="link-button" type="button" onClick={handleOpenTagManager}>
                 Gestionar
               </button>
             </div>
             <div className="tag-list">
-              {tags.map((tag) => (
-                <button
-                  key={tag.id}
-                  className={`tag ${
-                    activeConversation?.tags?.some(
-                      (item) => item.name === tag.name
-                    )
-                      ? "active"
-                      : ""
-                  }`}
-                  onClick={() => handleToggleTag(tag.name)}
-                >
-                  {tag.name}
-                </button>
-              ))}
+              {(activeConversation?.tags || []).length ? (
+                activeConversation.tags.map((tag) => (
+                  <span className="tag-chip" key={tag.name}>
+                    <span className="tag-chip-label">{tag.name}</span>
+                    <button
+                      className="tag-remove"
+                      type="button"
+                      title="Quitar etiqueta"
+                      onClick={() => handleToggleTag(tag.name)}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))
+              ) : (
+                <div className="empty-state">Sin etiquetas</div>
+              )}
             </div>
             <form className="tag-form" onSubmit={handleAddTag}>
-              <input
-                type="text"
-                placeholder="Anadir etiqueta..."
+              <select
                 value={tagInput}
                 onChange={(event) => setTagInput(event.target.value)}
-              />
+              >
+                <option value="">Selecciona etiqueta...</option>
+                {tags
+                  .filter(
+                    (tag) =>
+                      !activeConversation?.tags?.some(
+                        (item) => item.name === tag.name
+                      )
+                  )
+                  .map((tag) => (
+                    <option value={tag.name} key={tag.id}>
+                      {tag.name}
+                    </option>
+                  ))}
+              </select>
               <button className="icon-button" type="submit" title="Agregar">
                 <PlusIcon className="icon" />
               </button>
@@ -464,20 +510,66 @@ function ChatView({
 
           <div className="info-section">
             <div className="section-title">Notas internas</div>
-            {latestNote ? (
-              <div className="note-card">{latestNote}</div>
+            {notesList?.length ? (
+              <div className="notes-stack">
+                {notesList.slice(-5).map((note) => (
+                  <div className="note-card" key={note.id}>
+                    {note.text}
+                  </div>
+                ))}
+              </div>
             ) : (
               <div className="empty-state">Sin notas internas</div>
             )}
+            <form className="note-form" onSubmit={handleAddNote}>
+              <input
+                type="text"
+                placeholder="Agregar nota interna..."
+                value={noteInput}
+                onChange={(event) => setNoteInput(event.target.value)}
+                disabled={!activeConversation}
+              />
+              <button className="icon-button" type="submit" title="Guardar nota">
+                <PlusIcon className="icon" />
+              </button>
+            </form>
           </div>
 
           {activeConversation && (
             <div className="info-section">
               <div className="section-title">Acciones</div>
               <div className="action-stack">
-                <button className="ghost" type="button" onClick={handleAssignSelf}>
+                <button
+                  className="ghost"
+                  type="button"
+                  onClick={handleAssignSelf}
+                  disabled={isAssignedToOther}
+                >
                   Tomar conversacion
                 </button>
+                {canManageStatus && (
+                  <div className="reassign-row">
+                    <select
+                      value={reassignUserId}
+                      onChange={(event) => setReassignUserId(event.target.value)}
+                    >
+                      <option value="">Reasignar a...</option>
+                      {users.map((item) => (
+                        <option value={item.id} key={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="ghost"
+                      type="button"
+                      onClick={handleReassignConversation}
+                      disabled={!reassignUserId}
+                    >
+                      Reasignar
+                    </button>
+                  </div>
+                )}
                 {canManageStatus && (
                   <>
                     <button
@@ -492,14 +584,7 @@ function ChatView({
                       type="button"
                       onClick={() => handleStatusChange("pending")}
                     >
-                      Marcar pendiente
-                    </button>
-                    <button
-                      className="danger soft"
-                      type="button"
-                      onClick={() => handleStatusChange("closed")}
-                    >
-                      Cerrar conversacion
+                      Liberar para otro operador
                     </button>
                   </>
                 )}
@@ -509,6 +594,67 @@ function ChatView({
         </aside>
       </div>
     </section>
+    {showTagManager && (
+      <div className="modal-overlay" onClick={handleCloseTagManager}>
+        <div className="modal-card" onClick={(event) => event.stopPropagation()}>
+          <div className="modal-header">
+            <div className="modal-title">Gestion de etiquetas</div>
+            <button className="modal-close" type="button" onClick={handleCloseTagManager}>
+              ×
+            </button>
+          </div>
+          <div className="modal-body">
+            <form className="tag-manager-form" onSubmit={handleCreateTag}>
+              <label className="field">
+                <span>Nombre</span>
+                <input
+                  type="text"
+                  value={tagManagerForm.name}
+                  onChange={(event) =>
+                    setTagManagerForm((prev) => ({ ...prev, name: event.target.value }))
+                  }
+                  placeholder="Nombre de etiqueta"
+                />
+              </label>
+              <label className="field">
+                <span>Color</span>
+                <input
+                  type="color"
+                  value={tagManagerForm.color}
+                  onChange={(event) =>
+                    setTagManagerForm((prev) => ({ ...prev, color: event.target.value }))
+                  }
+                />
+              </label>
+              <div className="modal-actions">
+                <button className="primary" type="submit">
+                  Crear etiqueta
+                </button>
+              </div>
+            </form>
+
+            <div className="tag-manager-list">
+              {(tags || []).map((tag) => (
+                <div className="tag-manager-row" key={tag.id}>
+                  <span className="tag-chip" style={{ borderColor: tag.color || "#cbd5f5" }}>
+                    <span className="tag-chip-label">{tag.name}</span>
+                  </span>
+                  <div className="tag-manager-actions">
+                    <button
+                      className="danger soft"
+                      type="button"
+                      onClick={() => handleDeleteTag(tag.id, tag.name)}
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
   );
 }
 

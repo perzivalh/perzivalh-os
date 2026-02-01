@@ -3,7 +3,18 @@
  */
 
 export function sortConversations(list) {
+    const rank = (item) => {
+        if (item.status === "pending" && !item.assigned_user_id) return 0;
+        if (item.status === "pending" && item.assigned_user_id) return 1;
+        if (item.status === "assigned") return 2;
+        return 3;
+    };
     return [...list].sort((a, b) => {
+        const aRank = rank(a);
+        const bRank = rank(b);
+        if (aRank !== bRank) {
+            return aRank - bRank;
+        }
         const aTime = new Date(a.last_message_at || a.created_at || 0).getTime();
         const bTime = new Date(b.last_message_at || b.created_at || 0).getTime();
         return bTime - aTime;

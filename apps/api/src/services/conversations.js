@@ -177,9 +177,14 @@ async function setConversationStatus({ conversationId, status, userId }) {
     });
   }
 
+  const nextData = { status };
+  if (status === "open" || status === "pending") {
+    nextData.assigned_user_id = null;
+  }
+
   const updated = await prisma.conversation.update({
     where: { id: conversationId },
-    data: { status },
+    data: nextData,
     select: CONVERSATION_SELECT,
   });
   await logAudit({

@@ -4,7 +4,7 @@
 const express = require("express");
 const router = express.Router();
 
-const { requireAuth } = require("../middleware/auth");
+const { requireAuth, requireRole } = require("../middleware/auth");
 const { panelLimiter } = require("../middleware/rateLimit");
 const prisma = require("../db");
 const { getControlClient } = require("../control/controlClient");
@@ -19,6 +19,7 @@ const {
     assignConversation,
     addTagToConversation,
     removeTagFromConversation,
+    createMessage,
     logAudit,
 } = require("../services/conversations");
 
@@ -151,6 +152,70 @@ router.get("/tags", requireAuth, async (req, res) => {
     return res.json({ tags });
 });
 
+// POST /api/tags
+router.post("/tags", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+    const name = (req.body?.name || "").trim();
+    const color = (req.body?.color || "").trim() || null;
+    if (!name) {
+        return res.status(400).json({ error: "missing_name" });
+    }
+    try {
+        const tag = await prisma.tag.create({
+            data: { name, color },
+        });
+        return res.json({ tag });
+    } catch (error) {
+        if (error.code === "P2002") {
+            return res.status(400).json({ error: "tag_exists" });
+        }
+        return res.status(500).json({ error: "tag_create_failed" });
+    }
+});
+
+// PATCH /api/tags/:id
+router.patch("/tags/:id", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+    const updates = {};
+    if (req.body?.name !== undefined) {
+        const name = String(req.body.name || "").trim();
+        if (!name) {
+            return res.status(400).json({ error: "missing_name" });
+        }
+        updates.name = name;
+    }
+    if (req.body?.color !== undefined) {
+        const color = String(req.body.color || "").trim();
+        updates.color = color || null;
+    }
+    try {
+        const tag = await prisma.tag.update({
+            where: { id: req.params.id },
+            data: updates,
+        });
+        return res.json({ tag });
+    } catch (error) {
+        if (error.code === "P2002") {
+            return res.status(400).json({ error: "tag_exists" });
+        }
+        return res.status(404).json({ error: "tag_not_found" });
+    }
+});
+
+// DELETE /api/tags/:id
+router.delete("/tags/:id", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+    const tagId = req.params.id;
+    try {
+        await prisma.conversationTag.deleteMany({
+            where: { tag_id: tagId },
+        });
+        await prisma.tag.delete({
+            where: { id: tagId },
+        });
+        return res.json({ success: true });
+    } catch (error) {
+        return res.status(404).json({ error: "tag_not_found" });
+    }
+});
+
 // GET /api/conversations
 router.get("/conversations", requireAuth, async (req, res) => {
     const status = req.query.status;
@@ -256,7 +321,7 @@ router.get("/conversations/:id", requireAuth, async (req, res) => {
 // PATCH /api/conversations/:id/status
 router.patch("/conversations/:id/status", requireAuth, async (req, res) => {
     const status = req.body?.status;
-    const ALLOWED_STATUS = new Set(["open", "pending", "closed"]);
+    const ALLOWED_STATUS = new Set(["open", "pending", "assigned"]);
     if (!status || !ALLOWED_STATUS.has(status)) {
         return res.status(400).json({ error: "invalid_status" });
     }
@@ -266,6 +331,20 @@ router.patch("/conversations/:id/status", requireAuth, async (req, res) => {
             status,
             userId: req.user.id,
         });
+        if (status === "pending") {
+            await addTagToConversation({
+                conversationId: req.params.id,
+                tagName: "pendiente_atencion",
+                userId: req.user.id,
+            });
+        }
+        if (status === "open") {
+            await removeTagFromConversation({
+                conversationId: req.params.id,
+                tagName: "pendiente_atencion",
+                userId: req.user.id,
+            });
+        }
         return res.json({ conversation });
     } catch (error) {
         return res.status(404).json({ error: "not_found" });
@@ -276,12 +355,46 @@ router.patch("/conversations/:id/status", requireAuth, async (req, res) => {
 router.patch("/conversations/:id/assign", requireAuth, async (req, res) => {
     const userId = req.body?.user_id || null;
     try {
-        const conversation = await assignConversation({
-            conversationId: req.params.id,
-            userId,
-            byUserId: req.user.id,
+        const existing = await prisma.conversation.findUnique({
+            where: { id: req.params.id },
+            select: { assigned_user_id: true, status: true },
         });
-        return res.json({ conversation });
+        if (!existing) {
+            return res.status(404).json({ error: "not_found" });
+        }
+        if (
+            existing.assigned_user_id &&
+            existing.assigned_user_id !== req.user.id &&
+            req.user.role !== "admin"
+        ) {
+            return res.status(409).json({ error: "already_assigned" });
+        }
+
+        const conversation = await prisma.conversation.update({
+            where: { id: req.params.id },
+            data: {
+                assigned_user_id: userId || req.user.id,
+                status: "assigned",
+            },
+            select: CONVERSATION_SELECT,
+        });
+
+        await removeTagFromConversation({
+            conversationId: req.params.id,
+            tagName: "pendiente_atencion",
+            userId: req.user.id,
+        });
+
+        await logAudit({
+            userId: req.user.id,
+            action: "conversation.assigned",
+            data: {
+                conversation_id: req.params.id,
+                to: userId || req.user.id,
+            },
+        });
+
+        return res.json({ conversation: formatConversation(conversation) });
     } catch (error) {
         return res.status(404).json({ error: "not_found" });
     }
@@ -326,6 +439,27 @@ router.post("/conversations/:id/messages", requireAuth, async (req, res) => {
     const conversation = await getConversationById(req.params.id);
     if (!conversation) {
         return res.status(404).json({ error: "not_found" });
+    }
+
+    if (
+        conversation.assigned_user_id &&
+        conversation.assigned_user_id !== req.user.id
+    ) {
+        return res.status(403).json({ error: "not_assigned" });
+    }
+    if (conversation.status === "pending" && !conversation.assigned_user_id) {
+        return res.status(403).json({ error: "pending_unassigned" });
+    }
+
+    if (type === "note") {
+        const result = await createMessage({
+            conversationId: conversation.id,
+            direction: "out",
+            type: "note",
+            text,
+            rawJson: { source: "panel", by_user_id: req.user.id },
+        });
+        return res.json({ conversation: result.conversation, message: result.message });
     }
 
     let phoneNumberId = conversation.phone_number_id;

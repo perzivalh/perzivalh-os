@@ -19,6 +19,7 @@ enum UserRole {
 enum ConversationStatus {
   open
   pending
+  assigned
   closed
 }
 

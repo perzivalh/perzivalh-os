@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Service: Bot Metrics
  * Calculates performance metrics for tenant bots
  */
@@ -53,17 +53,17 @@ async function getBotMetrics(tenantId) {
     // Por ahora simulado o basado en tags 'error' si existen
     const errorsToday = 0; // Placeholder until error logging is in db
 
-    // 3. Resolución (Conversaciones cerradas vs abiertas)
-    const closedToday = await db.conversation.count({
+    // 3. Resolución (Conversaciones abiertas vs pendientes/asignadas)
+    const openToday = await db.conversation.count({
         where: {
             created_at: { gte: startOfDay },
-            status: "closed"
+            status: "open"
         }
     });
 
     let resolutionRate = 0;
     if (sessionsToday > 0) {
-        resolutionRate = Math.round((closedToday / sessionsToday) * 100);
+        resolutionRate = Math.round((openToday / sessionsToday) * 100);
     }
 
     return {

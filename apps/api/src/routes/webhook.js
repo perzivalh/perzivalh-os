@@ -334,12 +334,44 @@ router.post("/webhook", async (req, res) => {
                             }
                         }
 
+                        if (conversation.status === "closed") {
+                            await setConversationStatus({
+                                conversationId: conversation.id,
+                                status: "open",
+                                userId: null,
+                            });
+                        }
+
                         const settings = await getSettingsCached();
                         if (settings && (!settings.bot_enabled || !settings.auto_reply_enabled)) {
                             continue;
                         }
 
-                        if (conversation.status === "pending") {
+                        if (conversation.status === "pending" || conversation.status === "assigned") {
+                            if (normalized === "bot") {
+                                await setConversationStatus({
+                                    conversationId: conversation.id,
+                                    status: "open",
+                                    userId: null,
+                                });
+                                await removeTagFromConversation({
+                                    conversationId: conversation.id,
+                                    tagName: "pendiente_atencion",
+                                });
+
+                                const activeFlow = await getActiveTenantFlow(tenantContext.tenantId);
+                                if (!activeFlow) {
+                                    logger.info("bot.no_active_flow", { tenant_id: tenantContext.tenantId });
+                                    continue;
+                                }
+
+                                if (activeFlow.flow.useLegacyHandler) {
+                                    void handleIncomingText(waId, "menu");
+                                } else {
+                                    void executeDynamicFlow(waId, "menu", activeFlow);
+                                }
+                                continue;
+                            }
                             if (isMenuRequest(normalized)) {
                                 await sendText(
                                     waId,
@@ -347,11 +379,6 @@ router.post("/webhook", async (req, res) => {
                                 );
                                 continue;
                             }
-                            continue;
-                        }
-
-                        if (conversation.status === "closed") {
-                            await sendText(waId, "Conversa cerrada, escriba MENU para reabrir");
                             continue;
                         }
 

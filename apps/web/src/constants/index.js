@@ -2,7 +2,7 @@
  * Constantes del sistema - Frontend
  */
 
-export const STATUS_OPTIONS = ["open", "pending", "closed"];
+export const STATUS_OPTIONS = ["open", "pending", "assigned"];
 
 export const BASE_ROLE_OPTIONS = ["admin", "recepcion", "caja", "marketing", "doctor"];
 

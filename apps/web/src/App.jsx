@@ -113,6 +113,13 @@ function App() {
   const [tags, setTags] = useState([]);
   const [users, setUsers] = useState([]);
   const [tagInput, setTagInput] = useState("");
+  const [noteInput, setNoteInput] = useState("");
+  const [reassignUserId, setReassignUserId] = useState("");
+  const [showTagManager, setShowTagManager] = useState(false);
+  const [tagManagerForm, setTagManagerForm] = useState({
+    name: "",
+    color: "#6b7280",
+  });
   const [loadingConversation, setLoadingConversation] = useState(false);
   const [pageError, setPageError] = useState("");
   const { pushToast } = useToast();
@@ -120,6 +127,7 @@ function App() {
   const pendingRoleDeletesRef = useRef(new Map());
   const pendingTemplateDeletesRef = useRef(new Map());
   const pendingTagDeletesRef = useRef(new Map());
+  const conversationStatusRef = useRef(new Map());
 
   const [metrics, setMetrics] = useState(null);
   const [templates, setTemplates] = useState([]);
@@ -214,6 +222,10 @@ function App() {
     const note = [...messages].reverse().find((message) => message.type === "note");
     return note?.text || "";
   }, [messages]);
+  const notesList = useMemo(
+    () => messages.filter((message) => message.type === "note"),
+    [messages]
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -477,7 +489,37 @@ function App() {
       return;
     }
     const socket = connectSocket(token);
+    const playPendingSound = () => {
+      if (typeof window === "undefined") return;
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const ctx = new AudioContext();
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+        oscillator.type = "sine";
+        oscillator.frequency.value = 880;
+        gain.gain.value = 0.08;
+        oscillator.connect(gain);
+        gain.connect(ctx.destination);
+        oscillator.start();
+        oscillator.stop(ctx.currentTime + 0.2);
+        oscillator.onended = () => ctx.close();
+      } catch (error) {
+        // ignore audio errors
+      }
+    };
+
     socket.on("conversation:update", ({ conversation }) => {
+      const prevStatus = conversationStatusRef.current.get(conversation.id);
+      conversationStatusRef.current.set(conversation.id, conversation.status);
+      if (
+        conversation.status === "pending" &&
+        !conversation.assigned_user_id &&
+        prevStatus !== "pending"
+      ) {
+        playPendingSound();
+        pushToast({ message: "Nueva conversación pendiente" });
+      }
       setConversations((prev) => {
         const next = prev.map((item) =>
           item.id === conversation.id ? { ...item, ...conversation } : item
@@ -492,6 +534,12 @@ function App() {
       );
     });
     socket.on("message:new", ({ conversation, message }) => {
+      if (
+        conversation.status === "pending" &&
+        !conversation.assigned_user_id
+      ) {
+        playPendingSound();
+      }
       const enrichedConversation = {
         ...conversation,
         last_message_text: message?.text || null,
@@ -633,9 +681,27 @@ function App() {
     setLoadingConversation(true);
     try {
       const data = await apiGet(`/api/conversations/${conversationId}`);
-      setActiveConversation(data.conversation);
-      setMessages(data.messages || []);
-      markConversationRead(data.conversation);
+      let conversation = data.conversation;
+      const messages = data.messages || [];
+
+      if (
+        conversation?.status === "pending" &&
+        !conversation.assigned_user_id &&
+        user?.id
+      ) {
+        try {
+          const assigned = await apiPatch(`/api/conversations/${conversationId}/assign`, {});
+          conversation = assigned.conversation;
+        } catch (error) {
+          if (String(normalizeError(error)).includes("already_assigned")) {
+            pushToast({ type: "error", message: "Conversación tomada por otro operador" });
+          }
+        }
+      }
+
+      setActiveConversation(conversation);
+      setMessages(messages);
+      markConversationRead(conversation);
     } catch (error) {
       setPageError(normalizeError(error));
     } finally {
@@ -795,6 +861,29 @@ function App() {
     }
   }
 
+  async function handleAddNote(event) {
+    event.preventDefault();
+    if (!activeConversation || !noteInput.trim()) {
+      return;
+    }
+    const text = noteInput.trim();
+    setNoteInput("");
+    try {
+      const data = await apiPost(`/api/conversations/${activeConversation.id}/messages`, {
+        text,
+        type: "note",
+      });
+      if (data?.message) {
+        setMessages((prev) => [...prev, data.message]);
+      }
+      if (data?.conversation) {
+        setActiveConversation(data.conversation);
+      }
+    } catch (error) {
+      setPageError(normalizeError(error));
+    }
+  }
+
   async function handleAssignSelf() {
     if (!activeConversation) {
       return;
@@ -803,7 +892,25 @@ function App() {
       const data = await apiPost(`/api/conversations/${activeConversation.id}/assign`);
       setActiveConversation(data.conversation);
     } catch (error) {
-      setPageError(normalizeError(error));
+      const message = normalizeError(error) || "No se pudo tomar la conversacion";
+      pushToast({ type: "error", message });
+    }
+  }
+
+  async function handleReassignConversation() {
+    if (!activeConversation || !reassignUserId) {
+      return;
+    }
+    try {
+      const data = await apiPost(`/api/conversations/${activeConversation.id}/assign`, {
+        user_id: reassignUserId,
+      });
+      setActiveConversation(data.conversation);
+      setReassignUserId("");
+      pushToast({ message: "Conversación reasignada" });
+    } catch (error) {
+      const message = normalizeError(error) || "No se pudo reasignar";
+      pushToast({ type: "error", message });
     }
   }
 
@@ -904,6 +1011,47 @@ function App() {
       });
       setActiveConversation(data.conversation);
       await loadTags();
+    } catch (error) {
+      setPageError(normalizeError(error));
+    }
+  }
+
+  async function handleCreateTag(event) {
+    event.preventDefault();
+    const name = tagManagerForm.name.trim();
+    if (!name) {
+      setPageError("Completa el nombre de la etiqueta");
+      return;
+    }
+    try {
+      await apiPost("/api/tags", {
+        name,
+        color: tagManagerForm.color || null,
+      });
+      setTagManagerForm({ name: "", color: "#6b7280" });
+      await loadTags();
+      pushToast({ message: "Etiqueta creada" });
+    } catch (error) {
+      setPageError(normalizeError(error));
+    }
+  }
+
+  async function handleDeleteTag(tagId, tagName) {
+    if (!tagId) {
+      return;
+    }
+    try {
+      await apiDelete(`/api/tags/${tagId}`);
+      setActiveConversation((prev) =>
+        prev
+          ? {
+              ...prev,
+              tags: (prev.tags || []).filter((tag) => tag.name !== tagName),
+            }
+          : prev
+      );
+      await loadTags();
+      pushToast({ message: "Etiqueta eliminada" });
     } catch (error) {
       setPageError(normalizeError(error));
     }
@@ -1641,9 +1789,9 @@ function App() {
   const canManageStatus = hasPermission(roleAccess, "modules", "chat", "write");
   const quickActions = ["Confirmar Cita", "Solicitar Resultados", "Urgencia"];
   const statusLabels = {
-    open: "Abierto",
+    open: "Bot activo",
     pending: "Pendiente",
-    closed: "Cerrado",
+    assigned: "Tomada",
   };
   const activeName = activeConversation
     ? activeConversation.display_name ||
@@ -1788,51 +1936,66 @@ function App() {
           className={`content ${view === "chats" ? "content-chats" : "content-page"}`}
         >
           {view === "chats" && (
-            <ChatView
-              activeConversation={activeConversation}
-              conversations={conversations}
-              channels={tenantChannels}
-              brandName={branding?.brand_name || ""}
-              lastReadMap={lastReadMap}
-              filters={filters}
-              showFilters={showFilters}
-              users={users}
-              tags={tags}
-              statusOptions={STATUS_OPTIONS}
-              statusLabels={statusLabels}
-              formatListTime={formatListTime}
-              formatCompactDate={formatCompactDate}
-              messageBlocks={messageBlocks}
-              messageDraft={messageDraft}
-              messageMode={messageMode}
-              quickActions={quickActions}
-              tagInput={tagInput}
-              latestNote={latestNote}
-              loadingConversation={loadingConversation}
-              isInfoOpen={isInfoOpen}
-              hasUnread={hasUnread}
-              activeName={activeName}
-              activePhone={activePhone}
-              activeStatusLabel={activeStatusLabel}
-              canManageStatus={canManageStatus}
-              messageInputRef={messageInputRef}
-              chatBodyRef={chatBodyRef}
-              setShowFilters={setShowFilters}
-              setFilters={setFilters}
-              loadConversation={loadConversation}
-              handleBackToList={handleBackToList}
-              setIsInfoOpen={setIsInfoOpen}
-              handleChatScroll={handleChatScroll}
-              handleAssignSelf={handleAssignSelf}
-              handleStatusChange={handleStatusChange}
-              handleToggleTag={handleToggleTag}
-              handleAddTag={handleAddTag}
-              handleQuickAction={handleQuickAction}
-              handleSendMessage={handleSendMessage}
-              setMessageMode={setMessageMode}
-              setMessageDraft={setMessageDraft}
-              scrollChatToBottom={scrollChatToBottom}
-              getInitial={getInitial}
+              <ChatView
+                activeConversation={activeConversation}
+                conversations={conversations}
+                channels={tenantChannels}
+                brandName={branding?.brand_name || ""}
+                lastReadMap={lastReadMap}
+                filters={filters}
+                showFilters={showFilters}
+                users={users}
+                tags={tags}
+                statusOptions={STATUS_OPTIONS}
+                statusLabels={statusLabels}
+                formatListTime={formatListTime}
+                formatCompactDate={formatCompactDate}
+                messageBlocks={messageBlocks}
+                messageDraft={messageDraft}
+                messageMode={messageMode}
+                quickActions={quickActions}
+                tagInput={tagInput}
+                noteInput={noteInput}
+                notesList={notesList}
+                latestNote={latestNote}
+                loadingConversation={loadingConversation}
+                isInfoOpen={isInfoOpen}
+                hasUnread={hasUnread}
+                activeName={activeName}
+                activePhone={activePhone}
+                activeStatusLabel={activeStatusLabel}
+                canManageStatus={canManageStatus}
+                currentUser={user}
+                messageInputRef={messageInputRef}
+                chatBodyRef={chatBodyRef}
+                setShowFilters={setShowFilters}
+                setFilters={setFilters}
+                loadConversation={loadConversation}
+                handleBackToList={handleBackToList}
+                setIsInfoOpen={setIsInfoOpen}
+                handleChatScroll={handleChatScroll}
+                handleAssignSelf={handleAssignSelf}
+                handleStatusChange={handleStatusChange}
+                handleToggleTag={handleToggleTag}
+                handleAddTag={handleAddTag}
+                setNoteInput={setNoteInput}
+                handleAddNote={handleAddNote}
+                reassignUserId={reassignUserId}
+                setReassignUserId={setReassignUserId}
+                handleReassignConversation={handleReassignConversation}
+                handleOpenTagManager={() => setShowTagManager(true)}
+                handleCloseTagManager={() => setShowTagManager(false)}
+                showTagManager={showTagManager}
+                tagManagerForm={tagManagerForm}
+                setTagManagerForm={setTagManagerForm}
+                handleCreateTag={handleCreateTag}
+                handleDeleteTag={handleDeleteTag}
+                handleQuickAction={handleQuickAction}
+                handleSendMessage={handleSendMessage}
+                setMessageMode={setMessageMode}
+                setMessageDraft={setMessageDraft}
+                scrollChatToBottom={scrollChatToBottom}
+                getInitial={getInitial}
               PlusIcon={PlusIcon}
               SearchIcon={SearchIcon}
               VideoIcon={VideoIcon}

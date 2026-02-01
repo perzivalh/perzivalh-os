@@ -493,7 +493,7 @@ function ChatView({
                 {tags
                   .filter(
                     (tag) =>
-                      !activeConversation?.tagsx.some(
+                      !(activeConversation?.tags || []).some(
                         (item) => item.name === tag.name
                       )
                   )

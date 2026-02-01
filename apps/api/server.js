@@ -376,8 +376,34 @@ setInterval(() => {
 
 const BOTPODITO_INACTIVITY_INTERVAL_MS = 60 * 1000;
 
+async function processBotpoditoInactivityForAllTenants() {
+    if (!process.env.CONTROL_DB_URL) {
+        return;
+    }
+    try {
+        const control = getControlClient();
+        const tenants = await control.tenant.findMany({
+            where: { is_active: true },
+            select: { id: true },
+        });
+        for (const tenant of tenants) {
+            const context = await resolveTenantContextById(tenant.id);
+            if (!context) {
+                continue;
+            }
+            await prisma.runWithPrisma(context.prisma, () =>
+                processBotpoditoV2Inactivity()
+            );
+        }
+    } catch (error) {
+        logger.error("flow_inactivity.tenant_scan_failed", {
+            message: error.message || error,
+        });
+    }
+}
+
 setInterval(() => {
-    void processBotpoditoV2Inactivity();
+    void processBotpoditoInactivityForAllTenants();
 }, BOTPODITO_INACTIVITY_INTERVAL_MS);
 
 // ==========================================

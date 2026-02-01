@@ -85,11 +85,23 @@ async function processBotpoditoV2Inactivity() {
     "Gracias por escribirnos. Si necesitas algo mas, responde MENU.";
 
   const now = Date.now();
-  const sessions = await sessionStore.listSessionsDue({
-    flowId: BOT_FLOW_ID,
-    dueBefore: new Date(now),
-    limit: 200,
-  });
+  let sessions = [];
+  try {
+    sessions = await sessionStore.listSessionsDue({
+      flowId: BOT_FLOW_ID,
+      dueBefore: new Date(now),
+      limit: 200,
+    });
+  } catch (error) {
+    if (error?.code === "P2021") {
+      logger.warn("flow_inactivity.session_table_missing", {
+        flowId: BOT_FLOW_ID,
+        message: "Session table missing. Run tenant migrations.",
+      });
+      return;
+    }
+    throw error;
+  }
 
   if (!sessions.length) {
     if (now - lastMetricsAt > 5 * 60 * 1000) {

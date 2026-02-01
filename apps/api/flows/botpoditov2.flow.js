@@ -26,10 +26,10 @@ module.exports = {
       type: "text",
       text: "MENU Y ETIQUETA DEL MES ACTUAL",
       buttons: [
-        { label: "HORARIOS Y UBICACION", next: "HORARIOS_INFO" },
-        { label: "PRECIOS", next: "PRECIOS_INFO" },
-        { label: "SERVICIOS", next: "SERVICIOS_MENU" },
-        { label: "ATENCION PERSONALIZADA", next: "CONTACT_METHOD" },
+        { label: "🕒 Horarios y ubicacion", next: "HORARIOS_INFO" },
+        { label: "💰 Precios", next: "PRECIOS_INFO" },
+        { label: "🧼 Servicios", next: "SERVICIOS_MENU" },
+        { label: "👨‍💻 Atencion personal", next: "CONTACT_METHOD" },
       ],
     },
 
@@ -38,8 +38,8 @@ module.exports = {
       type: "text",
       text: "INFORMACIÓN DE HORARIOS Y UBICACION DE LA CENTRAL Y SUCURSAL",
       buttons: [
-        { label: "VOLVER AL MENU", next: "MAIN_MENU" },
-        { label: "FINALIZAR", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "⬅️ Volver al menu", next: "MAIN_MENU" },
+        { label: "✅ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
 
@@ -48,9 +48,9 @@ module.exports = {
       type: "text",
       text: "ENVIAR INFORMACIÓN DE PRECIOS GENERAL\nPREGUNTAR SI REQUIERE UN SERVICIO",
       buttons: [
-        { label: "ATENCION PERSONALIZADA", next: "CONTACT_METHOD" },
-        { label: "NO", next: "PRECIOS_MAS" },
-        { label: "SI", next: "SERVICIOS_MENU" },
+        { label: "👨‍💻 Atencion personal", next: "CONTACT_METHOD" },
+        { label: "❌ No", next: "PRECIOS_MAS" },
+        { label: "✅ Si", next: "SERVICIOS_MENU" },
       ],
     },
     {
@@ -58,8 +58,8 @@ module.exports = {
       type: "text",
       text: "SI REQUIERE ALGO MÁS DARLE OPCIÓN DEL VOLVER AL MENU O FINALIZAR",
       buttons: [
-        { label: "VOLVER AL MENU", next: "MAIN_MENU" },
-        { label: "FINALIZAR", next: "CIERRE_PRECIOS_SERVICIOS" },
+        { label: "⬅️ Volver al menu", next: "MAIN_MENU" },
+        { label: "✅ Finalizar", next: "CIERRE_PRECIOS_SERVICIOS" },
       ],
     },
 
@@ -68,12 +68,12 @@ module.exports = {
       type: "text",
       text: "SELECCIONA EL SERVICIO QUE NECESITES",
       buttons: [
-        { label: "UÑERO", next: "UNERO_TIPO_TRAT" },
-        { label: "HONGOS", next: "HONGOS_TIPO_TRAT" },
-        { label: "PEDICURE", next: "SVC_PEDICURE_INFO" },
-        { label: "PODOPEDIATRIA", next: "SVC_PODOPEDIATRIA_INFO" },
-        { label: "PODOGERIATRIA", next: "SVC_PODOGERIATRIA_INFO" },
-        { label: "OTROS", next: "OTROS_MENU" },
+        { label: "🦶 Uñero", next: "UNERO_TIPO_TRAT" },
+        { label: "🦠 Hongos", next: "HONGOS_TIPO_TRAT" },
+        { label: "💅 Pedicure", next: "SVC_PEDICURE_INFO" },
+        { label: "🧒 Podopediatria", next: "SVC_PODOPEDIATRIA_INFO" },
+        { label: "🧓 Podogeriatria", next: "SVC_PODOGERIATRIA_INFO" },
+        { label: "🧰 Otros", next: "OTROS_MENU" },
       ],
     },
 
@@ -82,8 +82,8 @@ module.exports = {
       type: "text",
       text: "INFORMACION DEL SERVICIO\nTIPO DE TRATAMIENTO",
       buttons: [
-        { label: "MATRICECTOMIA", next: "TRAT_MATRICECTOMIA_INFO" },
-        { label: "ORTESIS", next: "TRAT_ORTESIS_INFO" },
+        { label: "✂️ Matricectomia", next: "TRAT_MATRICECTOMIA_INFO" },
+        { label: "🦴 Ortesis", next: "TRAT_ORTESIS_INFO" },
       ],
     },
     {
@@ -91,9 +91,9 @@ module.exports = {
       type: "text",
       text: "INFORMACION DEL SERVICIO\nTIPO DE TRATAMIENTO",
       buttons: [
-        { label: "TOPICO", next: "TRAT_TOPICO_INFO" },
-        { label: "LASER", next: "TRAT_LASER_INFO" },
-        { label: "SISTEMICO", next: "TRAT_SISTEMICO_INFO" },
+        { label: "🧴 Topico", next: "TRAT_TOPICO_INFO" },
+        { label: "🔦 Laser", next: "TRAT_LASER_INFO" },
+        { label: "💊 Sistemico", next: "TRAT_SISTEMICO_INFO" },
       ],
     },
 
@@ -102,10 +102,10 @@ module.exports = {
       type: "text",
       text: "INFORMACION DEL TRATAMIENTO",
       buttons: [
-        { label: "ATENCION PERSONALIZADA", next: "CONTACT_METHOD" },
-        { label: "volver al menu", next: "MAIN_MENU" },
-        { label: "volver al menu de servicios", next: "SERVICIOS_MENU" },
-        { label: "FINALIZAR", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "👨‍💻 Atencion personal", next: "CONTACT_METHOD" },
+        { label: "⬅️ Volver al menu", next: "MAIN_MENU" },
+        { label: "🧼 Volver a servicios", next: "SERVICIOS_MENU" },
+        { label: "✅ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
@@ -113,10 +113,10 @@ module.exports = {
       type: "text",
       text: "INFORMACION DEL TRATAMIENTO",
       buttons: [
-        { label: "ATENCION PERSONALIZADA", next: "CONTACT_METHOD" },
-        { label: "volver al menu", next: "MAIN_MENU" },
-        { label: "volver al menu de servicios", next: "SERVICIOS_MENU" },
-        { label: "FINALIZAR", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "👨‍💻 Atencion personal", next: "CONTACT_METHOD" },
+        { label: "⬅️ Volver al menu", next: "MAIN_MENU" },
+        { label: "🧼 Volver a servicios", next: "SERVICIOS_MENU" },
+        { label: "✅ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
@@ -124,10 +124,10 @@ module.exports = {
       type: "text",
       text: "INFORMACION DEL TRATAMIENTO",
       buttons: [
-        { label: "ATENCION PERSONALIZADA", next: "CONTACT_METHOD" },
-        { label: "volver al menu", next: "MAIN_MENU" },
-        { label: "volver al menu de servicios", next: "SERVICIOS_MENU" },
-        { label: "FINALIZAR", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "👨‍💻 Atencion personal", next: "CONTACT_METHOD" },
+        { label: "⬅️ Volver al menu", next: "MAIN_MENU" },
+        { label: "🧼 Volver a servicios", next: "SERVICIOS_MENU" },
+        { label: "✅ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
@@ -135,10 +135,10 @@ module.exports = {
       type: "text",
       text: "INFORMACION DEL TRATAMIENTO",
       buttons: [
-        { label: "ATENCION PERSONALIZADA", next: "CONTACT_METHOD" },
-        { label: "volver al menu", next: "MAIN_MENU" },
-        { label: "volver al menu de servicios", next: "SERVICIOS_MENU" },
-        { label: "FINALIZAR", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "👨‍💻 Atencion personal", next: "CONTACT_METHOD" },
+        { label: "⬅️ Volver al menu", next: "MAIN_MENU" },
+        { label: "🧼 Volver a servicios", next: "SERVICIOS_MENU" },
+        { label: "✅ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
@@ -146,10 +146,10 @@ module.exports = {
       type: "text",
       text: "INFORMACION DEL TRATAMIENTO",
       buttons: [
-        { label: "ATENCION PERSONALIZADA", next: "CONTACT_METHOD" },
-        { label: "volver al menu", next: "MAIN_MENU" },
-        { label: "volver al menu de servicios", next: "SERVICIOS_MENU" },
-        { label: "FINALIZAR", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "👨‍💻 Atencion personal", next: "CONTACT_METHOD" },
+        { label: "⬅️ Volver al menu", next: "MAIN_MENU" },
+        { label: "🧼 Volver a servicios", next: "SERVICIOS_MENU" },
+        { label: "✅ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
 
@@ -158,10 +158,10 @@ module.exports = {
       type: "text",
       text: "INFORMACION DEL SERVICIO",
       buttons: [
-        { label: "ATENCION PERSONALIZADA", next: "CONTACT_METHOD" },
-        { label: "volver al menu", next: "MAIN_MENU" },
-        { label: "volver al menu de servicios", next: "SERVICIOS_MENU" },
-        { label: "FINALIZAR", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "👨‍💻 Atencion personal", next: "CONTACT_METHOD" },
+        { label: "⬅️ Volver al menu", next: "MAIN_MENU" },
+        { label: "🧼 Volver a servicios", next: "SERVICIOS_MENU" },
+        { label: "✅ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
@@ -169,10 +169,10 @@ module.exports = {
       type: "text",
       text: "INFORMACION DEL SERVICIO",
       buttons: [
-        { label: "ATENCION PERSONALIZADA", next: "CONTACT_METHOD" },
-        { label: "volver al menu", next: "MAIN_MENU" },
-        { label: "volver al menu de servicios", next: "SERVICIOS_MENU" },
-        { label: "FINALIZAR", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "👨‍💻 Atencion personal", next: "CONTACT_METHOD" },
+        { label: "⬅️ Volver al menu", next: "MAIN_MENU" },
+        { label: "🧼 Volver a servicios", next: "SERVICIOS_MENU" },
+        { label: "✅ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
@@ -180,10 +180,10 @@ module.exports = {
       type: "text",
       text: "INFORMACION DEL SERVICIO",
       buttons: [
-        { label: "ATENCION PERSONALIZADA", next: "CONTACT_METHOD" },
-        { label: "volver al menu", next: "MAIN_MENU" },
-        { label: "volver al menu de servicios", next: "SERVICIOS_MENU" },
-        { label: "FINALIZAR", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "👨‍💻 Atencion personal", next: "CONTACT_METHOD" },
+        { label: "⬅️ Volver al menu", next: "MAIN_MENU" },
+        { label: "🧼 Volver a servicios", next: "SERVICIOS_MENU" },
+        { label: "✅ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
 
@@ -192,13 +192,13 @@ module.exports = {
       type: "text",
       text: "SELECCIONA EL SERVICIO QUE NECESITES",
       buttons: [
-        { label: "CALLOSIDAD", next: "OTR_CALLOSIDAD_INFO" },
-        { label: "VERRUGA PLANTAR", next: "OTR_VERRUGA_PLANTAR_INFO" },
-        { label: "HELOMA", next: "OTR_HELOMA_INFO" },
-        { label: "EXTRACCION DE UÑA", next: "OTR_EXTRACCION_UNA_INFO" },
-        { label: "PIE DE ATLETA", next: "OTR_PIE_ATLETA_INFO" },
-        { label: "PIE DIABETICO", next: "OTR_PIE_DIABETICO_INFO" },
-        { label: "ATENCION PERSONALIZADA", next: "CONTACT_METHOD" },
+        { label: "🦶 Callosidad", next: "OTR_CALLOSIDAD_INFO" },
+        { label: "🦠 Verruga plantar", next: "OTR_VERRUGA_PLANTAR_INFO" },
+        { label: "💧 Heloma", next: "OTR_HELOMA_INFO" },
+        { label: "✂️ Extraccion de uña", next: "OTR_EXTRACCION_UNA_INFO" },
+        { label: "🏃 Pie de atleta", next: "OTR_PIE_ATLETA_INFO" },
+        { label: "🧪 Pie diabetico", next: "OTR_PIE_DIABETICO_INFO" },
+        { label: "👨‍💻 Atencion personal", next: "CONTACT_METHOD" },
       ],
     },
 
@@ -207,10 +207,10 @@ module.exports = {
       type: "text",
       text: "INFORMACION DEL SERVICIO + podopaquete",
       buttons: [
-        { label: "ATENCION PERSONALIZADA", next: "CONTACT_METHOD" },
-        { label: "volver al menu", next: "MAIN_MENU" },
-        { label: "volver al menu de servicios", next: "OTROS_MENU" },
-        { label: "FINALIZAR", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "👨‍💻 Atencion personal", next: "CONTACT_METHOD" },
+        { label: "⬅️ Volver al menu", next: "MAIN_MENU" },
+        { label: "🧰 Volver a servicios", next: "OTROS_MENU" },
+        { label: "✅ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
@@ -218,10 +218,10 @@ module.exports = {
       type: "text",
       text: "INFORMACION DEL SERVICIO",
       buttons: [
-        { label: "ATENCION PERSONALIZADA", next: "CONTACT_METHOD" },
-        { label: "volver al menu", next: "MAIN_MENU" },
-        { label: "volver al menu de servicios", next: "OTROS_MENU" },
-        { label: "FINALIZAR", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "👨‍💻 Atencion personal", next: "CONTACT_METHOD" },
+        { label: "⬅️ Volver al menu", next: "MAIN_MENU" },
+        { label: "🧰 Volver a servicios", next: "OTROS_MENU" },
+        { label: "✅ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
@@ -229,10 +229,10 @@ module.exports = {
       type: "text",
       text: "INFORMACION DEL SERVICIO",
       buttons: [
-        { label: "ATENCION PERSONALIZADA", next: "CONTACT_METHOD" },
-        { label: "volver al menu", next: "MAIN_MENU" },
-        { label: "volver al menu de servicios", next: "OTROS_MENU" },
-        { label: "FINALIZAR", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "👨‍💻 Atencion personal", next: "CONTACT_METHOD" },
+        { label: "⬅️ Volver al menu", next: "MAIN_MENU" },
+        { label: "🧰 Volver a servicios", next: "OTROS_MENU" },
+        { label: "✅ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
@@ -240,10 +240,10 @@ module.exports = {
       type: "text",
       text: "INFORMACION DEL SERVICIO",
       buttons: [
-        { label: "ATENCION PERSONALIZADA", next: "CONTACT_METHOD" },
-        { label: "volver al menu", next: "MAIN_MENU" },
-        { label: "volver al menu de servicios", next: "OTROS_MENU" },
-        { label: "FINALIZAR", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "👨‍💻 Atencion personal", next: "CONTACT_METHOD" },
+        { label: "⬅️ Volver al menu", next: "MAIN_MENU" },
+        { label: "🧰 Volver a servicios", next: "OTROS_MENU" },
+        { label: "✅ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
@@ -251,10 +251,10 @@ module.exports = {
       type: "text",
       text: "INFORMACION DEL SERVICIO",
       buttons: [
-        { label: "ATENCION PERSONALIZADA", next: "CONTACT_METHOD" },
-        { label: "volver al menu", next: "MAIN_MENU" },
-        { label: "volver al menu de servicios", next: "OTROS_MENU" },
-        { label: "FINALIZAR", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "👨‍💻 Atencion personal", next: "CONTACT_METHOD" },
+        { label: "⬅️ Volver al menu", next: "MAIN_MENU" },
+        { label: "🧰 Volver a servicios", next: "OTROS_MENU" },
+        { label: "✅ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
@@ -262,10 +262,10 @@ module.exports = {
       type: "text",
       text: "INFORMACION DEL SERVICIO + podopaquete",
       buttons: [
-        { label: "ATENCION PERSONALIZADA", next: "CONTACT_METHOD" },
-        { label: "volver al menu", next: "MAIN_MENU" },
-        { label: "volver al menu de servicios", next: "OTROS_MENU" },
-        { label: "FINALIZAR", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "👨‍💻 Atencion personal", next: "CONTACT_METHOD" },
+        { label: "⬅️ Volver al menu", next: "MAIN_MENU" },
+        { label: "🧰 Volver a servicios", next: "OTROS_MENU" },
+        { label: "✅ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
 
@@ -274,8 +274,8 @@ module.exports = {
       type: "text",
       text: "Seleccion de forma de atencion",
       buttons: [
-        { label: "Llamada", next: "ACTION_CALL" },
-        { label: "mensaje", next: "ACTION_MESSAGE" },
+        { label: "📞 Llamada", next: "ACTION_CALL" },
+        { label: "💬 Mensaje", next: "ACTION_MESSAGE" },
       ],
     },
     {

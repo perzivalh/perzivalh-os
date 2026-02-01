@@ -35,6 +35,7 @@ const { disconnectAllTenantClients } = require("./src/tenancy/tenantPrismaManage
 const { hasOdooConfig, getSessionInfo } = require("./src/services/odooClient");
 const { resolveTenantContextById } = require("./src/tenancy/tenantResolver");
 const { sendTemplate } = require("./src/whatsapp");
+const { processBotpoditoV2Inactivity } = require("./src/services/flowInactivity");
 
 // Rutas modulares
 const { setupRoutes } = require("./src/routes");
@@ -368,6 +369,16 @@ setInterval(() => {
     if (campaignSchemaReady === false) return;
     void processCampaignQueueForAllTenants();
 }, CAMPAIGN_INTERVAL_MS);
+
+// ==========================================
+// INACTIVITY FLOW HANDLING (Botpodito V2)
+// ==========================================
+
+const BOTPODITO_INACTIVITY_INTERVAL_MS = 60 * 1000;
+
+setInterval(() => {
+    void processBotpoditoV2Inactivity();
+}, BOTPODITO_INACTIVITY_INTERVAL_MS);
 
 // ==========================================
 // ERROR HANDLER

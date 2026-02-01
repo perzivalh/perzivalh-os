@@ -157,6 +157,24 @@ model Settings {
   updated_at         DateTime @updatedAt
 }
 
+model Session {
+  id                    String   @id @default(cuid())
+  wa_id                 String
+  phone_number_id       String?
+  state                 String
+  data                  Json
+  flow_id               String?
+  inactivity_notice_at  DateTime?
+  next_due_at           DateTime?
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  @@unique([wa_id, phone_number_id])
+  @@index([flow_id])
+  @@index([next_due_at])
+  @@index([updated_at])
+}
+
 model AuditLogTenant {
   id        String   @id @default(cuid())
   user_id   String?

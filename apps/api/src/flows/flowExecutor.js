@@ -9,6 +9,7 @@ const sessionStore = require("../sessionStore");
 const prisma = require("../db");
 const { getTenantContext } = require("../tenancy/tenantContext");
 const { setConversationStatus, addTagToConversation } = require("../services/conversations");
+const { BOT_FLOW_ID, FIRST_NOTICE_MS } = require("../config/flowInactivity");
 
 const MAX_LIST_TITLE = 24;
 const BUTTON_TITLE_LIMIT = 20;
@@ -105,9 +106,16 @@ async function sendNode(waId, flow, node, visited) {
   }
 
   const lineId = getCurrentLineId();
+  const isBotpoditoV2 = flow.id === BOT_FLOW_ID;
   await sessionStore.updateSession(waId, lineId, {
     state: node.id,
     data: { flow_id: flow.id },
+    ...(isBotpoditoV2
+      ? {
+          inactivity_notice_at: null,
+          next_due_at: new Date(Date.now() + FIRST_NOTICE_MS),
+        }
+      : {}),
   });
 
   if (node.type === "action") {

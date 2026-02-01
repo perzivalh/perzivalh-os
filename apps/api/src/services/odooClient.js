@@ -123,6 +123,34 @@ async function hasOdooConfig() {
   return Boolean(resolved.config);
 }
 
+function buildOdooConfig(input = {}) {
+  return {
+    baseUrl: normalizeBaseUrl(input.baseUrl || input.base_url || ""),
+    dbName: (input.dbName || input.db_name || "").trim(),
+    username: (input.username || "").trim(),
+    password: (input.password || "").trim(),
+  };
+}
+
+async function validateOdooCredentials(input) {
+  const config = buildOdooConfig(input);
+  if (!config.baseUrl || !config.dbName || !config.username || !config.password) {
+    const error = new Error("missing_odoo_fields");
+    error.code = "missing_fields";
+    throw error;
+  }
+  const state = getClientState(null, config);
+  state.sessionCookie = null;
+  state.sessionUid = null;
+  state.sessionExpiresAt = 0;
+  await odooLogin(state);
+  return {
+    uid: state.sessionUid,
+    readyAt: state.sessionReadyAt,
+    expiresAt: state.sessionExpiresAt,
+  };
+}
+
 function digitsOnly(value) {
   return (value || "").toString().replace(/\D+/g, "");
 }
@@ -648,6 +676,7 @@ async function getPosOrdersWithLines(partnerId, limit = 50) {
 
 module.exports = {
   hasOdooConfig,
+  validateOdooCredentials,
   normalizeCI,
   normalizePhone,
   searchRead,

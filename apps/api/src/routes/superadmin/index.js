@@ -12,12 +12,16 @@ const logger = require("../../lib/logger");
 const { signUser } = require("../../lib/auth");
 const { getControlClient } = require("../../control/controlClient");
 const { encryptString, decryptString } = require("../../core/crypto");
+const { PrismaClient: TenantPrismaClient } = require("@prisma/client-tenant");
 const {
     resolveTenantContextById,
     clearTenantDbCache,
     clearChannelCache,
 } = require("../../tenancy/tenantResolver");
-const { clearOdooConfigCache } = require("../../services/odooClient");
+const {
+    clearOdooConfigCache,
+    validateOdooCredentials,
+} = require("../../services/odooClient");
 
 // Middleware para requerir rol superadmin
 function requireSuperAdmin(req, res, next) {
@@ -25,6 +29,33 @@ function requireSuperAdmin(req, res, next) {
         return res.status(403).json({ error: "forbidden" });
     }
     return next();
+}
+
+async function validateTenantDatabaseConnection(dbUrl) {
+    const startedAt = Date.now();
+    const client = new TenantPrismaClient({
+        datasources: { db: { url: dbUrl } },
+    });
+    try {
+        await client.$connect();
+        await client.$queryRaw`SELECT 1`;
+        return { ok: true, latency_ms: Date.now() - startedAt };
+    } catch (error) {
+        return {
+            ok: false,
+            latency_ms: Date.now() - startedAt,
+            error: "db_connection_failed",
+            details: error?.message || "db_connection_failed",
+        };
+    } finally {
+        try {
+            await client.$disconnect();
+        } catch (disconnectError) {
+            logger.warn("db.validation_disconnect_failed", {
+                message: disconnectError?.message || disconnectError,
+            });
+        }
+    }
 }
 
 // ==========================================
@@ -194,6 +225,60 @@ router.post("/tenants/:id/database", requireAuth, requireSuperAdmin, async (req,
     });
     clearTenantDbCache(req.params.id);
     return res.json({ tenant_database: { tenant_id: record.tenant_id } });
+});
+
+// POST /api/superadmin/tenants/validate
+router.post("/tenants/validate", requireAuth, requireSuperAdmin, async (req, res) => {
+    const dbUrl = (req.body?.db_url || "").trim();
+    const odooBaseUrl = (req.body?.odoo_base_url || "").trim();
+    const odooDbName = (req.body?.odoo_db_name || "").trim();
+    const odooUsername = (req.body?.odoo_username || "").trim();
+    const odooPassword = (req.body?.odoo_password || "").trim();
+    const hasOdooInput =
+        odooBaseUrl || odooDbName || odooUsername || odooPassword;
+
+    if (!dbUrl && !hasOdooInput) {
+        return res.status(400).json({ error: "missing_fields" });
+    }
+
+    const checks = {
+        database: null,
+        odoo: null,
+    };
+
+    if (dbUrl) {
+        checks.database = await validateTenantDatabaseConnection(dbUrl);
+    }
+
+    if (hasOdooInput) {
+        const startedAt = Date.now();
+        try {
+            const session = await validateOdooCredentials({
+                base_url: odooBaseUrl,
+                db_name: odooDbName,
+                username: odooUsername,
+                password: odooPassword,
+            });
+            checks.odoo = {
+                ok: true,
+                latency_ms: Date.now() - startedAt,
+                session_uid: session?.uid || null,
+            };
+        } catch (error) {
+            checks.odoo = {
+                ok: false,
+                latency_ms: Date.now() - startedAt,
+                error: error?.code || error?.message || "odoo_connection_failed",
+                details: error?.message || "odoo_connection_failed",
+            };
+        }
+    }
+
+    const ok =
+        (!checks.database || checks.database.ok) &&
+        (!checks.odoo || checks.odoo.ok);
+
+    return res.json({ ok, checks });
 });
 
 // POST /api/superadmin/tenants/:id/impersonate

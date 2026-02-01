@@ -31,12 +31,13 @@ function SuperAdminView({
   const [tenantSearch, setTenantSearch] = useState("");
   const [error, setError] = useState("");
   const [statusNote, setStatusNote] = useState("Verificacion de red: sistema ok");
-    const [provisionForm, setProvisionForm] = useState(EMPTY_PROVISION);
+  const [provisionForm, setProvisionForm] = useState(EMPTY_PROVISION);
+  const [validationBusy, setValidationBusy] = useState(false);
   const [provisionBusy, setProvisionBusy] = useState(false);
   const [impersonateBusyId, setImpersonateBusyId] = useState("");
   const [editTenantId, setEditTenantId] = useState("");
   const [editTenantActive, setEditTenantActive] = useState(true);
-    const [baselineForm, setBaselineForm] = useState(EMPTY_PROVISION);
+  const [baselineForm, setBaselineForm] = useState(EMPTY_PROVISION);
   const [baselineActive, setBaselineActive] = useState(true);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const latestTenantRequest = useRef("");
@@ -379,13 +380,94 @@ function SuperAdminView({
     return { ok: true };
   }
 
-  function handleValidateProvision() {
+  function buildValidationNote(checks) {
+    if (!checks) {
+      return "Verificacion completada";
+    }
+    const segments = [];
+    if (checks.database) {
+      const dbLabel = checks.database.ok ? "DB ok" : "DB error";
+      const dbLatency =
+        typeof checks.database.latency_ms === "number"
+          ? ` (${checks.database.latency_ms}ms)`
+          : "";
+      segments.push(`${dbLabel}${dbLatency}`);
+    }
+    if (checks.odoo) {
+      const odooLabel = checks.odoo.ok ? "Odoo ok" : "Odoo error";
+      const odooLatency =
+        typeof checks.odoo.latency_ms === "number"
+          ? ` (${checks.odoo.latency_ms}ms)`
+          : "";
+      segments.push(`${odooLabel}${odooLatency}`);
+    }
+    return segments.length
+      ? `Verificacion completada: ${segments.join(" | ")}`
+      : "Verificacion completada";
+  }
+
+  function resolveValidationError(checks) {
+    if (checks?.database && !checks.database.ok) {
+      const message = checks.database.details || checks.database.error;
+      return formatValidationError(message || "Error en DB");
+    }
+    if (checks?.odoo && !checks.odoo.ok) {
+      const message = checks.odoo.details || checks.odoo.error;
+      return formatValidationError(message || "Error en Odoo");
+    }
+    return "No se pudo validar conexion";
+  }
+
+  function formatValidationError(value) {
+    const raw = (value || "").toString();
+    const lower = raw.toLowerCase();
+    if (lower.includes("missing")) {
+      return "Completa los campos de Odoo";
+    }
+    if (lower.includes("db_connection_failed")) {
+      return "No se pudo conectar a la base de datos";
+    }
+    if (lower.includes("odoo") && lower.includes("failed")) {
+      return "No se pudo autenticar en Odoo";
+    }
+    return raw || "No se pudo validar conexion";
+  }
+
+  async function handleValidateProvision() {
     const validation = validateProvision();
     if (!validation.ok) {
       setStatusNote(validation.message);
       return;
     }
-    setStatusNote("Verificacion de red: sistema ok");
+    setValidationBusy(true);
+    setStatusNote("Verificando conexion...");
+    try {
+      const response = await apiPost("/api/superadmin/tenants/validate", {
+        db_url: provisionForm.db_url.trim(),
+        odoo_base_url: provisionForm.odoo_base_url.trim(),
+        odoo_db_name: provisionForm.odoo_db_name.trim(),
+        odoo_username: provisionForm.odoo_username.trim(),
+        odoo_password: provisionForm.odoo_password.trim(),
+      });
+      const note = buildValidationNote(response.checks);
+      setStatusNote(note);
+      if (response.ok) {
+        pushToast({ message: note });
+      } else {
+        pushToast({
+          type: "error",
+          message: resolveValidationError(response.checks),
+        });
+      }
+    } catch (err) {
+      setStatusNote("Error validando conexion");
+      pushToast({
+        type: "error",
+        message: err.message || "No se pudo validar conexion",
+      });
+    } finally {
+      setValidationBusy(false);
+    }
   }
 
   async function handleProvisionTenant(event) {
@@ -1000,8 +1082,9 @@ function SuperAdminView({
                           className="sa-btn ghost"
                           type="button"
                           onClick={handleValidateProvision}
+                          disabled={validationBusy || provisionBusy}
                         >
-                          Validar conexion
+                          {validationBusy ? "Validando..." : "Validar conexion"}
                         </button>
                         <button className="sa-btn primary" type="submit" disabled={provisionBusy}>
                           {provisionBusy ? "Guardando..." : "Desplegar instancia"}

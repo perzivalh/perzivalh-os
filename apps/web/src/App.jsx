@@ -889,7 +889,7 @@ function App() {
       return;
     }
     try {
-      const data = await apiPost(`/api/conversations/${activeConversation.id}/assign`);
+      const data = await apiPatch(`/api/conversations/${activeConversation.id}/assign`);
       setActiveConversation(data.conversation);
     } catch (error) {
       const message = normalizeError(error) || "No se pudo tomar la conversacion";
@@ -902,7 +902,7 @@ function App() {
       return;
     }
     try {
-      const data = await apiPost(`/api/conversations/${activeConversation.id}/assign`, {
+      const data = await apiPatch(`/api/conversations/${activeConversation.id}/assign`, {
         user_id: reassignUserId,
       });
       setActiveConversation(data.conversation);
@@ -919,7 +919,7 @@ function App() {
       return;
     }
     try {
-      const data = await apiPost(`/api/conversations/${activeConversation.id}/status`, {
+      const data = await apiPatch(`/api/conversations/${activeConversation.id}/status`, {
         status,
       });
       setActiveConversation(data.conversation);

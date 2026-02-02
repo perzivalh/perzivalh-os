@@ -1,5 +1,5 @@
 ﻿import React, { useMemo, useState, useEffect, useRef } from "react";
-import { apiGet, apiPost, apiDelete } from "../api";
+import { apiGet, apiPost, apiDelete, apiPut } from "../api";
 import { useToast } from "./ToastProvider.jsx";
 
 const STATUS_LABELS = {
@@ -113,6 +113,8 @@ function CampaignsView({
 }) {
   const [templateSearch, setTemplateSearch] = useState("");
   const [templateCategory, setTemplateCategory] = useState("all");
+  const [templatePreviewOpen, setTemplatePreviewOpen] = useState(false);
+  const [templatePreviewTemplate, setTemplatePreviewTemplate] = useState(null);
   const [audienceSearch, setAudienceSearch] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [campaignSearch, setCampaignSearch] = useState("");
@@ -177,6 +179,7 @@ function CampaignsView({
     date: "Cualquier fecha",
     status: "Activos",
   });
+  const [openAudienceMenuId, setOpenAudienceMenuId] = useState(null);
 
   // Custom segments from API
   const [customSegments, setCustomSegments] = useState([]);
@@ -217,7 +220,7 @@ function CampaignsView({
 
   async function loadSegments() {
     try {
-      const res = await apiGet("/api/audiences");
+      const res = await apiGet("/api/audiences?with_counts=true");
       if (res && res.segments) {
         setCustomSegments(res.segments);
       }
@@ -411,8 +414,29 @@ function CampaignsView({
         const res = await apiGet(
           `/api/contacts?search=${encodeURIComponent(search)}&offset=${offset}&limit=${audiencePageSize}`
         );
-        setAudienceContacts(res?.contacts || []);
-        setAudienceContactsTotal(res?.total || 0);
+        let contacts = res?.contacts || [];
+        if (audienceFilters.tag !== "Todas") {
+          contacts = contacts.filter((contact) => {
+            const tags = contact.tags_json || [];
+            if (audienceFilters.tag === "Con etiquetas") {
+              return Array.isArray(tags) && tags.length > 0;
+            }
+            if (audienceFilters.tag === "Sin etiquetas") {
+              return !Array.isArray(tags) || tags.length === 0;
+            }
+            return true;
+          });
+        }
+        if (audienceFilters.status !== "Activos") {
+          contacts = contacts.filter((contact) => {
+            const status = (contact.status || "ACTIVO").toUpperCase();
+            return audienceFilters.status === "Activos"
+              ? status === "ACTIVO"
+              : status !== "ACTIVO";
+          });
+        }
+        setAudienceContacts(contacts);
+        setAudienceContactsTotal(res?.total || contacts.length);
         return;
       }
 
@@ -421,13 +445,16 @@ function CampaignsView({
       );
       const recipients = preview?.recipients || [];
       const query = search.trim().toLowerCase();
-      const filtered = !query
+      let filtered = !query
         ? recipients
         : recipients.filter((recipient) => {
             const name = recipient.name?.toLowerCase() || "";
             const phone = recipient.phone_e164?.toLowerCase() || "";
             return name.includes(query) || phone.includes(query);
           });
+      if (audienceFilters.tag === "Sin etiquetas") {
+        filtered = filtered.filter((recipient) => !recipient.tags || recipient.tags.length === 0);
+      }
       const total = preview?.total || filtered.length;
       const start = (page - 1) * audiencePageSize;
       const paged = filtered.slice(start, start + audiencePageSize);
@@ -475,10 +502,34 @@ function CampaignsView({
       if (selectedAudienceId === segment.id) {
         setSelectedAudienceId(null);
       }
+      setOpenAudienceMenuId(null);
       pushToast({ message: "Audiencia eliminada" });
     } catch (err) {
       pushToast({ type: "error", message: err.message || "No se pudo eliminar" });
     }
+  }
+
+  async function handleRenameAudience(segment) {
+    if (!segment || segment.type === "odoo" || segment.isDefault) return;
+    const nextName = window.prompt("Nuevo nombre de la audiencia:", segment.name);
+    if (!nextName || !nextName.trim()) return;
+    try {
+      await apiPut(`/api/audiences/${segment.id}`, { name: nextName.trim() });
+      await loadSegments();
+      setOpenAudienceMenuId(null);
+      pushToast({ message: "Audiencia renombrada" });
+    } catch (err) {
+      pushToast({ type: "error", message: err.message || "No se pudo renombrar" });
+    }
+  }
+
+  function cycleAudienceFilter(key, options) {
+    setAudienceFilters((prev) => {
+      const current = prev[key];
+      const index = options.indexOf(current);
+      const nextValue = options[(index + 1) % options.length];
+      return { ...prev, [key]: nextValue };
+    });
   }
 
   function handleAudiencePrimaryAction() {
@@ -603,7 +654,14 @@ function CampaignsView({
       page: audiencePage,
       search: audienceContactSearch,
     });
-  }, [selectedAudienceId, audiencePage, audienceContactSearch, activeTab, selectedAudience]);
+  }, [
+    selectedAudienceId,
+    audiencePage,
+    audienceContactSearch,
+    activeTab,
+    selectedAudience,
+    audienceFilters,
+  ]);
 
   const templateCategories = useMemo(() => {
     const unique = new Set();
@@ -674,6 +732,11 @@ function CampaignsView({
       ...prev,
       template_id: templateId,
     }));
+  }
+
+  function handleTemplatePreview(template) {
+    setTemplatePreviewTemplate(template);
+    setTemplatePreviewOpen(true);
   }
 
   const activeTabMeta =
@@ -747,20 +810,17 @@ function CampaignsView({
               </>
             )}
             {!audienceFlowOpen && activeTab === "audiences" && (
-              <button
-                className="campaigns-primary campaigns-primary--dropdown"
-                type="button"
-                onClick={() => {
-                  setAudienceFlowOpen(true);
-                  setAudienceFlowTab("dynamic");
-                }}
-              >
-                <span className="campaigns-primary-icon">+</span>
-                Nueva Audiencia
-                <span className="campaigns-primary-chevron" aria-hidden="true">
-                  v
-                </span>
-              </button>
+                <button
+                  className="campaigns-primary campaigns-primary--dropdown"
+                  type="button"
+                  onClick={() => {
+                    setAudienceFlowOpen(true);
+                    setAudienceFlowTab("dynamic");
+                  }}
+                >
+                  <span className="campaigns-primary-icon">+</span>
+                  Nueva Audiencia
+                </button>
             )}
             {!audienceFlowOpen && activeTab === "new" && (
               <>
@@ -1245,7 +1305,7 @@ function CampaignsView({
                         <button
                           className="template-action"
                           type="button"
-                          onClick={() => handleTemplateSelect(template.id)}
+                          onClick={() => handleTemplatePreview(template)}
                         >
                           {actionLabel}
                         </button>
@@ -1296,19 +1356,40 @@ function CampaignsView({
                             <span className="audience-count">
                               {segment.count?.toLocaleString("es-PE") || 0}
                             </span>
-                            {!segment.isDefault && segment.type !== "odoo" && (
-                              <button
-                                className="audience-menu"
-                                type="button"
-                                aria-label="Eliminar audiencia"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  handleDeleteAudience(segment);
-                                }}
-                              >
-                                ...
-                              </button>
+                        {!segment.isDefault && segment.type !== "odoo" && (
+                          <div className="audience-menu-wrapper">
+                            <button
+                              className="audience-menu"
+                              type="button"
+                              aria-label="Opciones de audiencia"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setOpenAudienceMenuId((prev) =>
+                                  prev === segment.id ? null : segment.id
+                                );
+                              }}
+                            >
+                              ...
+                            </button>
+                            {openAudienceMenuId === segment.id && (
+                              <div className="audience-menu-dropdown">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRenameAudience(segment)}
+                                >
+                                  Renombrar
+                                </button>
+                                <button
+                                  type="button"
+                                  className="danger"
+                                  onClick={() => handleDeleteAudience(segment)}
+                                >
+                                  Eliminar
+                                </button>
+                              </div>
                             )}
+                          </div>
+                        )}
                           </div>
                         </div>
                         <div className="audience-subtitle">{segment.subtitle}</div>
@@ -1320,32 +1401,57 @@ function CampaignsView({
                   </div>
                 </div>
                 <div className="audiences-table-panel">
-                  <div className="audiences-filters">
-                    <div className="audiences-filter">
-                      <span>ETIQUETA:</span>
-                      <button className="audiences-filter-chip" type="button">
-                        {audienceFilters.tag}
-                      </button>
-                    </div>
-                    <div className="audiences-filter">
-                      <span>FECHA:</span>
-                      <button className="audiences-filter-chip" type="button">
-                        {audienceFilters.date}
-                      </button>
-                    </div>
-                    <div className="audiences-filter">
-                      <span>ESTADO:</span>
-                      <button className="audiences-filter-chip" type="button">
-                        {audienceFilters.status}
-                      </button>
-                    </div>
+                    <div className="audiences-filters">
+                      <div className="audiences-filter">
+                        <span>ETIQUETA:</span>
+                        <button
+                          className="audiences-filter-chip"
+                          type="button"
+                          onClick={() =>
+                            cycleAudienceFilter("tag", [
+                              "Todas",
+                              "Con etiquetas",
+                              "Sin etiquetas",
+                            ])
+                          }
+                        >
+                          {audienceFilters.tag}
+                        </button>
+                      </div>
+                      <div className="audiences-filter">
+                        <span>FECHA:</span>
+                        <button
+                          className="audiences-filter-chip"
+                          type="button"
+                          onClick={() =>
+                            cycleAudienceFilter("date", [
+                              "Cualquier fecha",
+                              "Últimos 30 días",
+                            ])
+                          }
+                        >
+                          {audienceFilters.date}
+                        </button>
+                      </div>
+                      <div className="audiences-filter">
+                        <span>ESTADO:</span>
+                        <button
+                          className="audiences-filter-chip"
+                          type="button"
+                          onClick={() =>
+                            cycleAudienceFilter("status", ["Activos", "Inactivos"])
+                          }
+                        >
+                          {audienceFilters.status}
+                        </button>
+                      </div>
                     <div className="audiences-filter-actions">
                       <button
                         className="audiences-icon-btn"
                         type="button"
                         aria-label="Descargar"
                       >
-                        D
+                        {"\u2193"}
                       </button>
                       <button
                         className="audiences-icon-btn"
@@ -1353,7 +1459,7 @@ function CampaignsView({
                         aria-label="Actualizar"
                         onClick={handleRefreshAudienceCounts}
                       >
-                        R
+                        {"\u21bb"}
                       </button>
                     </div>
                   </div>
@@ -1400,12 +1506,7 @@ function CampaignsView({
                           : contact.tags
                             ? [contact.tags]
                             : [];
-                        const initials = contactName
-                          .split(" ")
-                          .map((item) => item[0])
-                          .join("")
-                          .slice(0, 2)
-                          .toUpperCase();
+                        const initials = (contactName || "?").trim().slice(0, 1).toUpperCase();
                         return (
                           <div className="audiences-table-row" key={contact.id || contactPhone}>
                             <input type="checkbox" aria-label="Seleccionar contacto" />
@@ -1573,10 +1674,10 @@ function CampaignsView({
                       <div className="campaigns-filter-chip">Periodo: Últimos 30 días</div>
                       <div className="campaigns-table-actions">
                         <button className="audiences-icon-btn" type="button">
-                          D
+                          {"\u2193"}
                         </button>
-                        <button className="audiences-icon-btn" type="button" onClick={onLoadCampaigns}>
-                          R
+                        <button className="audiences-icon-btn" type="button" onClick={() => onLoadCampaigns(1, campaignPageSize)}>
+                          {"\u21bb"}
                         </button>
                       </div>
                     </div>
@@ -1685,7 +1786,7 @@ function CampaignsView({
                   >
                     <div className="launch-step">
                       <span className="launch-step-number">1</span>
-                      <div>
+                      <div className="launch-card">
                         <div className="launch-step-title">Nombre de la Campaña</div>
                         <input
                           type="text"
@@ -1702,7 +1803,7 @@ function CampaignsView({
                     </div>
                     <div className="launch-step">
                       <span className="launch-step-number">2</span>
-                      <div>
+                      <div className="launch-card">
                         <div className="launch-step-title">Seleccionar Audiencia</div>
                         <select
                           value={audienceValue}
@@ -1723,7 +1824,7 @@ function CampaignsView({
                     </div>
                     <div className="launch-step">
                       <span className="launch-step-number">3</span>
-                      <div>
+                      <div className="launch-card">
                         <div className="launch-step-title">Elegir Plantilla de Meta</div>
                         <div className="launch-templates">
                           {templates.map((template) => {
@@ -1738,6 +1839,7 @@ function CampaignsView({
                                 key={template.id}
                                 onClick={() => handleTemplateSelect(template.id)}
                               >
+                                <div className="launch-template-icon" />
                                 <div className="launch-template-title">{template.name}</div>
                                 <div className="launch-template-preview">
                                   {template.body_preview || template.body_text || "Sin preview"}
@@ -1753,7 +1855,7 @@ function CampaignsView({
                     </div>
                     <div className="launch-step">
                       <span className="launch-step-number">4</span>
-                      <div>
+                      <div className="launch-card">
                         <div className="launch-step-title">Programación</div>
                         <div className="launch-schedule">
                           <button
@@ -1796,12 +1898,32 @@ function CampaignsView({
                   <aside className="campaigns-launch-preview">
                     <div className="preview-title">Vista previa en tiempo real</div>
                     <div className="preview-phone">
+                      <div className="preview-phone-header">
+                        <div className="preview-phone-notch" />
+                        <div className="preview-phone-title">
+                          <div className="preview-phone-avatar" />
+                          <div>
+                            <div className="preview-phone-name">Nombre del Cliente</div>
+                            <div className="preview-phone-status">en línea</div>
+                          </div>
+                        </div>
+                      </div>
                       <div className="preview-phone-body">
+                        <div className="preview-day-pill">HOY</div>
                         <div className="preview-bubble">
                           {selectedTemplate?.body_preview ||
                             selectedTemplate?.body_text ||
                             "Selecciona una plantilla para ver el contenido."}
                         </div>
+                        <div className="preview-actions">
+                          <button type="button">Ver Tutorial</button>
+                          <button type="button">Hablar con Soporte</button>
+                        </div>
+                        <div className="preview-time">10:45 AM</div>
+                      </div>
+                      <div className="preview-phone-input">
+                        <span>Escribir mensaje...</span>
+                        <div className="preview-mic" />
                       </div>
                     </div>
                     <div className="preview-summary">
@@ -1927,6 +2049,32 @@ function CampaignsView({
         </div>
       </div>
 
+      {templatePreviewOpen && (
+        <div className="modal-overlay" onClick={() => setTemplatePreviewOpen(false)}>
+          <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Previsualizar plantilla</h2>
+              <button
+                className="modal-close"
+                onClick={() => setTemplatePreviewOpen(false)}
+              >
+                x
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="preview-phone">
+                <div className="preview-phone-body">
+                  <div className="preview-bubble">
+                    {templatePreviewTemplate?.body_preview ||
+                      templatePreviewTemplate?.body_text ||
+                      "Sin previsualización disponible."}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

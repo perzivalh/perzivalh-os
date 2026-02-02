@@ -66,7 +66,21 @@ async function getAllSegments(options = {}) {
         },
     });
 
-    return segments;
+    if (!options.withCounts) {
+        return segments;
+    }
+
+    const counts = await Promise.all(
+        segments.map(async (segment) => {
+            const count = await estimateRecipientCount(segment.id);
+            return { id: segment.id, count };
+        })
+    );
+    const countMap = new Map(counts.map((item) => [item.id, item.count]));
+    return segments.map((segment) => ({
+        ...segment,
+        estimated_count: countMap.get(segment.id) ?? segment.estimated_count ?? 0,
+    }));
 }
 
 /**

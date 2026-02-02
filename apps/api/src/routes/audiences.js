@@ -21,7 +21,8 @@ router.use(requireAuth);
 router.get("/audiences", async (req, res) => {
     try {
         const { search } = req.query;
-        const segments = await audienceService.getAllSegments({ search });
+        const withCounts = req.query.with_counts === "true";
+        const segments = await audienceService.getAllSegments({ search, withCounts });
         res.json({ segments });
     } catch (error) {
         logger.error("Failed to get audiences", { error: error.message, stack: error.stack });

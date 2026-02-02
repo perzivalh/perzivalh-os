@@ -430,6 +430,15 @@ body[data-theme="dark"] .campaigns-templates .template-card.selected {
   isolation: isolate;
 }
 
+@media (max-width: 1400px) {
+  .campaigns-layout {
+    grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+  }
+  .campaigns-create {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 1200px) {
   .campaigns-layout {
     grid-template-columns: 220px minmax(0, 1fr);

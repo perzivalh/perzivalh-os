@@ -104,6 +104,7 @@ body[data-theme="dark"] .campaigns-ghost {
   gap: 1.2rem;
   min-height: 0;
   align-items: start;
+  grid-auto-rows: minmax(0, max-content);
 }
 
 .campaigns-audiences,
@@ -236,8 +237,8 @@ body[data-theme="dark"] .campaigns-ghost {
 }
 
 .template-card.selected {
-  border-color: var(--accent);
-  background: var(--accent-soft-2);
+  border-color: var(--border);
+  background: var(--panel-muted);
 }
 
 .template-head {
@@ -325,6 +326,11 @@ body[data-theme="dark"] .audience-card.active {
   border-color: #2a2a2a;
 }
 
+body[data-theme="dark"] .campaigns-history {
+  background: #111111;
+  border-color: #1f1f1f;
+}
+
 body[data-theme="dark"] .history-bar-fill {
   background: #3a3a3a;
 }
@@ -338,6 +344,11 @@ body[data-theme="dark"] .template-card.selected {
   background: #1a1a1a;
   border-color: #2a2a2a;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+body[data-theme="dark"] .campaigns-templates .template-card.selected {
+  background: #1a1a1a !important;
+  border-color: #2a2a2a !important;
 }
 
 .campaigns-form {
@@ -414,6 +425,9 @@ body[data-theme="dark"] .template-card.selected {
   margin-top: 1.5rem;
   position: static;
   z-index: 0;
+  width: 100%;
+  opacity: 1;
+  isolation: isolate;
 }
 
 @media (max-width: 1200px) {

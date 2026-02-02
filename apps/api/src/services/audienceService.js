@@ -150,17 +150,30 @@ async function deleteSegment(id, userId = null) {
  * ]
  */
 function buildWhereFromRules(rules, source = "all") {
+    let resolvedSource = source;
+
+    for (const rule of rules || []) {
+        const ruleType = rule.type || rule.field;
+        if (ruleType === "source" && rule.value) {
+            resolvedSource = rule.value;
+        }
+    }
+
     // Determine which source to query
-    const queryOdoo = source === "all" || source === "odoo";
-    const queryConversations = source === "all" || source === "conversation";
+    const queryOdoo = resolvedSource === "all" || resolvedSource === "odoo";
+    const queryConversations =
+        resolvedSource === "all" || resolvedSource === "conversation";
+    const queryImports = resolvedSource === "all" || resolvedSource === "import";
 
     // Build conditions
     const conversationConditions = [];
     const odooContactConditions = [];
+    const importContactConditions = [];
     const tagConditions = [];
 
     for (const rule of rules || []) {
-        switch (rule.type) {
+        const ruleType = rule.type || rule.field;
+        switch (ruleType) {
             case "tag":
                 if (rule.operator === "has") {
                     tagConditions.push({
@@ -170,6 +183,9 @@ function buildWhereFromRules(rules, source = "all") {
                             },
                         },
                     });
+                    importContactConditions.push({
+                        tags_json: { array_contains: [rule.value] },
+                    });
                 } else if (rule.operator === "not_has") {
                     tagConditions.push({
                         tags: {
@@ -177,6 +193,45 @@ function buildWhereFromRules(rules, source = "all") {
                                 tag: { name: rule.value },
                             },
                         },
+                    });
+                    importContactConditions.push({
+                        OR: [
+                            { tags_json: { equals: null } },
+                            { tags_json: { equals: [] } },
+                            { NOT: { tags_json: { array_contains: [rule.value] } } },
+                        ],
+                    });
+                } else if (rule.operator === "none") {
+                    tagConditions.push({
+                        tags: { none: {} },
+                    });
+                    importContactConditions.push({
+                        OR: [
+                            { tags_json: { equals: null } },
+                            { tags_json: { equals: [] } },
+                        ],
+                    });
+                }
+                break;
+
+            case "primary_tag":
+                if (rule.operator === "is") {
+                    if (rule.value === null || rule.value === "__NONE__") {
+                        conversationConditions.push({
+                            primary_tag_id: null,
+                        });
+                    } else {
+                        conversationConditions.push({
+                            primary_tag_id: rule.value,
+                        });
+                    }
+                }
+                break;
+
+            case "phone_number_id":
+                if (rule.value) {
+                    conversationConditions.push({
+                        phone_number_id: rule.value,
                     });
                 }
                 break;
@@ -222,7 +277,7 @@ function buildWhereFromRules(rules, source = "all") {
                 break;
 
             case "source":
-                // This affects which tables to query, handled by source parameter
+                // This affects which tables to query, handled above
                 break;
         }
     }
@@ -236,8 +291,13 @@ function buildWhereFromRules(rules, source = "all") {
             AND: odooContactConditions,
             phone_e164: { not: null },
         },
+        importContactWhere: {
+            AND: importContactConditions,
+            phone_e164: { not: null },
+        },
         queryOdoo,
         queryConversations,
+        queryImports,
     };
 }
 
@@ -253,8 +313,14 @@ async function estimateRecipientCount(segmentId) {
         return 0;
     }
 
-    const { conversationWhere, odooContactWhere, queryOdoo, queryConversations } =
-        buildWhereFromRules(segment.rules_json);
+    const {
+        conversationWhere,
+        odooContactWhere,
+        importContactWhere,
+        queryOdoo,
+        queryConversations,
+        queryImports,
+    } = buildWhereFromRules(segment.rules_json);
 
     let totalCount = 0;
     const phonesSeen = new Set();
@@ -287,6 +353,19 @@ async function estimateRecipientCount(segmentId) {
         }
     }
 
+    if (queryImports) {
+        const contacts = await prisma.importedContact.findMany({
+            where: importContactWhere,
+            select: { phone_e164: true },
+        });
+        for (const c of contacts) {
+            if (c.phone_e164 && !phonesSeen.has(c.phone_e164)) {
+                phonesSeen.add(c.phone_e164);
+                totalCount++;
+            }
+        }
+    }
+
     return totalCount;
 }
 
@@ -303,8 +382,14 @@ async function getSegmentRecipients(segmentId, options = {}) {
         throw new Error("Segment not found");
     }
 
-    const { conversationWhere, odooContactWhere, queryOdoo, queryConversations } =
-        buildWhereFromRules(segment.rules_json);
+    const {
+        conversationWhere,
+        odooContactWhere,
+        importContactWhere,
+        queryOdoo,
+        queryConversations,
+        queryImports,
+    } = buildWhereFromRules(segment.rules_json);
 
     const recipients = [];
     const phonesSeen = new Set();
@@ -365,6 +450,34 @@ async function getSegmentRecipients(segmentId, options = {}) {
                     conversation_id: null,
                     odoo_contact_id: c.id,
                     partner_id: c.odoo_partner_id,
+                });
+            }
+        }
+    }
+
+    if (queryImports) {
+        const contacts = await prisma.importedContact.findMany({
+            where: importContactWhere,
+            select: {
+                id: true,
+                phone_e164: true,
+                name: true,
+            },
+            take: options.limit || 10000,
+        });
+
+        for (const c of contacts) {
+            if (c.phone_e164 && !phonesSeen.has(c.phone_e164)) {
+                phonesSeen.add(c.phone_e164);
+                const waId = c.phone_e164.replace(/^\+/, "");
+                recipients.push({
+                    wa_id: waId,
+                    phone_e164: c.phone_e164,
+                    name: c.name || null,
+                    source: "import",
+                    conversation_id: null,
+                    odoo_contact_id: null,
+                    partner_id: null,
                 });
             }
         }

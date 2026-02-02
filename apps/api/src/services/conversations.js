@@ -14,6 +14,7 @@ const CONVERSATION_SELECT = {
   verified_at: true,
   verification_method: true,
   last_message_at: true,
+  primary_tag_id: true,
   created_at: true,
   assigned_user: {
     select: {
@@ -268,6 +269,7 @@ async function addTagToConversation({ conversationId, tagName, color, userId }) 
     },
   });
 
+  await refreshPrimaryTag(conversationId);
   const updated = await prisma.conversation.findUnique({
     where: { id: conversationId },
     select: CONVERSATION_SELECT,
@@ -298,6 +300,7 @@ async function removeTagFromConversation({ conversationId, tagName, userId }) {
       tag_id: tag.id,
     },
   });
+  await refreshPrimaryTag(conversationId);
   const updated = await prisma.conversation.findUnique({
     where: { id: conversationId },
     select: CONVERSATION_SELECT,
@@ -362,6 +365,18 @@ async function updateConversationByWaId(waId, phoneNumberId, data) {
   return formatted;
 }
 
+async function refreshPrimaryTag(conversationId) {
+  const latestTag = await prisma.conversationTag.findFirst({
+    where: { conversation_id: conversationId },
+    orderBy: { created_at: "desc" },
+    select: { tag_id: true },
+  });
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { primary_tag_id: latestTag?.tag_id || null },
+  });
+}
+
 module.exports = {
   upsertConversation,
   createMessage,
@@ -374,6 +389,7 @@ module.exports = {
   getConversationById,
   updateConversationVerification,
   updateConversationByWaId,
+  refreshPrimaryTag,
   formatConversation,
   CONVERSATION_SELECT,
 };

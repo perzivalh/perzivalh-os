@@ -8,6 +8,8 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 const logger = require("../lib/logger");
 
 const audienceService = require("../services/audienceService");
+const audienceAutomationService = require("../services/audienceAutomationService");
+const audienceImportService = require("../services/audienceImportService");
 
 // All routes require authentication
 router.use(requireAuth);
@@ -30,6 +32,159 @@ router.get("/audiences", async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+/**
+ * GET /api/audiences/automation-settings
+ * Get automation settings for dynamic audiences
+ */
+router.get("/audiences/automation-settings", async (req, res) => {
+    try {
+        const phoneNumberId = req.query.phone_number_id || null;
+        const settings = await audienceAutomationService.getAutomationSettings({
+            phoneNumberId,
+        });
+        res.json({ settings });
+    } catch (error) {
+        logger.error("Failed to get automation settings", { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * POST /api/audiences/automation-settings
+ * Update automation settings
+ */
+router.post(
+    "/audiences/automation-settings",
+    requireRole(["admin", "marketing"]),
+    async (req, res) => {
+        try {
+            const userId = req.user?.id || null;
+            const settings = await audienceAutomationService.setAutomationSettings({
+                phoneNumberId: req.body.phone_number_id || null,
+                enabled: req.body.enabled,
+                userId,
+            });
+            res.json({ settings });
+        } catch (error) {
+            logger.error("Failed to update automation settings", { error: error.message });
+            res.status(400).json({ error: error.message });
+        }
+    }
+);
+
+/**
+ * GET /api/audiences/dynamic-tags
+ * List dynamic audience mappings (tags + default)
+ */
+router.get("/audiences/dynamic-tags", async (req, res) => {
+    try {
+        const phoneNumberId = req.query.phone_number_id || null;
+        const items = await audienceAutomationService.listDynamicAudiences({
+            phoneNumberId,
+        });
+        res.json({ items });
+    } catch (error) {
+        logger.error("Failed to list dynamic audiences", { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * POST /api/audiences/dynamic-tags
+ * Create a new tag and its dynamic audience
+ */
+router.post(
+    "/audiences/dynamic-tags",
+    requireRole(["admin", "marketing"]),
+    async (req, res) => {
+        try {
+            const userId = req.user?.id || null;
+            const { name, color, phone_number_id } = req.body;
+            const result = await audienceAutomationService.createTagWithAudience({
+                name,
+                color,
+                phoneNumberId: phone_number_id || null,
+                userId,
+            });
+            res.status(201).json(result);
+        } catch (error) {
+            logger.error("Failed to create dynamic tag", { error: error.message });
+            res.status(400).json({ error: error.message });
+        }
+    }
+);
+
+/**
+ * POST /api/audiences/sync-historical
+ * Sync historical contacts for dynamic audiences
+ */
+router.post(
+    "/audiences/sync-historical",
+    requireRole(["admin", "marketing"]),
+    async (req, res) => {
+        try {
+            const userId = req.user?.id || null;
+            const phoneNumberId = req.body.phone_number_id || null;
+            const result = await audienceAutomationService.syncHistorical({
+                phoneNumberId,
+                userId,
+            });
+            res.json(result);
+        } catch (error) {
+            logger.error("Failed to sync historical data", { error: error.message });
+            res.status(500).json({ error: error.message });
+        }
+    }
+);
+
+/**
+ * POST /api/audiences/import-preview
+ * Preview Excel/CSV import
+ */
+router.post(
+    "/audiences/import-preview",
+    requireRole(["admin", "marketing"]),
+    async (req, res) => {
+        try {
+            const { file_base64, filename } = req.body;
+            const preview = await audienceImportService.previewImport({
+                fileBase64: file_base64,
+                filename,
+            });
+            res.json(preview);
+        } catch (error) {
+            logger.error("Failed to preview import", { error: error.message });
+            res.status(400).json({ error: error.message });
+        }
+    }
+);
+
+/**
+ * POST /api/audiences/import-excel
+ * Import contacts from Excel/CSV
+ */
+router.post(
+    "/audiences/import-excel",
+    requireRole(["admin", "marketing"]),
+    async (req, res) => {
+        try {
+            const userId = req.user?.id || null;
+            const { file_base64, filename, mapping, options } = req.body;
+            const result = await audienceImportService.importContacts({
+                fileBase64: file_base64,
+                filename,
+                mapping,
+                options,
+                userId,
+            });
+            res.json(result);
+        } catch (error) {
+            logger.error("Failed to import contacts", { error: error.message });
+            res.status(400).json({ error: error.message });
+        }
+    }
+);
 
 /**
  * GET /api/audiences/:id

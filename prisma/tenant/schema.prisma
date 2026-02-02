@@ -108,9 +108,11 @@ model Conversation {
   verified_at      DateTime?
   verification_method VerificationMethod?
   last_message_at  DateTime?
+  primary_tag_id   String?
   created_at       DateTime            @default(now())
   messages         Message[]
   tags             ConversationTag[]
+  primary_tag      Tag?                @relation("ConversationPrimaryTag", fields: [primary_tag_id], references: [id])
   assigned_user    User?               @relation("AssignedConversations", fields: [assigned_user_id], references: [id])
   campaign_messages CampaignMessage[]
 
@@ -140,11 +142,14 @@ model Tag {
   name  String            @unique
   color String?
   tags  ConversationTag[]
+  primary_conversations Conversation[] @relation("ConversationPrimaryTag")
+  audience_tags AudienceTag[]
 }
 
 model ConversationTag {
   conversation_id String
   tag_id          String
+  created_at      DateTime     @default(now())
   conversation    Conversation @relation(fields: [conversation_id], references: [id])
   tag             Tag          @relation(fields: [tag_id], references: [id])
 
@@ -363,12 +368,58 @@ model AudienceSegment {
   estimated_count    Int      @default(0)
   is_active          Boolean  @default(true)
   created_by_user_id String?
+  last_synced_at     DateTime?
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
 
   created_by_user User? @relation("AudienceCreatedBy", fields: [created_by_user_id], references: [id])
+  audience_tags AudienceTag[]
 
   @@index([is_active])
+}
+
+model AudienceAutomationSetting {
+  id               String   @id @default(cuid())
+  phone_number_id  String?
+  enabled          Boolean  @default(false)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  @@index([phone_number_id])
+}
+
+model AudienceTag {
+  id               String   @id @default(cuid())
+  tag_id           String?
+  segment_id       String
+  phone_number_id  String?
+  is_default       Boolean  @default(false)
+  last_synced_at   DateTime?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  tag         Tag?            @relation(fields: [tag_id], references: [id])
+  segment     AudienceSegment @relation(fields: [segment_id], references: [id])
+
+  @@index([tag_id])
+  @@index([segment_id])
+  @@index([phone_number_id])
+  @@unique([tag_id, phone_number_id])
+}
+
+model ImportedContact {
+  id              String   @id @default(cuid())
+  phone_e164      String
+  name            String?
+  city            String?
+  tags_json       Json?
+  source          String   @default("excel")
+  source_ref      String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@index([phone_e164])
+  @@index([source])
 }
 
 model OdooContact {

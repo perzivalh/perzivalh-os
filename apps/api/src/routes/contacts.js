@@ -8,6 +8,7 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 const logger = require("../lib/logger");
 
 const contactImportService = require("../services/contactImportService");
+const { hasOdooConfig } = require("../services/odooClient");
 
 // All routes require authentication
 router.use(requireAuth);
@@ -42,6 +43,20 @@ router.get("/contacts/stats", async (req, res) => {
         res.json(stats);
     } catch (error) {
         logger.error("Failed to get contact stats", { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * GET /api/contacts/odoo-status
+ * Check Odoo connectivity status
+ */
+router.get("/contacts/odoo-status", async (req, res) => {
+    try {
+        const connected = await hasOdooConfig();
+        res.json({ connected });
+    } catch (error) {
+        logger.error("Failed to check Odoo status", { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });

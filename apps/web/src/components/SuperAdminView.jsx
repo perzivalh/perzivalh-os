@@ -513,26 +513,13 @@ function SuperAdminView({
 
       const wantsBranding =
         provisionForm.brand_name.trim() ||
-        provisionForm.logo_url.trim() ||
-        provisionForm.brand_primary ||
-        provisionForm.brand_accent ||
-        provisionForm.brand_bg;
+        provisionForm.logo_url.trim();
       if (wantsBranding) {
-        const colors = {};
-        if (provisionForm.brand_primary) {
-          colors.primary = provisionForm.brand_primary;
-        }
-        if (provisionForm.brand_accent) {
-          colors.accent = provisionForm.brand_accent;
-        }
-        if (provisionForm.brand_bg) {
-          colors.bg = provisionForm.brand_bg;
-        }
         await apiPatch("/api/superadmin/branding", {
           tenant_id: tenantId,
           brand_name: provisionForm.brand_name.trim(),
           logo_url: provisionForm.logo_url.trim() || null,
-          colors: Object.keys(colors).length ? colors : null,
+          colors: null,
         });
       }
 
@@ -889,82 +876,8 @@ function SuperAdminView({
                   </div>
                   <div className="sa-field">
                     <label>Paleta de colores</label>
-                    <div className="sa-color-grid">
-                      <div className="sa-color-control">
-                        <span>Primario</span>
-                        <div className="sa-color-row">
-                          <input
-                            type="color"
-                            value={provisionForm.brand_primary}
-                            onChange={(event) =>
-                              setProvisionForm({
-                                ...provisionForm,
-                                brand_primary: event.target.value,
-                              })
-                            }
-                          />
-                          <input
-                            className="sa-color-input"
-                            value={provisionForm.brand_primary}
-                            onChange={(event) =>
-                              setProvisionForm({
-                                ...provisionForm,
-                                brand_primary: event.target.value,
-                              })
-                            }
-                          />
-                        </div>
-                      </div>
-                      <div className="sa-color-control">
-                        <span>Accent</span>
-                        <div className="sa-color-row">
-                          <input
-                            type="color"
-                            value={provisionForm.brand_accent}
-                            onChange={(event) =>
-                              setProvisionForm({
-                                ...provisionForm,
-                                brand_accent: event.target.value,
-                              })
-                            }
-                          />
-                          <input
-                            className="sa-color-input"
-                            value={provisionForm.brand_accent}
-                            onChange={(event) =>
-                              setProvisionForm({
-                                ...provisionForm,
-                                brand_accent: event.target.value,
-                              })
-                            }
-                          />
-                        </div>
-                      </div>
-                      <div className="sa-color-control">
-                        <span>Fondo</span>
-                        <div className="sa-color-row">
-                          <input
-                            type="color"
-                            value={provisionForm.brand_bg}
-                            onChange={(event) =>
-                              setProvisionForm({
-                                ...provisionForm,
-                                brand_bg: event.target.value,
-                              })
-                            }
-                          />
-                          <input
-                            className="sa-color-input"
-                            value={provisionForm.brand_bg}
-                            onChange={(event) =>
-                              setProvisionForm({
-                                ...provisionForm,
-                                brand_bg: event.target.value,
-                              })
-                            }
-                          />
-                        </div>
-                      </div>
+                    <div className="sa-note">
+                      Personalización deshabilitada por ahora.
                     </div>
                   </div>
                   {!isEditRoute && (

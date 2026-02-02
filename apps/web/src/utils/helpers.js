@@ -79,27 +79,11 @@ export function applyBrandingToCss(nextBranding) {
         return;
     }
     const style = document.documentElement.style;
-    if (!nextBranding?.colors) {
-        style.removeProperty("--accent");
-        style.removeProperty("--accent-strong");
-        style.removeProperty("--accent-soft");
-        style.removeProperty("--accent-soft-2");
-        style.removeProperty("--scroll-thumb");
-        style.removeProperty("--scroll-thumb-hover");
-        return;
-    }
-    const primaryHex = nextBranding.colors?.primary || nextBranding.colors?.accent;
-    const accentHex = nextBranding.colors?.accent || primaryHex;
-    const primary = hexToRgb(primaryHex);
-    const accent = hexToRgb(accentHex);
-    if (!primary || !accent) {
-        return;
-    }
-    const accentStrong = darken(accent, 0.22);
-    style.setProperty("--accent", `#${primaryHex.replace("#", "")}`);
-    style.setProperty("--accent-strong", `#${accentHex.replace("#", "")}`);
-    style.setProperty("--accent-soft", rgba(accent, 0.18));
-    style.setProperty("--accent-soft-2", rgba(accent, 0.12));
-    style.setProperty("--scroll-thumb", rgba(accentStrong, 0.45));
-    style.setProperty("--scroll-thumb-hover", rgba(accentStrong, 0.65));
+    // Temporarily disable per-tenant color personalization (use defaults).
+    style.removeProperty("--accent");
+    style.removeProperty("--accent-strong");
+    style.removeProperty("--accent-soft");
+    style.removeProperty("--accent-soft-2");
+    style.removeProperty("--scroll-thumb");
+    style.removeProperty("--scroll-thumb-hover");
 }

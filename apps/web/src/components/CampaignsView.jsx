@@ -611,7 +611,7 @@ function CampaignsView({
                   onClick={() => setAudienceFlowOpen(false)}
                   aria-label="Volver"
                 >
-                  ?
+                  {"<"}
                 </button>
               )}
               <span className="campaigns-heading">{headerMeta.title}</span>

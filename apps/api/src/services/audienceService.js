@@ -285,7 +285,6 @@ function buildWhereFromRules(rules, source = "all") {
     return {
         conversationWhere: {
             AND: [...conversationConditions, ...tagConditions],
-            phone_e164: { not: null },
         },
         odooContactWhere: {
             AND: odooContactConditions,
@@ -293,7 +292,6 @@ function buildWhereFromRules(rules, source = "all") {
         },
         importContactWhere: {
             AND: importContactConditions,
-            phone_e164: { not: null },
         },
         queryOdoo,
         queryConversations,

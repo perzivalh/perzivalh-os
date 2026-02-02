@@ -429,7 +429,7 @@ function App() {
     }
     if (view === "campaigns") {
       void loadTemplates();
-      void loadCampaigns();
+      void loadCampaigns(1, 6);
     }
   }, [user, view]);
 
@@ -1164,9 +1164,11 @@ function App() {
     }
   }
 
-  async function loadCampaigns() {
+  async function loadCampaigns(page = 1, pageSize = 6) {
     try {
-      const data = await apiGet("/api/admin/campaigns");
+      const data = await apiGet(
+        `/api/admin/campaigns?page=${page}&page_size=${pageSize}`
+      );
       setCampaigns(data.campaigns || []);
     } catch (error) {
       setPageError(normalizeError(error));
@@ -1216,7 +1218,7 @@ function App() {
         assigned_user_id: "",
         verified_only: false,
       });
-      await loadCampaigns();
+      await loadCampaigns(1, 6);
       pushToast({ message: "Campaña creada correctamente" });
     } catch (error) {
       setPageError(normalizeError(error));
@@ -1227,7 +1229,7 @@ function App() {
   async function handleSendCampaign(campaignId) {
     try {
       await apiPost(`/api/admin/campaigns/${campaignId}/send`, {});
-      await loadCampaigns();
+      await loadCampaigns(1, 6);
     } catch (error) {
       setPageError(normalizeError(error));
     }

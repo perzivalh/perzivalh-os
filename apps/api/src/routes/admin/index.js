@@ -684,11 +684,19 @@ async function queueCampaignMessages(campaign, userId) {
 
 // GET /api/admin/campaigns
 router.get("/campaigns", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
-    const campaigns = await prisma.campaign.findMany({
-        include: { template: true },
-        orderBy: { created_at: "desc" },
-    });
-    return res.json({ campaigns });
+    const pageSize = Math.min(Math.max(Number(req.query.page_size) || 10, 5), 100);
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const offset = (page - 1) * pageSize;
+    const [campaigns, total] = await Promise.all([
+        prisma.campaign.findMany({
+            include: { template: true },
+            orderBy: { created_at: "desc" },
+            skip: offset,
+            take: pageSize,
+        }),
+        prisma.campaign.count(),
+    ]);
+    return res.json({ campaigns, total, page, page_size: pageSize });
 });
 
 // POST /api/admin/campaigns

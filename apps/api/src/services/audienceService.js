@@ -128,6 +128,10 @@ async function deleteSegment(id, userId = null) {
         data: { is_active: false },
     });
 
+    await prisma.audienceTag.deleteMany({
+        where: { segment_id: id },
+    });
+
     await prisma.auditLogTenant.create({
         data: {
             action: "audience_deleted",

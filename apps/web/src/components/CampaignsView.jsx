@@ -1,5 +1,5 @@
 ﻿import React, { useMemo, useState, useEffect, useRef } from "react";
-import { apiGet, apiPost } from "../api";
+import { apiGet, apiPost, apiDelete } from "../api";
 import { useToast } from "./ToastProvider.jsx";
 
 const STATUS_LABELS = {
@@ -115,6 +115,14 @@ function CampaignsView({
   const [templateCategory, setTemplateCategory] = useState("all");
   const [audienceSearch, setAudienceSearch] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [campaignSearch, setCampaignSearch] = useState("");
+  const [campaignStatusFilter, setCampaignStatusFilter] = useState("all");
+  const [campaignLaunchOpen, setCampaignLaunchOpen] = useState(false);
+  const [campaignScheduleMode, setCampaignScheduleMode] = useState(
+    campaignForm.scheduled_for ? "schedule" : "now"
+  );
+  const [campaignPage, setCampaignPage] = useState(1);
+  const [campaignPageSize] = useState(6);
   const { pushToast } = useToast();
   const formRef = useRef(null);
   const [audienceFlowOpen, setAudienceFlowOpen] = useState(false);
@@ -252,16 +260,21 @@ function CampaignsView({
     }
   }
 
-  async function handleSaveAutomation() {
+  async function handleSaveAutomation(nextEnabled = automationSettings.enabled) {
     try {
       const res = await apiPost("/api/audiences/automation-settings", {
-        enabled: automationSettings.enabled,
+        enabled: nextEnabled,
       });
-      setAutomationSettings(res?.settings || automationSettings);
+      setAutomationSettings(res?.settings || { ...automationSettings, enabled: nextEnabled });
       pushToast({ message: "Configuración guardada" });
     } catch (err) {
       pushToast({ type: "error", message: err.message || "No se pudo guardar" });
     }
+  }
+
+  async function handleToggleAutomation(nextEnabled) {
+    setAutomationSettings((prev) => ({ ...prev, enabled: nextEnabled }));
+    await handleSaveAutomation(nextEnabled);
   }
 
   async function handleSyncHistorical() {
@@ -269,6 +282,7 @@ function CampaignsView({
     try {
       await apiPost("/api/audiences/sync-historical", {});
       await loadDynamicAudiences();
+      await loadSegments();
       pushToast({ message: "Sincronización completa" });
     } catch (err) {
       pushToast({ type: "error", message: err.message || "Error al sincronizar" });
@@ -284,6 +298,7 @@ function CampaignsView({
       await apiPost("/api/audiences/dynamic-tags", { name });
       setNewTagName("");
       await loadDynamicAudiences();
+      await loadSegments();
       pushToast({ message: "Etiqueta creada correctamente" });
     } catch (err) {
       pushToast({ type: "error", message: err.message || "No se pudo crear etiqueta" });
@@ -432,6 +447,40 @@ function CampaignsView({
     setAudiencePage(1);
   }
 
+  async function handleRefreshAudienceCounts() {
+    try {
+      await apiPost("/api/audiences/refresh-counts", {});
+      await loadSegments();
+      if (selectedAudience) {
+        await loadAudienceContacts(selectedAudience, {
+          page: audiencePage,
+          search: audienceContactSearch,
+        });
+      }
+      pushToast({ message: "Conteos actualizados" });
+    } catch (err) {
+      pushToast({ type: "error", message: err.message || "No se pudo actualizar" });
+    }
+  }
+
+  async function handleDeleteAudience(segment) {
+    if (!segment || segment.type === "odoo" || segment.isDefault) return;
+    const confirmed = window.confirm(
+      `¿Eliminar la audiencia "${segment.name}"? Esta acción la desactiva y no borra contactos.`
+    );
+    if (!confirmed) return;
+    try {
+      await apiDelete(`/api/audiences/${segment.id}`);
+      await loadSegments();
+      if (selectedAudienceId === segment.id) {
+        setSelectedAudienceId(null);
+      }
+      pushToast({ message: "Audiencia eliminada" });
+    } catch (err) {
+      pushToast({ type: "error", message: err.message || "No se pudo eliminar" });
+    }
+  }
+
   function handleAudiencePrimaryAction() {
     if (audienceFlowTab === "dynamic") {
       handleSaveAutomation();
@@ -455,25 +504,17 @@ function CampaignsView({
       type: "odoo",
     };
 
-    // Combine custom segments with tag-based segments
-    const tagSegments = (tags || []).slice(0, 6).map((tag, index) => ({
-      id: tag.id || `tag-${tag.name}-${index}`,
-      name: tag.name,
-      subtitle: "Segmento por etiqueta",
-      count: tag.count || tag.total || 0,
-      type: "tag",
-    }));
-
     const apiSegments = customSegments.map((seg) => ({
       id: seg.id,
       name: seg.name,
       subtitle: seg.description || "Segmento personalizado",
       count: seg.estimated_count || 0,
-      type: "custom",
+      type: "segment",
+      isDefault: (seg.name || "").toUpperCase().startsWith("DEFAULT"),
     }));
 
-    return [odooSegment, ...apiSegments, ...tagSegments];
-  }, [tags, customSegments, odooStats]);
+    return [odooSegment, ...apiSegments];
+  }, [customSegments, odooStats]);
 
   const filteredSegments = useMemo(() => {
     const query = audienceSearch.trim().toLowerCase();
@@ -505,12 +546,56 @@ function CampaignsView({
     return pages;
   }, [audiencePage, audienceTotalPages]);
 
+  const campaignStatusBuckets = useMemo(() => {
+    const buckets = {
+      all: campaigns.length,
+      sent: 0,
+      scheduled: 0,
+      draft: 0,
+      failed: 0,
+    };
+    campaigns.forEach((item) => {
+      if (item.status === "sent") buckets.sent += 1;
+      if (item.status === "scheduled") buckets.scheduled += 1;
+      if (item.status === "draft") buckets.draft += 1;
+      if (item.status === "failed") buckets.failed += 1;
+    });
+    return buckets;
+  }, [campaigns]);
+
+  const filteredCampaigns = useMemo(() => {
+    const query = campaignSearch.trim().toLowerCase();
+    return campaigns.filter((campaign) => {
+      const matchesSearch = !query || (campaign.name || "").toLowerCase().includes(query);
+      const matchesStatus =
+        campaignStatusFilter === "all" || campaign.status === campaignStatusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [campaigns, campaignSearch, campaignStatusFilter]);
+
+  const campaignPages = useMemo(() => {
+    const pages = [];
+    const totalPages = Math.max(1, Math.ceil(campaigns.length / campaignPageSize));
+    const start = Math.max(1, campaignPage - 1);
+    const end = Math.min(totalPages, start + 2);
+    for (let i = start; i <= end; i += 1) {
+      pages.push(i);
+    }
+    return { pages, totalPages };
+  }, [campaigns.length, campaignPage, campaignPageSize]);
+
   useEffect(() => {
     if (activeTab !== "audiences") return;
     if (!selectedAudienceId && segments.length) {
       setSelectedAudienceId(segments[0].id);
     }
   }, [segments, activeTab, selectedAudienceId]);
+
+  useEffect(() => {
+    if (activeTab !== "new" && campaignLaunchOpen) {
+      setCampaignLaunchOpen(false);
+    }
+  }, [activeTab, campaignLaunchOpen]);
 
   useEffect(() => {
     if (activeTab !== "audiences") return;
@@ -593,10 +678,18 @@ function CampaignsView({
 
   const activeTabMeta =
     CAMPAIGN_TABS.find((tab) => tab.id === activeTab) || CAMPAIGN_TABS[1];
+  const campaignLaunchMeta = {
+    title: "PERZIVALH Campañas",
+    subtitle: "CONFIGURACIÓN DE NUEVO ENVÍO MASIVO",
+  };
   const activeAudienceMeta =
     AUDIENCE_FLOW_TABS.find((tab) => tab.id === audienceFlowTab) ||
     AUDIENCE_FLOW_TABS[0];
-  const headerMeta = audienceFlowOpen ? activeAudienceMeta : activeTabMeta;
+  const headerMeta = audienceFlowOpen
+    ? activeAudienceMeta
+    : activeTab === "new" && campaignLaunchOpen
+      ? campaignLaunchMeta
+      : activeTabMeta;
 
   return (
     <section className="campaigns-page">
@@ -670,13 +763,34 @@ function CampaignsView({
               </button>
             )}
             {!audienceFlowOpen && activeTab === "new" && (
-              <button
-                className="campaigns-primary"
-                type="button"
-                onClick={() => formRef.current?.requestSubmit?.()}
-              >
-                + Lanzar Campaña
-              </button>
+              <>
+                {campaignLaunchOpen ? (
+                  <>
+                    <button
+                      className="campaigns-ghost"
+                      type="button"
+                      onClick={() => setCampaignLaunchOpen(false)}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      className="campaigns-primary"
+                      type="button"
+                      onClick={() => formRef.current?.requestSubmit?.()}
+                    >
+                      Lanzar Campaña
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="campaigns-primary"
+                    type="button"
+                    onClick={() => setCampaignLaunchOpen(true)}
+                  >
+                    + Lanzar Campaña
+                  </button>
+                )}
+              </>
             )}
           </div>
         </header>
@@ -740,12 +854,7 @@ function CampaignsView({
                         <input
                           type="checkbox"
                           checked={automationSettings.enabled}
-                          onChange={(event) =>
-                            setAutomationSettings((prev) => ({
-                              ...prev,
-                              enabled: event.target.checked,
-                            }))
-                          }
+                          onChange={(event) => handleToggleAutomation(event.target.checked)}
                           disabled={loadingAutomation}
                         />
                         <span>{automationSettings.enabled ? "ACTIVO" : "INACTIVO"}</span>
@@ -1183,7 +1292,24 @@ function CampaignsView({
                       >
                         <div className="audience-title">
                           <span>{segment.name}</span>
-                          <span className="audience-count">{segment.count}</span>
+                          <div className="audience-title-actions">
+                            <span className="audience-count">
+                              {segment.count?.toLocaleString("es-PE") || 0}
+                            </span>
+                            {!segment.isDefault && segment.type !== "odoo" && (
+                              <button
+                                className="audience-menu"
+                                type="button"
+                                aria-label="Eliminar audiencia"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleDeleteAudience(segment);
+                                }}
+                              >
+                                ...
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <div className="audience-subtitle">{segment.subtitle}</div>
                       </button>
@@ -1225,12 +1351,7 @@ function CampaignsView({
                         className="audiences-icon-btn"
                         type="button"
                         aria-label="Actualizar"
-                        onClick={() =>
-                          loadAudienceContacts(selectedAudience, {
-                            page: audiencePage,
-                            search: audienceContactSearch,
-                          })
-                        }
+                        onClick={handleRefreshAudienceCounts}
                       >
                         R
                       </button>
@@ -1363,178 +1484,340 @@ function CampaignsView({
           )}
 
           {activeTab === "new" && (
-            <section className="campaigns-panel campaign-form-panel">
-              <form
-                className="campaigns-form"
-                ref={formRef}
-                onSubmit={onCreateCampaign}
-              >
-                <label className="campaigns-field">
-                  <span>Nombre de Campaña</span>
-                  <input
-                    type="text"
-                    placeholder="Ej: Promo Onicomicosis Mar"
-                    value={campaignForm.name}
-                    onChange={(event) =>
-                      setCampaignForm((prev) => ({
-                        ...prev,
-                        name: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label className="campaigns-field">
-                  <span>Seleccionar audiencia</span>
-                  <select
-                    value={audienceValue}
-                    onChange={(event) => handleAudienceChange(event.target.value)}
-                  >
-                    <option value="">Selecciona un segmento...</option>
-                    {segments
-                      .filter((segment) => segment.type !== "odoo")
-                      .map((segment) => (
-                        <option value={`tag:${segment.name}`} key={`seg-${segment.id}`}>
-                          {segment.name}
-                        </option>
-                      ))}
-                    <option value="verified">Solo verificados</option>
-                    <option value="assigned:unassigned">Sin asignar</option>
-                    {statusOptions.map((status) => (
-                      <option value={`status:${status}`} key={`status-${status}`}>
-                        Status: {status}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="campaigns-field">
-                  <span>Plantilla Meta</span>
-                  <select
-                    value={campaignForm.template_id}
-                    onChange={(event) =>
-                      setCampaignForm((prev) => ({
-                        ...prev,
-                        template_id: event.target.value,
-                      }))
-                    }
-                  >
-                    <option value="">Selecciona plantilla...</option>
-                    {templates.map((template) => (
-                      <option value={template.id} key={template.id}>
-                        {template.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="campaigns-field">
-                  <span>Programacion</span>
-                  <input
-                    type="datetime-local"
-                    value={campaignForm.scheduled_for}
-                    onChange={(event) =>
-                      setCampaignForm((prev) => ({
-                        ...prev,
-                        scheduled_for: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-
-                <button
-                  className="campaigns-advanced-toggle"
-                  type="button"
-                  onClick={() => setShowAdvanced((prev) => !prev)}
-                >
-                  {showAdvanced ? "Ocultar filtros avanzados" : "Filtros avanzados"}
-                </button>
-
-                {showAdvanced && (
-                  <div className="campaigns-advanced">
-                    <label className="campaigns-field">
-                      <span>Status filtro</span>
-                      <select
-                        value={campaignFilter.status}
-                        onChange={(event) =>
-                          setCampaignFilter((prev) => ({
-                            ...prev,
-                            status: event.target.value,
-                          }))
-                        }
-                      >
-                        <option value="">Todos</option>
-                        {statusOptions.map((status) => (
-                          <option value={status} key={status}>
-                            {status}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="campaigns-field">
-                      <span>Asignado</span>
-                      <select
-                        value={campaignFilter.assigned_user_id}
-                        onChange={(event) =>
-                          setCampaignFilter((prev) => ({
-                            ...prev,
-                            assigned_user_id: event.target.value,
-                          }))
-                        }
-                      >
-                        <option value="">Todos</option>
-                        <option value="unassigned">Sin asignar</option>
-                        {users.map((item) => (
-                          <option value={item.id} key={item.id}>
-                            {item.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="campaigns-field">
-                      <span>Tag</span>
-                      <select
-                        value={campaignFilter.tag}
-                        onChange={(event) =>
-                          setCampaignFilter((prev) => ({
-                            ...prev,
-                            tag: event.target.value,
-                          }))
-                        }
-                      >
-                        <option value="">Todos</option>
-                        {tags.map((tag) => (
-                          <option value={tag.name} key={tag.id}>
-                            {tag.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="campaigns-toggle">
+            <section className="campaigns-panel campaigns-module">
+              {!campaignLaunchOpen ? (
+                <div className="campaigns-dashboard">
+                  <aside className="campaigns-sidebar">
+                    <label className="campaigns-search">
+                      <span className="template-search-icon" aria-hidden="true" />
                       <input
-                        type="checkbox"
-                        checked={campaignFilter.verified_only}
-                        onChange={(event) =>
-                          setCampaignFilter((prev) => ({
-                            ...prev,
-                            verified_only: event.target.checked,
-                          }))
-                        }
+                        type="text"
+                        placeholder="Buscar campaña..."
+                        value={campaignSearch}
+                        onChange={(event) => setCampaignSearch(event.target.value)}
                       />
-                      Solo verificados
                     </label>
+                    <div className="campaigns-filters-list">
+                      <button
+                        className={`campaigns-filter-item ${
+                          campaignStatusFilter === "all" ? "active" : ""
+                        }`}
+                        type="button"
+                        onClick={() => setCampaignStatusFilter("all")}
+                      >
+                        <span>Todas las Campañas</span>
+                        <span className="campaigns-filter-count">
+                          {campaignStatusBuckets.all}
+                        </span>
+                      </button>
+                      <button
+                        className={`campaigns-filter-item ${
+                          campaignStatusFilter === "sent" ? "active" : ""
+                        }`}
+                        type="button"
+                        onClick={() => setCampaignStatusFilter("sent")}
+                      >
+                        <span>Enviadas</span>
+                        <span className="campaigns-filter-count">
+                          {campaignStatusBuckets.sent}
+                        </span>
+                      </button>
+                      <button
+                        className={`campaigns-filter-item ${
+                          campaignStatusFilter === "scheduled" ? "active" : ""
+                        }`}
+                        type="button"
+                        onClick={() => setCampaignStatusFilter("scheduled")}
+                      >
+                        <span>Programadas</span>
+                        <span className="campaigns-filter-count">
+                          {campaignStatusBuckets.scheduled}
+                        </span>
+                      </button>
+                      <button
+                        className={`campaigns-filter-item ${
+                          campaignStatusFilter === "draft" ? "active" : ""
+                        }`}
+                        type="button"
+                        onClick={() => setCampaignStatusFilter("draft")}
+                      >
+                        <span>Borradores</span>
+                        <span className="campaigns-filter-count">
+                          {campaignStatusBuckets.draft}
+                        </span>
+                      </button>
+                      <button
+                        className={`campaigns-filter-item ${
+                          campaignStatusFilter === "failed" ? "active" : ""
+                        }`}
+                        type="button"
+                        onClick={() => setCampaignStatusFilter("failed")}
+                      >
+                        <span>Fallidas</span>
+                        <span className="campaigns-filter-count">
+                          {campaignStatusBuckets.failed}
+                        </span>
+                      </button>
+                    </div>
+                    <div className="campaigns-quota">
+                      <div className="campaigns-quota-title">Cuota de mensajes</div>
+                      <div className="campaigns-quota-bar">
+                        <div className="campaigns-quota-fill" style={{ width: "65%" }} />
+                      </div>
+                      <div className="campaigns-quota-meta">65% usado</div>
+                    </div>
+                  </aside>
+                  <div className="campaigns-table-panel">
+                    <div className="campaigns-table-filters">
+                      <div className="campaigns-filter-chip">Canal: WhatsApp Business</div>
+                      <div className="campaigns-filter-chip">Periodo: Últimos 30 días</div>
+                      <div className="campaigns-table-actions">
+                        <button className="audiences-icon-btn" type="button">
+                          D
+                        </button>
+                        <button className="audiences-icon-btn" type="button" onClick={onLoadCampaigns}>
+                          R
+                        </button>
+                      </div>
+                    </div>
+                      <div className="campaigns-table">
+                        <div className="campaigns-table-head">
+                          <span>Campaña</span>
+                          <span>Fecha</span>
+                          <span>Audiencia</span>
+                        <span>Enviados</span>
+                        <span>Leídos</span>
+                        <span>Respuestas</span>
+                        <span>Estado</span>
+                        <span />
+                      </div>
+                      {filteredCampaigns.map((campaign) => {
+                        const sent = campaign.messages_count || campaign.audience_count || "--";
+                        const reads = campaign.read_count || "--";
+                        const replies = campaign.reply_count || "--";
+                        const statusLabel = STATUS_LABELS[campaign.status] || campaign.status;
+                        return (
+                          <div className="campaigns-table-row" key={campaign.id}>
+                            <div className="campaigns-table-title">
+                              <div className="campaigns-table-name">{campaign.name}</div>
+                              <div className="campaigns-table-ref">
+                                Ref: {campaign.id.slice(0, 10)}
+                              </div>
+                            </div>
+                            <div className="campaigns-table-date">
+                              {formatDate(campaign.created_at)}
+                            </div>
+                            <div className="campaigns-table-tags">
+                              <span className="campaigns-pill">
+                                {campaign.audience_label || "Base General"}
+                              </span>
+                            </div>
+                            <div className="campaigns-metric">{sent}</div>
+                            <div className="campaigns-metric">{reads}</div>
+                            <div className="campaigns-metric">{replies}</div>
+                            <div className={`campaigns-status ${campaign.status}`}>
+                              {statusLabel}
+                            </div>
+                            <button className="campaigns-row-action" type="button">
+                              ...
+                            </button>
+                          </div>
+                        );
+                      })}
+                      {!filteredCampaigns.length && (
+                        <div className="empty-state">Sin campañas registradas</div>
+                      )}
+                    </div>
+                    <div className="campaigns-table-footer">
+                      <span>
+                        Mostrando {filteredCampaigns.length} de {campaigns.length} campañas
+                      </span>
+                      <div className="audiences-page-actions">
+                        <button
+                          className="audiences-page-btn"
+                          type="button"
+                          disabled={campaignPage <= 1}
+                          onClick={() => {
+                            const next = Math.max(1, campaignPage - 1);
+                            setCampaignPage(next);
+                            onLoadCampaigns(next, campaignPageSize);
+                          }}
+                        >
+                          {"<"}
+                        </button>
+                        {campaignPages.pages.map((page) => (
+                          <button
+                            key={`camp-page-${page}`}
+                            className={`audiences-page-btn ${
+                              page === campaignPage ? "active" : ""
+                            }`}
+                            type="button"
+                            onClick={() => {
+                              setCampaignPage(page);
+                              onLoadCampaigns(page, campaignPageSize);
+                            }}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                        <button
+                          className="audiences-page-btn"
+                          type="button"
+                          disabled={campaignPage >= campaignPages.totalPages}
+                          onClick={() => {
+                            const next = Math.min(campaignPages.totalPages, campaignPage + 1);
+                            setCampaignPage(next);
+                            onLoadCampaigns(next, campaignPageSize);
+                          }}
+                        >
+                          {">"}
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                )}
-
-                <button className="campaigns-launch" type="submit">
-                  Lanzar Campaña
-                </button>
-                <div className="campaigns-hint">
-                  Se enviaran aproximadamente{" "}
-                  <strong>{selectedSegment?.count || 0}</strong> mensajes HSM
                 </div>
-                <div className="campaigns-preview-box">
-                  {selectedTemplate?.body_preview ||
-                    "Selecciona una plantilla para ver preview"}
+              ) : (
+                <div className="campaigns-launch">
+                  <form
+                    className="campaigns-launch-form"
+                    ref={formRef}
+                    onSubmit={onCreateCampaign}
+                  >
+                    <div className="launch-step">
+                      <span className="launch-step-number">1</span>
+                      <div>
+                        <div className="launch-step-title">Nombre de la Campaña</div>
+                        <input
+                          type="text"
+                          placeholder="Ej: Promoción Black Friday 2024"
+                          value={campaignForm.name}
+                          onChange={(event) =>
+                            setCampaignForm((prev) => ({
+                              ...prev,
+                              name: event.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                    </div>
+                    <div className="launch-step">
+                      <span className="launch-step-number">2</span>
+                      <div>
+                        <div className="launch-step-title">Seleccionar Audiencia</div>
+                        <select
+                          value={audienceValue}
+                          onChange={(event) => handleAudienceChange(event.target.value)}
+                        >
+                          <option value="">Selecciona un segmento...</option>
+                          {segments
+                            .filter((segment) => segment.type !== "odoo")
+                            .map((segment) => (
+                              <option value={`tag:${segment.name}`} key={`seg-${segment.id}`}>
+                                {segment.name}
+                              </option>
+                            ))}
+                          <option value="verified">Solo verificados</option>
+                          <option value="assigned:unassigned">Sin asignar</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="launch-step">
+                      <span className="launch-step-number">3</span>
+                      <div>
+                        <div className="launch-step-title">Elegir Plantilla de Meta</div>
+                        <div className="launch-templates">
+                          {templates.map((template) => {
+                            const statusKey = template.status || "APPROVED";
+                            const statusMeta =
+                              TEMPLATE_STATUS[statusKey] || TEMPLATE_STATUS.APPROVED;
+                            const selected = campaignForm.template_id === template.id;
+                            return (
+                              <button
+                                className={`launch-template ${selected ? "selected" : ""}`}
+                                type="button"
+                                key={template.id}
+                                onClick={() => handleTemplateSelect(template.id)}
+                              >
+                                <div className="launch-template-title">{template.name}</div>
+                                <div className="launch-template-preview">
+                                  {template.body_preview || template.body_text || "Sin preview"}
+                                </div>
+                                <span className={`launch-template-status ${statusMeta.className}`}>
+                                  {statusMeta.label}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="launch-step">
+                      <span className="launch-step-number">4</span>
+                      <div>
+                        <div className="launch-step-title">Programación</div>
+                        <div className="launch-schedule">
+                          <button
+                            className={`launch-schedule-option ${
+                              campaignScheduleMode === "now" ? "active" : ""
+                            }`}
+                            type="button"
+                            onClick={() => {
+                              setCampaignScheduleMode("now");
+                              setCampaignForm((prev) => ({ ...prev, scheduled_for: "" }));
+                            }}
+                          >
+                            Enviar Ahora
+                          </button>
+                          <button
+                            className={`launch-schedule-option ${
+                              campaignScheduleMode === "schedule" ? "active" : ""
+                            }`}
+                            type="button"
+                            onClick={() => setCampaignScheduleMode("schedule")}
+                          >
+                            Programar Envío
+                          </button>
+                        </div>
+                        {campaignScheduleMode === "schedule" && (
+                          <input
+                            type="datetime-local"
+                            value={campaignForm.scheduled_for}
+                            onChange={(event) =>
+                              setCampaignForm((prev) => ({
+                                ...prev,
+                                scheduled_for: event.target.value,
+                              }))
+                            }
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </form>
+                  <aside className="campaigns-launch-preview">
+                    <div className="preview-title">Vista previa en tiempo real</div>
+                    <div className="preview-phone">
+                      <div className="preview-phone-body">
+                        <div className="preview-bubble">
+                          {selectedTemplate?.body_preview ||
+                            selectedTemplate?.body_text ||
+                            "Selecciona una plantilla para ver el contenido."}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="preview-summary">
+                      <div className="preview-summary-title">Resumen</div>
+                      <div className="preview-summary-row">
+                        <span>Destinatarios</span>
+                        <strong>{selectedSegment?.count || 0}</strong>
+                      </div>
+                      <div className="preview-summary-row">
+                        <span>Plantilla</span>
+                        <strong>{selectedTemplate?.name || "Sin plantilla"}</strong>
+                      </div>
+                    </div>
+                  </aside>
                 </div>
-              </form>
+              )}
             </section>
           )}
 

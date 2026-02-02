@@ -490,12 +490,24 @@ function App() {
     }
     const socket = connectSocket(token);
     const pendingSoundRef = { current: null };
+    const SOUND_SOURCES = [
+      "/sounds/new-notification-09-352705.wav",
+      "/sounds/new-notification-09-352705.mp3",
+    ];
     const ensurePendingAudio = () => {
       if (pendingSoundRef.current) {
         return pendingSoundRef.current;
       }
-      const audio = new Audio("/sounds/notify.wav");
+      const audio = new Audio(SOUND_SOURCES[0]);
       audio.volume = 1;
+      let sourceIndex = 0;
+      audio.addEventListener("error", () => {
+        sourceIndex += 1;
+        if (sourceIndex < SOUND_SOURCES.length) {
+          audio.src = SOUND_SOURCES[sourceIndex];
+          audio.load();
+        }
+      });
       pendingSoundRef.current = audio;
       return audio;
     };

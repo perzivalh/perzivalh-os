@@ -489,11 +489,33 @@ function App() {
       return;
     }
     const socket = connectSocket(token);
+    const pendingSoundRef = { current: null };
+    const ensurePendingAudio = () => {
+      if (pendingSoundRef.current) {
+        return pendingSoundRef.current;
+      }
+      const audio = new Audio("/sounds/notify.wav");
+      audio.volume = 1;
+      pendingSoundRef.current = audio;
+      return audio;
+    };
+    const unlockAudio = () => {
+      const audio = ensurePendingAudio();
+      audio.play().then(() => {
+        audio.pause();
+        audio.currentTime = 0;
+      }).catch(() => {
+        // ignore autoplay errors
+      });
+    };
+    window.addEventListener("click", unlockAudio, { once: true });
+    window.addEventListener("touchstart", unlockAudio, { once: true });
+
     const playPendingSound = () => {
       if (typeof window === "undefined") return;
       try {
-        const audio = new Audio("/sounds/notify.mp3");
-        audio.volume = 1;
+        const audio = ensurePendingAudio();
+        audio.currentTime = 0;
         audio.play().catch(() => {
           // ignore autoplay errors
         });

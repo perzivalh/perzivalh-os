@@ -96,7 +96,7 @@ async function setConversationToPending(waId) {
   });
   await addTagToConversation({
     conversationId: conversation.id,
-    tagName: "pendiente_atencion",
+    tagName: "pendiente",
   });
 }
 
@@ -217,6 +217,12 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
     return;
   }
 
+  const lineId = getCurrentLineId();
+  await sessionStore.updateSession(waId, lineId, {
+    data: { flow_id: flow.id, last_user_at: new Date().toISOString() },
+    flow_id: flow.id,
+  });
+
   if (Array.isArray(flow.nodes)) {
     const nodeMap = buildNodeMap(flow);
     const startNodeId = getStartNodeId(flow);
@@ -230,7 +236,7 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
       return;
     }
 
-    const session = await sessionStore.getSession(waId, getCurrentLineId());
+    const session = await sessionStore.getSession(waId, lineId);
     const sessionFlowId = session.data?.flow_id;
     const currentNodeId =
       sessionFlowId === flow.id && nodeMap.has(session.state)
@@ -264,9 +270,15 @@ async function executeDynamicInteractive(waId, selectionId, flowData, context = 
     return;
   }
 
+  const lineId = getCurrentLineId();
+  await sessionStore.updateSession(waId, lineId, {
+    data: { flow_id: flow.id, last_user_at: new Date().toISOString() },
+    flow_id: flow.id,
+  });
+
   if (Array.isArray(flow.nodes)) {
     const nodeMap = buildNodeMap(flow);
-    const session = await sessionStore.getSession(waId, getCurrentLineId());
+    const session = await sessionStore.getSession(waId, lineId);
     const sessionFlowId = session.data?.flow_id;
     const currentNode =
       sessionFlowId === flow.id ? nodeMap.get(session.state) : null;

@@ -39,7 +39,9 @@ async function handleSession(session, now, flow, closingText) {
     return;
   }
   const updatedAt = Date.parse(session.updatedAt || "") || 0;
-  if (!updatedAt) {
+  const lastUserAt =
+    Date.parse(session.data?.last_user_at || "") || updatedAt || 0;
+  if (!lastUserAt) {
     return;
   }
 
@@ -47,7 +49,7 @@ async function handleSession(session, now, flow, closingText) {
     ? Date.parse(session.inactivity_notice_at)
     : 0;
 
-  if (noticeAt && updatedAt > noticeAt) {
+  if (noticeAt && lastUserAt > noticeAt) {
     await sessionStore.updateSession(session.wa_id, session.phone_number_id, {
       inactivity_notice_at: null,
       next_due_at: new Date(now + FIRST_NOTICE_MS),
@@ -63,7 +65,7 @@ async function handleSession(session, now, flow, closingText) {
     return;
   }
 
-  if (now - updatedAt >= FIRST_NOTICE_MS) {
+  if (now - lastUserAt >= FIRST_NOTICE_MS) {
     await sendWithTenantContext(session, REMINDER_TEXT);
     await sessionStore.updateSession(session.wa_id, session.phone_number_id, {
       inactivity_notice_at: new Date(now).toISOString(),

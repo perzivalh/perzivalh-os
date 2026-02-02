@@ -31,6 +31,7 @@
   gap: 0.6rem;
   font-size: 1.6rem;
   font-weight: 700;
+  color: var(--ink);
 }
 
 .campaigns-brand {
@@ -61,6 +62,7 @@
 .campaigns-ghost {
   border: 1px solid var(--border);
   background: var(--panel);
+  color: var(--ink);
   border-radius: 12px;
   padding: 0.6rem 1rem;
   font-weight: 600;
@@ -141,6 +143,7 @@
   align-items: center;
   justify-content: space-between;
   font-weight: 600;
+  color: var(--ink);
 }
 
 .audience-count {
@@ -230,6 +233,7 @@
 .template-name {
   font-weight: 600;
   font-size: 0.95rem;
+  color: var(--ink);
 }
 
 .template-status {
@@ -348,6 +352,58 @@
   padding: 1.2rem;
 }
 
+@media (max-width: 1200px) {
+  .campaigns-layout {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+  .campaigns-create {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 980px) {
+  .campaigns-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .campaigns-actions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .campaigns-layout {
+    grid-template-columns: 1fr;
+  }
+  .template-grid {
+    grid-template-columns: 1fr;
+  }
+  .campaigns-history {
+    overflow-x: auto;
+  }
+  .history-head,
+  .history-row {
+    grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1.2fr;
+    min-width: 680px;
+  }
+}
+
+@media (max-width: 720px) {
+  .campaigns-title-row {
+    font-size: 1.3rem;
+  }
+  .campaigns-layout {
+    gap: 1rem;
+  }
+  .campaigns-audiences,
+  .campaigns-templates,
+  .campaigns-create {
+    padding: 1rem;
+  }
+  .campaigns-section-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 .campaigns-history-header {
   display: flex;
   justify-content: space-between;
@@ -404,6 +460,7 @@
 
 .history-name {
   font-weight: 600;
+  color: var(--ink);
 }
 
 .history-date {
@@ -418,7 +475,7 @@
 
 .history-value {
   font-weight: 700;
-  color: var(--accent);
+  color: var(--ink);
 }
 
 .history-label {

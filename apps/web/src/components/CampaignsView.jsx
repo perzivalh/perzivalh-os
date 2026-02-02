@@ -1331,7 +1331,7 @@ function CampaignsView({
                         disabled={audiencePage <= 1}
                         onClick={() => setAudiencePage((page) => Math.max(1, page - 1))}
                       >
-                        <
+                        {"<"}
                       </button>
                       {audiencePages.map((page) => (
                         <button
@@ -1353,7 +1353,7 @@ function CampaignsView({
                           setAudiencePage((page) => Math.min(audienceTotalPages, page + 1))
                         }
                       >
-                        >
+                        {">"}
                       </button>
                     </div>
                   </div>

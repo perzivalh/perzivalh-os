@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+﻿import React, { useMemo, useState, useEffect, useRef } from "react";
 import { apiGet, apiPost } from "../api";
 import { useToast } from "./ToastProvider.jsx";
 
@@ -29,8 +29,8 @@ const CAMPAIGN_TABS = [
   {
     id: "audiences",
     label: "Audiencias",
-    title: "Audiencias",
-    subtitle: "Gestiona, segmenta y organiza tus listas de contactos.",
+    title: "PERZIVALH Audiencias",
+    subtitle: "MÓDULO DE GESTIÓN Y CAMPAÑAS",
   },
   {
     id: "templates",
@@ -40,15 +40,9 @@ const CAMPAIGN_TABS = [
   },
   {
     id: "new",
-    label: "Nueva Campaña",
-    title: "Nueva Campaña",
-    subtitle: "Configura y programa Envíos masivos en minutos.",
-  },
-  {
-    id: "history",
-    label: "Historial de Envíos",
-    title: "Historial de Envíos",
-    subtitle: "Revisa el desempeño y estado de tus Campañas recientes.",
+    label: "Campañas",
+    title: "Gestión de Campañas",
+    subtitle: "Historial de envíos y difusión WhatsApp",
   },
 ];
 
@@ -62,8 +56,8 @@ const TAB_ALIASES = {
   campaign: "new",
   campaigns: "new",
   nueva_campana: "new",
-  history: "history",
-  historial: "history",
+  history: "new",
+  historial: "new",
 };
 
 const AUDIENCE_FLOW_TABS = [
@@ -162,13 +156,19 @@ function CampaignsView({
     return TAB_ALIASES[raw] || raw;
   });
 
-  // Modal states
-  const [showContactsModal, setShowContactsModal] = useState(false);
-
-  // Contacts list state
-  const [contacts, setContacts] = useState([]);
-  const [loadingContacts, setLoadingContacts] = useState(false);
   const [odooStats, setOdooStats] = useState(null);
+  const [selectedAudienceId, setSelectedAudienceId] = useState(null);
+  const [audienceContacts, setAudienceContacts] = useState([]);
+  const [audienceContactsTotal, setAudienceContactsTotal] = useState(0);
+  const [audienceContactsLoading, setAudienceContactsLoading] = useState(false);
+  const [audienceContactSearch, setAudienceContactSearch] = useState("");
+  const [audiencePage, setAudiencePage] = useState(1);
+  const [audiencePageSize] = useState(10);
+  const [audienceFilters, setAudienceFilters] = useState({
+    tag: "Todas",
+    date: "Cualquier fecha",
+    status: "Activos",
+  });
 
   // Custom segments from API
   const [customSegments, setCustomSegments] = useState([]);
@@ -381,21 +381,55 @@ function CampaignsView({
     }
   }
 
-  async function loadContacts() {
-    setLoadingContacts(true);
+  async function loadAudienceContacts(segment, options = {}) {
+    if (!segment) {
+      setAudienceContacts([]);
+      setAudienceContactsTotal(0);
+      return;
+    }
+    const page = options.page || 1;
+    const search = options.search || "";
+    setAudienceContactsLoading(true);
     try {
-      const res = await apiGet("/api/contacts");
-      setContacts(res?.contacts || []);
+      if (segment.type === "odoo") {
+        const offset = (page - 1) * audiencePageSize;
+        const res = await apiGet(
+          `/api/contacts?search=${encodeURIComponent(search)}&offset=${offset}&limit=${audiencePageSize}`
+        );
+        setAudienceContacts(res?.contacts || []);
+        setAudienceContactsTotal(res?.total || 0);
+        return;
+      }
+
+      const preview = await apiGet(
+        `/api/audiences/${segment.id}/preview?limit=200`
+      );
+      const recipients = preview?.recipients || [];
+      const query = search.trim().toLowerCase();
+      const filtered = !query
+        ? recipients
+        : recipients.filter((recipient) => {
+            const name = recipient.name?.toLowerCase() || "";
+            const phone = recipient.phone_e164?.toLowerCase() || "";
+            return name.includes(query) || phone.includes(query);
+          });
+      const total = preview?.total || filtered.length;
+      const start = (page - 1) * audiencePageSize;
+      const paged = filtered.slice(start, start + audiencePageSize);
+      setAudienceContacts(paged);
+      setAudienceContactsTotal(total);
     } catch (err) {
-      console.error("Failed to load contacts", err);
+      console.error("Failed to load audience contacts", err);
+      setAudienceContacts([]);
+      setAudienceContactsTotal(0);
     } finally {
-      setLoadingContacts(false);
+      setAudienceContactsLoading(false);
     }
   }
 
-  function openContactsModal() {
-    setShowContactsModal(true);
-    loadContacts();
+  function handleSelectAudience(segment) {
+    setSelectedAudienceId(segment?.id || null);
+    setAudiencePage(1);
   }
 
   function handleAudiencePrimaryAction() {
@@ -452,6 +486,39 @@ function CampaignsView({
       return name.includes(query) || subtitle.includes(query);
     });
   }, [segments, audienceSearch]);
+
+  const selectedAudience = useMemo(() => {
+    return segments.find((segment) => segment.id === selectedAudienceId);
+  }, [segments, selectedAudienceId]);
+
+  const audienceTotalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(audienceContactsTotal / audiencePageSize));
+  }, [audienceContactsTotal, audiencePageSize]);
+
+  const audiencePages = useMemo(() => {
+    const pages = [];
+    const start = Math.max(1, audiencePage - 1);
+    const end = Math.min(audienceTotalPages, start + 2);
+    for (let i = start; i <= end; i += 1) {
+      pages.push(i);
+    }
+    return pages;
+  }, [audiencePage, audienceTotalPages]);
+
+  useEffect(() => {
+    if (activeTab !== "audiences") return;
+    if (!selectedAudienceId && segments.length) {
+      setSelectedAudienceId(segments[0].id);
+    }
+  }, [segments, activeTab, selectedAudienceId]);
+
+  useEffect(() => {
+    if (activeTab !== "audiences") return;
+    loadAudienceContacts(selectedAudience, {
+      page: audiencePage,
+      search: audienceContactSearch,
+    });
+  }, [selectedAudienceId, audiencePage, audienceContactSearch, activeTab, selectedAudience]);
 
   const templateCategories = useMemo(() => {
     const unique = new Set();
@@ -587,28 +654,20 @@ function CampaignsView({
               </>
             )}
             {!audienceFlowOpen && activeTab === "audiences" && (
-              <>
-                <button
-                  className="campaigns-ghost"
-                  type="button"
-                  onClick={() => {
-                    setAudienceFlowOpen(true);
-                    setAudienceFlowTab("excel");
-                  }}
-                >
-                  Importar Contactos
-                </button>
-                <button
-                  className="campaigns-primary"
-                  type="button"
-                  onClick={() => {
-                    setAudienceFlowOpen(true);
-                    setAudienceFlowTab("dynamic");
-                  }}
-                >
-                  + Nueva Audiencia
-                </button>
-              </>
+              <button
+                className="campaigns-primary campaigns-primary--dropdown"
+                type="button"
+                onClick={() => {
+                  setAudienceFlowOpen(true);
+                  setAudienceFlowTab("dynamic");
+                }}
+              >
+                <span className="campaigns-primary-icon">+</span>
+                Nueva Audiencia
+                <span className="campaigns-primary-chevron" aria-hidden="true">
+                  v
+                </span>
+              </button>
             )}
             {!audienceFlowOpen && activeTab === "new" && (
               <button
@@ -1118,18 +1177,9 @@ function CampaignsView({
                         key={segment.id}
                         type="button"
                         className={`audience-card ${
-                          campaignFilter.tag === segment.name ? "active" : ""
+                          selectedAudienceId === segment.id ? "active" : ""
                         }`}
-                        onClick={() => {
-                          if (segment.type === "odoo") {
-                            openContactsModal();
-                            return;
-                          }
-                          setCampaignFilter((prev) => ({
-                            ...prev,
-                            tag: segment.name,
-                          }));
-                        }}
+                        onClick={() => handleSelectAudience(segment)}
                       >
                         <div className="audience-title">
                           <span>{segment.name}</span>
@@ -1143,44 +1193,170 @@ function CampaignsView({
                     )}
                   </div>
                 </div>
-                <div className="audiences-detail">
-                  <div className="audiences-detail-header">
-                    <div>
-                      <div className="audiences-detail-title">Detalle de audiencia</div>
-                      <div className="audiences-detail-subtitle">
-                        {selectedSegment
-                          ? "Resumen y acciones rápidas"
-                          : "Selecciona una audiencia"}
-                      </div>
+                <div className="audiences-table-panel">
+                  <div className="audiences-filters">
+                    <div className="audiences-filter">
+                      <span>ETIQUETA:</span>
+                      <button className="audiences-filter-chip" type="button">
+                        {audienceFilters.tag}
+                      </button>
                     </div>
-                    <button
-                      className="campaigns-ghost"
-                      type="button"
-                      onClick={openContactsModal}
-                    >
-                      Ver contactos
-                    </button>
+                    <div className="audiences-filter">
+                      <span>FECHA:</span>
+                      <button className="audiences-filter-chip" type="button">
+                        {audienceFilters.date}
+                      </button>
+                    </div>
+                    <div className="audiences-filter">
+                      <span>ESTADO:</span>
+                      <button className="audiences-filter-chip" type="button">
+                        {audienceFilters.status}
+                      </button>
+                    </div>
+                    <div className="audiences-filter-actions">
+                      <button
+                        className="audiences-icon-btn"
+                        type="button"
+                        aria-label="Descargar"
+                      >
+                        D
+                      </button>
+                      <button
+                        className="audiences-icon-btn"
+                        type="button"
+                        aria-label="Actualizar"
+                        onClick={() =>
+                          loadAudienceContacts(selectedAudience, {
+                            page: audiencePage,
+                            search: audienceContactSearch,
+                          })
+                        }
+                      >
+                        R
+                      </button>
+                    </div>
                   </div>
-                  {selectedSegment ? (
-                    <div className="audiences-detail-body">
-                      <div className="audience-metric">
-                        <div className="audience-metric-label">Contactos</div>
-                        <div className="audience-metric-value">
-                          {selectedSegment.count}
-                        </div>
-                      </div>
-                      <div className="audience-metric">
-                        <div className="audience-metric-label">Descripcion</div>
-                        <div className="audience-metric-value">
-                          {selectedSegment.subtitle}
-                        </div>
-                      </div>
+                  <div className="audiences-search-row">
+                    <label className="audiences-search-field">
+                      <span className="template-search-icon" aria-hidden="true" />
+                      <input
+                        type="text"
+                        placeholder="Buscar contacto en esta lista..."
+                        value={audienceContactSearch}
+                        onChange={(event) => {
+                          setAudienceContactSearch(event.target.value);
+                          setAudiencePage(1);
+                        }}
+                      />
+                    </label>
+                    <div className="audiences-total">
+                      {audienceContactsTotal.toLocaleString("es-PE")} contactos en total
                     </div>
-                  ) : (
-                    <div className="audiences-empty">
-                      Selecciona una audiencia para ver su resumen.
+                  </div>
+                  <div className="audiences-table">
+                    <div className="audiences-table-head">
+                      <span />
+                      <span>CONTACTO</span>
+                      <span>WHATSAPP</span>
+                      <span>ETIQUETAS</span>
+                      <span>FECHA REGISTRO</span>
+                      <span>ESTADO</span>
+                      <span />
                     </div>
-                  )}
+                    {audienceContactsLoading && (
+                      <div className="loading">Cargando contactos...</div>
+                    )}
+                    {!audienceContactsLoading && audienceContacts.length === 0 && (
+                      <div className="empty-state">No hay contactos en esta audiencia.</div>
+                    )}
+                    {!audienceContactsLoading &&
+                      audienceContacts.map((contact) => {
+                        const contactName = contact.name || "Sin nombre";
+                        const contactEmail = contact.email || "";
+                        const contactPhone = contact.phone_e164 || contact.phone || "-";
+                        const contactTags = Array.isArray(contact.tags)
+                          ? contact.tags
+                          : contact.tags
+                            ? [contact.tags]
+                            : [];
+                        const initials = contactName
+                          .split(" ")
+                          .map((item) => item[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase();
+                        return (
+                          <div className="audiences-table-row" key={contact.id || contactPhone}>
+                            <input type="checkbox" aria-label="Seleccionar contacto" />
+                            <div className="audiences-contact">
+                              <div className="audiences-avatar">{initials}</div>
+                              <div className="audiences-contact-info">
+                                <div className="audiences-contact-name">{contactName}</div>
+                                {contactEmail && (
+                                  <div className="audiences-contact-email">{contactEmail}</div>
+                                )}
+                              </div>
+                            </div>
+                            <div>{contactPhone}</div>
+                            <div className="audiences-tags">
+                              {contactTags.length ? (
+                                contactTags.map((tag) => (
+                                  <span className="audiences-tag" key={`${contact.id}-${tag}`}>
+                                    {tag}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="audiences-tag empty">—</span>
+                              )}
+                            </div>
+                            <div>{contact.created_at ? formatDate(contact.created_at) : "—"}</div>
+                            <div className="audiences-status">
+                              {(contact.status || "ACTIVO").toUpperCase()}
+                            </div>
+                            <button className="audiences-menu" type="button" aria-label="Opciones">
+                              ...
+                            </button>
+                          </div>
+                        );
+                      })}
+                  </div>
+                  <div className="audiences-pagination">
+                    <div className="audiences-page-info">
+                      Página {audiencePage} de {audienceTotalPages}
+                    </div>
+                    <div className="audiences-page-actions">
+                      <button
+                        className="audiences-page-btn"
+                        type="button"
+                        disabled={audiencePage <= 1}
+                        onClick={() => setAudiencePage((page) => Math.max(1, page - 1))}
+                      >
+                        <
+                      </button>
+                      {audiencePages.map((page) => (
+                        <button
+                          key={`aud-page-${page}`}
+                          className={`audiences-page-btn ${
+                            page === audiencePage ? "active" : ""
+                          }`}
+                          type="button"
+                          onClick={() => setAudiencePage(page)}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                      <button
+                        className="audiences-page-btn"
+                        type="button"
+                        disabled={audiencePage >= audienceTotalPages}
+                        onClick={() =>
+                          setAudiencePage((page) => Math.min(audienceTotalPages, page + 1))
+                        }
+                      >
+                        >
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </section>
@@ -1468,44 +1644,6 @@ function CampaignsView({
         </div>
       </div>
 
-      {/* Contacts List Modal */}
-      {showContactsModal && (
-        <div className="modal-overlay" onClick={() => setShowContactsModal(false)}>
-          <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Contactos ({contacts.length})</h2>
-              <button className="modal-close" onClick={() => setShowContactsModal(false)}>×</button>
-            </div>
-            <div className="modal-body">
-              {loadingContacts ? (
-                <div className="loading">Cargando contactos...</div>
-              ) : contacts.length === 0 ? (
-                <div className="empty-state">No hay contactos. Importa desde Odoo.</div>
-              ) : (
-                <div className="contacts-table">
-                  <div className="contacts-header">
-                    <span>Nombre</span>
-                    <span>Teléfono</span>
-                    <span>Email</span>
-                    <span>Tipo</span>
-                  </div>
-                  {contacts.slice(0, 50).map((contact) => (
-                    <div key={contact.id} className="contacts-row">
-                      <span>{contact.name}</span>
-                      <span>{contact.phone_e164 || "-"}</span>
-                      <span>{contact.email || "-"}</span>
-                      <span className="contact-type">{contact.is_patient ? "Paciente" : "Contacto"}</span>
-                    </div>
-                  ))}
-                  {contacts.length > 50 && (
-                    <div className="contacts-more">...y {contacts.length - 50} más</div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </section>
   );
 }

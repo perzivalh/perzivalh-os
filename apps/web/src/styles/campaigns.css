@@ -96,6 +96,30 @@
   white-space: nowrap;
 }
 
+.campaigns-primary--dropdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.campaigns-primary-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.campaigns-primary-chevron {
+  font-size: 0.8rem;
+  opacity: 0.85;
+  margin-left: 0.1rem;
+}
+
 .campaigns-danger {
   border: none;
   background: #ef4444;
@@ -402,6 +426,9 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  max-height: calc(100vh - 320px);
+  overflow-y: auto;
+  padding-right: 0.25rem;
 }
 
 .audience-card {
@@ -442,62 +469,243 @@
   font-size: 0.8rem;
 }
 
-.audiences-detail {
-  border: 1px solid var(--border);
-  background: var(--panel-muted);
-  border-radius: 16px;
-  padding: 1.25rem;
-  min-width: 0;
+.audiences-table-panel {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  min-width: 0;
 }
 
-.audiences-detail-header {
+.audiences-filters {
   display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  align-items: flex-start;
-}
-
-.audiences-detail-title {
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.audiences-detail-subtitle {
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.audiences-detail-body {
-  display: grid;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.75rem;
 }
 
-.audiences-empty {
+.audiences-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--muted);
-  font-size: 0.9rem;
+  font-weight: 700;
 }
 
-.audience-metric {
-  background: var(--panel);
+.audiences-filter-chip {
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 0.75rem 0.9rem;
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-weight: 600;
+  color: var(--ink);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.8rem;
 }
 
-.audience-metric-label {
+.audiences-filter-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.audiences-icon-btn {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.audiences-search-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+.audiences-search-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 0.55rem 0.9rem;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.audiences-search-field input {
+  border: none;
+  background: transparent;
+  padding: 0;
+  width: 100%;
+  min-width: 0;
+}
+
+.audiences-total {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-left: auto;
+}
+
+.audiences-table {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow-x: auto;
+  min-width: 0;
+}
+
+.audiences-table-head,
+.audiences-table-row {
+  display: grid;
+  grid-template-columns: 32px 2fr 1.2fr 1.4fr 1.2fr 0.9fr 32px;
+  gap: 0.75rem;
+  align-items: center;
+  min-width: 760px;
+  padding: 0.75rem 1rem;
+}
+
+.audiences-table-head {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-weight: 700;
+  background: var(--panel-muted);
+}
+
+.audiences-table-row {
+  border-top: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+.audiences-table-row:hover {
+  background: var(--panel-muted);
+}
+
+.audiences-contact {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.audiences-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #ede9fe;
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.audiences-contact-info {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.audiences-contact-name {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.audiences-contact-email {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.audiences-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.audiences-tag {
+  background: #eef2ff;
+  color: #4f46e5;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.audiences-tag.empty {
+  background: transparent;
+  color: var(--muted);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.audiences-status {
+  background: #dcfce7;
+  color: #16a34a;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  display: inline-flex;
+  justify-content: center;
+}
+
+.audiences-menu {
+  border: none;
+  background: transparent;
+  font-weight: 700;
   color: var(--muted);
 }
 
-.audience-metric-value {
+.audiences-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.audiences-page-info {
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.audiences-page-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.audiences-page-btn {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  padding: 0.35rem 0.6rem;
+  border-radius: 10px;
+  min-width: 32px;
   font-weight: 600;
-  color: var(--ink);
-  margin-top: 0.4rem;
+}
+
+.audiences-page-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: transparent;
 }
 
 .campaigns-form {
@@ -1197,7 +1405,6 @@
 
 body[data-theme="dark"] .campaigns-panel,
 body[data-theme="dark"] .template-card,
-body[data-theme="dark"] .audiences-detail,
 body[data-theme="dark"] .audience-card {
   background: #141414;
   border-color: #2a2a2a;
@@ -1206,7 +1413,12 @@ body[data-theme="dark"] .audience-card {
 body[data-theme="dark"] .campaigns-ghost,
 body[data-theme="dark"] .templates-search,
 body[data-theme="dark"] .templates-select,
-body[data-theme="dark"] .template-menu {
+body[data-theme="dark"] .template-menu,
+body[data-theme="dark"] .audiences-search,
+body[data-theme="dark"] .audiences-search-field,
+body[data-theme="dark"] .audiences-filter-chip,
+body[data-theme="dark"] .audiences-icon-btn,
+body[data-theme="dark"] .audiences-page-btn {
   background: #141414;
   border-color: #2a2a2a;
   color: #e6e6e6;
@@ -1221,7 +1433,8 @@ body[data-theme="dark"] .template-preview {
 body[data-theme="dark"] .audience-hero,
 body[data-theme="dark"] .audience-tag-card,
 body[data-theme="dark"] .excel-card,
-body[data-theme="dark"] .excel-dropzone {
+body[data-theme="dark"] .excel-dropzone,
+body[data-theme="dark"] .audiences-table {
   background: #141414;
   border-color: #2a2a2a;
 }

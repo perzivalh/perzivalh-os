@@ -1,4 +1,4 @@
-﻿-- AlterTable
+-- AlterTable
 ALTER TABLE "AudienceSegment" ADD COLUMN     "last_synced_at" TIMESTAMP(3);
 
 -- AlterTable

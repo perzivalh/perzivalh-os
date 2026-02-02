@@ -7,14 +7,6 @@
     grid-template-columns: minmax(0, 1fr) 280px;
   }
 
-  .campaigns-layout {
-    grid-template-columns: 240px minmax(0, 1fr);
-  }
-
-  .campaigns-create {
-    grid-column: span 2;
-  }
-
   .dashboard-layout {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -56,37 +48,6 @@
 
   .chat-view.info-open .chat-info {
     display: flex;
-  }
-
-  .campaigns-header {
-    flex-direction: column;
-  }
-
-  .campaigns-actions {
-    width: 100%;
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .campaigns-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .campaigns-create {
-    grid-column: auto;
-  }
-
-  .template-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .campaigns-history {
-    overflow-x: auto;
-  }
-
-  .history-head,
-  .history-row {
-    min-width: 720px;
   }
 
   .dashboard-header {

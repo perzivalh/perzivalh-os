@@ -255,6 +255,7 @@ function CampaignsView({
 
   return (
     <section className="campaigns-page">
+      <div className="campaigns-shell">
       <header className="campaigns-header">
         <div className="campaigns-title">
           <span className="campaigns-mark" />
@@ -513,177 +514,178 @@ function CampaignsView({
           </div>
         </div>
 
-        <aside className="campaigns-create">
-          <div className="campaigns-section-title">Nueva campana</div>
-          <form className="campaigns-form" onSubmit={onCreateCampaign}>
-            <label className="campaigns-field">
-              <span>Nombre de campana</span>
-              <input
-                type="text"
-                placeholder="Ej: Promo Onicomicosis Mar"
-                value={campaignForm.name}
-                onChange={(event) =>
-                  setCampaignForm((prev) => ({
-                    ...prev,
-                    name: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label className="campaigns-field">
-              <span>Seleccionar audiencia</span>
-              <select
-                value={audienceValue}
-                onChange={(event) => handleAudienceChange(event.target.value)}
-              >
-                <option value="">Selecciona un segmento...</option>
-                {segments
-                  .filter((segment) => segment.type !== "odoo")
-                  .map((segment) => (
-                    <option value={`tag:${segment.name}`} key={`seg-${segment.id}`}>
-                      {segment.name}
+      </div>
+
+      <section className="campaigns-create">
+        <div className="campaigns-section-title">Nueva campana</div>
+        <form className="campaigns-form" onSubmit={onCreateCampaign}>
+          <label className="campaigns-field">
+            <span>Nombre de campana</span>
+            <input
+              type="text"
+              placeholder="Ej: Promo Onicomicosis Mar"
+              value={campaignForm.name}
+              onChange={(event) =>
+                setCampaignForm((prev) => ({
+                  ...prev,
+                  name: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label className="campaigns-field">
+            <span>Seleccionar audiencia</span>
+            <select
+              value={audienceValue}
+              onChange={(event) => handleAudienceChange(event.target.value)}
+            >
+              <option value="">Selecciona un segmento...</option>
+              {segments
+                .filter((segment) => segment.type !== "odoo")
+                .map((segment) => (
+                  <option value={`tag:${segment.name}`} key={`seg-${segment.id}`}>
+                    {segment.name}
+                  </option>
+                ))}
+              <option value="verified">Solo verificados</option>
+              <option value="assigned:unassigned">Sin asignar</option>
+              {statusOptions.map((status) => (
+                <option value={`status:${status}`} key={`status-${status}`}>
+                  Status: {status}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="campaigns-field">
+            <span>Plantilla Meta</span>
+            <select
+              value={campaignForm.template_id}
+              onChange={(event) =>
+                setCampaignForm((prev) => ({
+                  ...prev,
+                  template_id: event.target.value,
+                }))
+              }
+            >
+              <option value="">Selecciona plantilla...</option>
+              {templates.map((template) => (
+                <option value={template.id} key={template.id}>
+                  {template.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="campaigns-field">
+            <span>Programacion</span>
+            <input
+              type="datetime-local"
+              value={campaignForm.scheduled_for}
+              onChange={(event) =>
+                setCampaignForm((prev) => ({
+                  ...prev,
+                  scheduled_for: event.target.value,
+                }))
+              }
+            />
+          </label>
+
+          <button
+            className="campaigns-advanced-toggle"
+            type="button"
+            onClick={() => setShowAdvanced((prev) => !prev)}
+          >
+            {showAdvanced ? "Ocultar filtros avanzados" : "Filtros avanzados"}
+          </button>
+
+          {showAdvanced && (
+            <div className="campaigns-advanced">
+              <label className="campaigns-field">
+                <span>Status filtro</span>
+                <select
+                  value={campaignFilter.status}
+                  onChange={(event) =>
+                    setCampaignFilter((prev) => ({
+                      ...prev,
+                      status: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="">Todos</option>
+                  {statusOptions.map((status) => (
+                    <option value={status} key={status}>
+                      {status}
                     </option>
                   ))}
-                <option value="verified">Solo verificados</option>
-                <option value="assigned:unassigned">Sin asignar</option>
-                {statusOptions.map((status) => (
-                  <option value={`status:${status}`} key={`status-${status}`}>
-                    Status: {status}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="campaigns-field">
-              <span>Plantilla Meta</span>
-              <select
-                value={campaignForm.template_id}
-                onChange={(event) =>
-                  setCampaignForm((prev) => ({
-                    ...prev,
-                    template_id: event.target.value,
-                  }))
-                }
-              >
-                <option value="">Selecciona plantilla...</option>
-                {templates.map((template) => (
-                  <option value={template.id} key={template.id}>
-                    {template.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="campaigns-field">
-              <span>Programacion</span>
-              <input
-                type="datetime-local"
-                value={campaignForm.scheduled_for}
-                onChange={(event) =>
-                  setCampaignForm((prev) => ({
-                    ...prev,
-                    scheduled_for: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <button
-              className="campaigns-advanced-toggle"
-              type="button"
-              onClick={() => setShowAdvanced((prev) => !prev)}
-            >
-              {showAdvanced ? "Ocultar filtros avanzados" : "Filtros avanzados"}
-            </button>
-
-            {showAdvanced && (
-              <div className="campaigns-advanced">
-                <label className="campaigns-field">
-                  <span>Status filtro</span>
-                  <select
-                    value={campaignFilter.status}
-                    onChange={(event) =>
-                      setCampaignFilter((prev) => ({
-                        ...prev,
-                        status: event.target.value,
-                      }))
-                    }
-                  >
-                    <option value="">Todos</option>
-                    {statusOptions.map((status) => (
-                      <option value={status} key={status}>
-                        {status}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="campaigns-field">
-                  <span>Asignado</span>
-                  <select
-                    value={campaignFilter.assigned_user_id}
-                    onChange={(event) =>
-                      setCampaignFilter((prev) => ({
-                        ...prev,
-                        assigned_user_id: event.target.value,
-                      }))
-                    }
-                  >
-                    <option value="">Todos</option>
-                    <option value="unassigned">Sin asignar</option>
-                    {users.map((item) => (
-                      <option value={item.id} key={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="campaigns-field">
-                  <span>Tag</span>
-                  <select
-                    value={campaignFilter.tag}
-                    onChange={(event) =>
-                      setCampaignFilter((prev) => ({
-                        ...prev,
-                        tag: event.target.value,
-                      }))
-                    }
-                  >
-                    <option value="">Todos</option>
-                    {tags.map((tag) => (
-                      <option value={tag.name} key={tag.id}>
-                        {tag.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="campaigns-toggle">
-                  <input
-                    type="checkbox"
-                    checked={campaignFilter.verified_only}
-                    onChange={(event) =>
-                      setCampaignFilter((prev) => ({
-                        ...prev,
-                        verified_only: event.target.checked,
-                      }))
-                    }
-                  />
-                  Solo verificados
-                </label>
-              </div>
-            )}
-
-            <button className="campaigns-launch" type="submit">
-              Lanzar Campana
-            </button>
-            <div className="campaigns-hint">
-              Se enviaran aproximadamente{" "}
-              <strong>{selectedSegment?.count || 0}</strong> mensajes HSM
+                </select>
+              </label>
+              <label className="campaigns-field">
+                <span>Asignado</span>
+                <select
+                  value={campaignFilter.assigned_user_id}
+                  onChange={(event) =>
+                    setCampaignFilter((prev) => ({
+                      ...prev,
+                      assigned_user_id: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="">Todos</option>
+                  <option value="unassigned">Sin asignar</option>
+                  {users.map((item) => (
+                    <option value={item.id} key={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="campaigns-field">
+                <span>Tag</span>
+                <select
+                  value={campaignFilter.tag}
+                  onChange={(event) =>
+                    setCampaignFilter((prev) => ({
+                      ...prev,
+                      tag: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="">Todos</option>
+                  {tags.map((tag) => (
+                    <option value={tag.name} key={tag.id}>
+                      {tag.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="campaigns-toggle">
+                <input
+                  type="checkbox"
+                  checked={campaignFilter.verified_only}
+                  onChange={(event) =>
+                    setCampaignFilter((prev) => ({
+                      ...prev,
+                      verified_only: event.target.checked,
+                    }))
+                  }
+                />
+                Solo verificados
+              </label>
             </div>
-            <div className="campaigns-preview-box">
-              {selectedTemplate?.body_preview ||
-                "Selecciona una plantilla para ver preview"}
-            </div>
-          </form>
-        </aside>
-      </div>
+          )}
+
+          <button className="campaigns-launch" type="submit">
+            Lanzar Campana
+          </button>
+          <div className="campaigns-hint">
+            Se enviaran aproximadamente{" "}
+            <strong>{selectedSegment?.count || 0}</strong> mensajes HSM
+          </div>
+          <div className="campaigns-preview-box">
+            {selectedTemplate?.body_preview ||
+              "Selecciona una plantilla para ver preview"}
+          </div>
+        </form>
+      </section>
 
       <section className="campaigns-history">
         <div className="campaigns-history-header">
@@ -697,7 +699,7 @@ function CampaignsView({
             Ver todo el historial
           </button>
         </div>
-        <div className="history-table">
+        <div className="history-table history-table--main">
           <div className="history-head">
             <span>Campana / Fecha</span>
             <span>Alcance</span>
@@ -765,7 +767,7 @@ function CampaignsView({
         {selectedCampaignId && (
           <div className="campaigns-messages">
             <div className="campaigns-history-title">Mensajes</div>
-            <div className="history-table">
+            <div className="history-table history-table--messages">
               <div className="history-head">
                 <span>WA</span>
                 <span>Status</span>
@@ -782,6 +784,7 @@ function CampaignsView({
           </div>
         )}
       </section>
+      </div>
     </section>
   );
 }

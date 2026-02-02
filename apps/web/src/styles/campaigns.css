@@ -3,6 +3,8 @@
   flex-direction: column;
   gap: 1.5rem;
   min-height: 0;
+  align-items: stretch;
+  overflow: visible;
 }
 
 .campaigns-header {
@@ -105,6 +107,7 @@ body[data-theme="dark"] .campaigns-ghost {
   min-height: 0;
   align-items: start;
   grid-auto-rows: minmax(0, max-content);
+  margin-bottom: 1.5rem;
 }
 
 .campaigns-audiences,
@@ -428,9 +431,10 @@ body[data-theme="dark"] .campaigns-templates .template-card.selected {
   width: 100%;
   opacity: 1;
   isolation: isolate;
+  clear: both;
 }
 
-@media (max-width: 1400px) {
+@media (max-width: 1600px) {
   .campaigns-layout {
     grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
   }

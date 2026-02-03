@@ -121,7 +121,7 @@ function CampaignsView({
   const [campaignStatusFilter, setCampaignStatusFilter] = useState("all");
   const [campaignLaunchOpen, setCampaignLaunchOpen] = useState(false);
   const [campaignScheduleMode, setCampaignScheduleMode] = useState(
-    campaignForm.scheduled_for ? "schedule" : "now"
+    campaignForm.send_now === false || campaignForm.scheduled_for ? "schedule" : "now"
   );
   const [campaignPage, setCampaignPage] = useState(1);
   const [campaignPageSize] = useState(6);
@@ -180,6 +180,12 @@ function CampaignsView({
     status: "Activos",
   });
   const [openAudienceMenuId, setOpenAudienceMenuId] = useState(null);
+
+  useEffect(() => {
+    const nextMode =
+      campaignForm.send_now === false || campaignForm.scheduled_for ? "schedule" : "now";
+    setCampaignScheduleMode(nextMode);
+  }, [campaignForm.send_now, campaignForm.scheduled_for]);
 
   // Custom segments from API
   const [customSegments, setCustomSegments] = useState([]);
@@ -686,10 +692,19 @@ function CampaignsView({
   }, [templateSearch, templateCategory, templates]);
 
   const selectedSegment = useMemo(() => {
-    return segments.find((segment) => segment.name === campaignFilter.tag);
-  }, [segments, campaignFilter.tag]);
+    if (campaignFilter.segment_id) {
+      return segments.find((segment) => segment.id === campaignFilter.segment_id) || null;
+    }
+    if (campaignFilter.tag) {
+      return segments.find((segment) => segment.name === campaignFilter.tag) || null;
+    }
+    return null;
+  }, [segments, campaignFilter.segment_id, campaignFilter.tag]);
 
   const audienceValue = useMemo(() => {
+    if (campaignFilter.segment_id) {
+      return `segment:${campaignFilter.segment_id}`;
+    }
     if (campaignFilter.tag) {
       return `tag:${campaignFilter.tag}`;
     }
@@ -703,7 +718,13 @@ function CampaignsView({
       return "verified";
     }
     return "";
-  }, [campaignFilter]);
+  }, [
+    campaignFilter.segment_id,
+    campaignFilter.tag,
+    campaignFilter.assigned_user_id,
+    campaignFilter.status,
+    campaignFilter.verified_only,
+  ]);
 
   function handleAudienceChange(value) {
     setCampaignFilter((prev) => {
@@ -713,8 +734,15 @@ function CampaignsView({
         tag: "",
         assigned_user_id: "",
         verified_only: false,
+        segment_id: "",
+        segment_name: "",
       };
-      if (value.startsWith("tag:")) {
+      if (value.startsWith("segment:")) {
+        const segmentId = value.slice(8);
+        const segment = segments.find((item) => item.id === segmentId);
+        next.segment_id = segmentId;
+        next.segment_name = segment?.name || "";
+      } else if (value.startsWith("tag:")) {
         next.tag = value.slice(4);
       } else if (value.startsWith("status:")) {
         next.status = value.slice(7);
@@ -1813,7 +1841,7 @@ function CampaignsView({
                           {segments
                             .filter((segment) => segment.type !== "odoo")
                             .map((segment) => (
-                              <option value={`tag:${segment.name}`} key={`seg-${segment.id}`}>
+                              <option value={`segment:${segment.id}`} key={`seg-${segment.id}`}>
                                 {segment.name}
                               </option>
                             ))}
@@ -1865,7 +1893,11 @@ function CampaignsView({
                             type="button"
                             onClick={() => {
                               setCampaignScheduleMode("now");
-                              setCampaignForm((prev) => ({ ...prev, scheduled_for: "" }));
+                              setCampaignForm((prev) => ({
+                                ...prev,
+                                scheduled_for: "",
+                                send_now: true,
+                              }));
                             }}
                           >
                             Enviar Ahora
@@ -1875,7 +1907,10 @@ function CampaignsView({
                               campaignScheduleMode === "schedule" ? "active" : ""
                             }`}
                             type="button"
-                            onClick={() => setCampaignScheduleMode("schedule")}
+                            onClick={() => {
+                              setCampaignScheduleMode("schedule");
+                              setCampaignForm((prev) => ({ ...prev, send_now: false }));
+                            }}
                           >
                             Programar Envío
                           </button>
@@ -1888,6 +1923,7 @@ function CampaignsView({
                               setCampaignForm((prev) => ({
                                 ...prev,
                                 scheduled_for: event.target.value,
+                                send_now: false,
                               }))
                             }
                           />

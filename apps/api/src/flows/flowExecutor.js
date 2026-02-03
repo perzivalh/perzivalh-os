@@ -2,7 +2,7 @@
  * Flow Executor Dynamic
  * Ejecuta flows definidos en JSON/JS sin logica hardcodeada
  */
-const { sendText, sendButtons, sendList } = require("../whatsapp");
+const { sendText, sendButtons, sendList, sendImage, sendVideo } = require("../whatsapp");
 const logger = require("../lib/logger");
 const { normalizeText } = require("../lib/normalize");
 const sessionStore = require("../sessionStore");
@@ -137,7 +137,11 @@ async function sendNode(waId, flow, node, visited) {
   const bodyText = node.text || node.title || "Selecciona una opcion:";
 
   const buttons = Array.isArray(node.buttons) ? node.buttons : [];
-  if (buttons.length > 0) {
+  if (node.type === "image") {
+    await sendImage(waId, node.url || node.media || node.image, bodyText || null);
+  } else if (node.type === "video") {
+    await sendVideo(waId, node.url || node.media || node.video, bodyText || null);
+  } else if (buttons.length > 0) {
     if (shouldUseList(buttons)) {
       const rows = buttons.map((btn) => ({
         id: btn.next,

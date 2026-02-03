@@ -235,12 +235,16 @@ function buildWhereFromRules(rules, source = "all") {
             case "primary_tag":
                 if (rule.operator === "is") {
                     if (rule.value === null || rule.value === "__NONE__") {
-                        conversationConditions.push({
-                            primary_tag_id: null,
+                        tagConditions.push({
+                            tags: { none: {} },
                         });
                     } else {
-                        conversationConditions.push({
-                            primary_tag_id: rule.value,
+                        tagConditions.push({
+                            tags: {
+                                some: {
+                                    tag: { id: rule.value },
+                                },
+                            },
                         });
                     }
                 }
@@ -418,6 +422,7 @@ async function getSegmentRecipients(segmentId, options = {}) {
                 id: true,
                 wa_id: true,
                 phone_e164: true,
+                phone_number_id: true,
                 display_name: true,
                 partner_id: true,
             },
@@ -430,6 +435,7 @@ async function getSegmentRecipients(segmentId, options = {}) {
                 recipients.push({
                     wa_id: c.wa_id,
                     phone_e164: c.phone_e164,
+                    phone_number_id: c.phone_number_id || null,
                     name: c.display_name || null,
                     source: "conversation",
                     conversation_id: c.id,

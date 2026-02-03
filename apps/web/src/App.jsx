@@ -141,12 +141,15 @@ function App() {
     name: "",
     template_id: "",
     scheduled_for: "",
+    send_now: true,
   });
   const [campaignFilter, setCampaignFilter] = useState({
     status: "",
     tag: "",
     assigned_user_id: "",
     verified_only: false,
+    segment_id: "",
+    segment_name: "",
   });
 
   const [adminUsers, setAdminUsers] = useState([]);
@@ -1204,19 +1207,38 @@ function App() {
     if (campaignFilter.verified_only) {
       filter.verified_only = true;
     }
+    if (campaignFilter.segment_id) {
+      filter.segment_id = campaignFilter.segment_id;
+      if (campaignFilter.segment_name) {
+        filter.segment_name = campaignFilter.segment_name;
+      }
+    }
     try {
-      await apiPost("/api/admin/campaigns", {
+      const result = await apiPost("/api/admin/campaigns", {
         name: campaignForm.name.trim(),
         template_id: campaignForm.template_id,
         audience_filter: filter,
         scheduled_for: campaignForm.scheduled_for || null,
       });
-      setCampaignForm({ name: "", template_id: "", scheduled_for: "" });
+      if (campaignForm.send_now && !campaignForm.scheduled_for) {
+        const campaignId = result?.campaign?.id;
+        if (campaignId) {
+          await apiPost(`/api/admin/campaigns/${campaignId}/send`, {});
+        }
+      }
+      setCampaignForm({
+        name: "",
+        template_id: "",
+        scheduled_for: "",
+        send_now: true,
+      });
       setCampaignFilter({
         status: "",
         tag: "",
         assigned_user_id: "",
         verified_only: false,
+        segment_id: "",
+        segment_name: "",
       });
       await loadCampaigns(1, 6);
       pushToast({ message: "Campaña creada correctamente" });

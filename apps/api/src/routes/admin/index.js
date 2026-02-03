@@ -14,6 +14,7 @@ const { getControlClient } = require("../../control/controlClient");
 const { getTenantContext } = require("../../tenancy/tenantContext");
 const { resolveChannelByPhoneNumberId } = require("../../tenancy/tenantResolver");
 const { logAudit, createMessage } = require("../../services/conversations");
+const { getSegmentRecipients } = require("../../services/audienceService");
 const { ROLE_OPTIONS } = require("../../config/roles");
 
 // Settings cache (para sincronizar con webhook)
@@ -641,7 +642,52 @@ function buildConversationFilter(filter) {
 }
 
 async function queueCampaignMessages(campaign, userId) {
-    const where = buildConversationFilter(campaign.audience_filter);
+    const filter = campaign.audience_filter || {};
+    let segmentId = filter.segment_id || null;
+    if (!segmentId && filter.segment_name) {
+        const byName = await prisma.audienceSegment.findFirst({
+            where: { name: filter.segment_name, is_active: true },
+            select: { id: true },
+        });
+        segmentId = byName?.id || null;
+    }
+
+    if (segmentId) {
+        const defaultPhoneNumberId = getTenantContext().channel?.phone_number_id || null;
+        if (!defaultPhoneNumberId) {
+            logger.warn("campaign.missing_default_channel", { campaign_id: campaign.id });
+            return 0;
+        }
+        const recipients = await getSegmentRecipients(segmentId);
+        if (!recipients.length) {
+            return 0;
+        }
+
+        await prisma.campaignMessage.deleteMany({
+            where: { campaign_id: campaign.id },
+        });
+
+        const data = recipients.map((recipient) => ({
+            campaign_id: campaign.id,
+            conversation_id: recipient.conversation_id || null,
+            wa_id: recipient.wa_id,
+            phone_e164: recipient.phone_e164,
+            phone_number_id: recipient.phone_number_id || defaultPhoneNumberId,
+            status: "queued",
+        }));
+
+        await prisma.campaignMessage.createMany({ data });
+
+        await logAudit({
+            userId,
+            action: "campaign.queued",
+            data: { campaign_id: campaign.id, total: recipients.length, segment_id: segmentId },
+        });
+
+        return data.length;
+    }
+
+    const where = buildConversationFilter(filter);
     const conversations = await prisma.conversation.findMany({
         where,
         select: {

@@ -211,6 +211,115 @@ async function refreshCampaignStatus(campaignId) {
     });
 }
 
+function getTemplateParamCount(text) {
+    if (!text) return 0;
+    let maxIndex = 0;
+    const regex = /\{\{(\d+)\}\}/g;
+    let match = null;
+    while ((match = regex.exec(text)) !== null) {
+        const index = Number(match[1]);
+        if (!Number.isNaN(index)) {
+            maxIndex = Math.max(maxIndex, index);
+        }
+    }
+    return maxIndex;
+}
+
+function resolveVariableValues(mappings, recipient) {
+    const values = {};
+    if (!Array.isArray(mappings)) {
+        return values;
+    }
+    for (const mapping of mappings) {
+        let value = mapping?.default_value || "";
+        if (mapping?.source_type === "static") {
+            value = mapping?.source_path || mapping?.default_value || "";
+        } else if (mapping?.source_type === "db") {
+            if (mapping?.source_path === "recipient.name") {
+                value = recipient?.name || mapping?.default_value || "";
+            } else if (mapping?.source_path === "recipient.phone") {
+                value = recipient?.phone || mapping?.default_value || "";
+            }
+        }
+        values[mapping?.var_index] = value || mapping?.default_value || "Cliente";
+    }
+    return values;
+}
+
+async function buildTemplateComponentsForMessage(template, message) {
+    let metaTemplate = null;
+    try {
+        metaTemplate = await prisma.metaTemplate.findFirst({
+            where: {
+                name: template.name,
+                language: template.language,
+                is_deleted: false,
+            },
+            include: { variable_mappings: true },
+        });
+    } catch (error) {
+        logger.warn("campaign.template_meta_lookup_failed", {
+            template: template.name,
+            message: error.message || error,
+        });
+    }
+
+    let recipient = null;
+    if (message.conversation_id) {
+        recipient = await prisma.conversation.findUnique({
+            where: { id: message.conversation_id },
+            select: { display_name: true, phone_e164: true },
+        });
+    }
+
+    const recipientInfo = {
+        name: recipient?.display_name || null,
+        phone: message.phone_e164 || recipient?.phone_e164 || null,
+    };
+
+    const bodyText = metaTemplate?.body_text || template.body_preview || "";
+    const headerText =
+        metaTemplate?.header_type === "text" ? metaTemplate?.header_content || "" : "";
+    const variableValues = resolveVariableValues(
+        metaTemplate?.variable_mappings,
+        recipientInfo
+    );
+
+    const components = [];
+    let bodyCount = getTemplateParamCount(bodyText);
+    if (bodyCount === 0 && Array.isArray(metaTemplate?.variable_mappings)) {
+        const maxIndex = metaTemplate.variable_mappings.reduce((acc, mapping) => {
+            const index = Number(mapping?.var_index || 0);
+            return Number.isNaN(index) ? acc : Math.max(acc, index);
+        }, 0);
+        bodyCount = Math.max(bodyCount, maxIndex);
+    }
+    if (bodyCount > 0) {
+        const parameters = [];
+        for (let i = 1; i <= bodyCount; i += 1) {
+            parameters.push({
+                type: "text",
+                text: variableValues[i] || "Cliente",
+            });
+        }
+        components.push({ type: "body", parameters });
+    }
+
+    const headerCount = getTemplateParamCount(headerText);
+    if (headerCount > 0) {
+        const parameters = [];
+        for (let i = 1; i <= headerCount; i += 1) {
+            parameters.push({
+                type: "text",
+                text: variableValues[i] || "Cliente",
+            });
+        }
+        components.push({ type: "header", parameters });
+    }
+
+    return components;
+}
+
 async function processCampaignQueue(tenantId) {
     const { resolveChannelByPhoneNumberId } = require("./src/tenancy/tenantResolver");
 
@@ -264,7 +373,7 @@ async function processCampaignQueue(tenantId) {
             const channelConfig = await resolveChannelByPhoneNumberId(
                 message.phone_number_id
             );
-            if (!channelConfig || channelConfig.tenantId !== tenantId) {
+            if (!channelConfig || (channelConfig.tenantId && channelConfig.tenantId !== tenantId)) {
                 await prisma.campaignMessage.update({
                     where: { id: message.id },
                     data: {
@@ -275,11 +384,12 @@ async function processCampaignQueue(tenantId) {
                 processedCampaigns.add(message.campaign_id);
                 continue;
             }
+            const components = await buildTemplateComponentsForMessage(template, message);
             const result = await sendTemplate(
                 message.wa_id,
                 template.name,
                 template.language,
-                [],
+                components,
                 { channel: channelConfig }
             );
             if (result.ok) {

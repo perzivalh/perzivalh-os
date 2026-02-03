@@ -3,6 +3,83 @@ const { upsertConversation, createMessage } = require("./services/conversations"
 const { toPhoneE164 } = require("./lib/normalize");
 const logger = require("./lib/logger");
 const { getTenantContext } = require("./tenancy/tenantContext");
+const prisma = require("./db");
+
+function getTemplateParamCount(text) {
+  if (!text) return 0;
+  let maxIndex = 0;
+  const regex = /\{\{(\d+)\}\}/g;
+  let match = null;
+  while ((match = regex.exec(text)) !== null) {
+    const index = Number(match[1]);
+    if (!Number.isNaN(index)) {
+      maxIndex = Math.max(maxIndex, index);
+    }
+  }
+  return maxIndex;
+}
+
+function resolveTemplateVariables(mappings) {
+  const values = {};
+  if (!Array.isArray(mappings)) {
+    return values;
+  }
+  for (const mapping of mappings) {
+    let value = mapping?.default_value || "";
+    if (mapping?.source_type === "static") {
+      value = mapping?.source_path || mapping?.default_value || "";
+    }
+    values[mapping?.var_index] = value || mapping?.default_value || "Cliente";
+  }
+  return values;
+}
+
+async function ensureTemplateComponents(name, language, components) {
+  if (Array.isArray(components) && components.length) {
+    return components;
+  }
+  try {
+    const metaTemplate = await prisma.metaTemplate.findFirst({
+      where: { name, language, is_deleted: false },
+      include: { variable_mappings: true },
+    });
+    const bodyText = metaTemplate?.body_text || "";
+    const headerText =
+      metaTemplate?.header_type === "text" ? metaTemplate?.header_content || "" : "";
+    let bodyCount = getTemplateParamCount(bodyText);
+    if (bodyCount === 0 && Array.isArray(metaTemplate?.variable_mappings)) {
+      const maxIndex = metaTemplate.variable_mappings.reduce((acc, mapping) => {
+        const index = Number(mapping?.var_index || 0);
+        return Number.isNaN(index) ? acc : Math.max(acc, index);
+      }, 0);
+      bodyCount = Math.max(bodyCount, maxIndex);
+    }
+    const headerCount = getTemplateParamCount(headerText);
+    if (bodyCount === 0 && headerCount === 0) {
+      return components || [];
+    }
+    const variableValues = resolveTemplateVariables(metaTemplate?.variable_mappings);
+    const resolved = [];
+    if (bodyCount > 0) {
+      const parameters = [];
+      for (let i = 1; i <= bodyCount; i += 1) {
+        parameters.push({ type: "text", text: variableValues[i] || "Cliente" });
+      }
+      resolved.push({ type: "body", parameters });
+    }
+    if (headerCount > 0) {
+      const parameters = [];
+      for (let i = 1; i <= headerCount; i += 1) {
+        parameters.push({ type: "text", text: variableValues[i] || "Cliente" });
+      }
+      resolved.push({ type: "header", parameters });
+    }
+    return resolved;
+  } catch (error) {
+    logger.warn("template.auto_fill_failed", { name, message: error.message || error });
+    return components || [];
+  }
+}
 
 function getWhatsAppConfig(options = {}) {
   const context = getTenantContext();
@@ -274,8 +351,43 @@ async function sendImage(to, imageUrl, caption = null, options = {}) {
   return result;
 }
 
+async function sendVideo(to, videoUrl, caption = null, options = {}) {
+  const config = getWhatsAppConfig(options);
+  if (!videoUrl) {
+    return sendText(to, "Video no disponible por ahora.");
+  }
+  const payload = {
+    messaging_product: "whatsapp",
+    to,
+    type: "video",
+    video: {
+      link: videoUrl,
+      caption: caption || undefined,
+    },
+  };
+  const result = await sendWhatsAppMessage(payload, options);
+  await recordOutgoingMessage(
+    to,
+    "video",
+    caption || null,
+    {
+      payload,
+      response: result.response,
+      error: result.error,
+      meta: options.meta,
+    },
+    config.phoneNumberId
+  );
+  return result;
+}
+
 async function sendTemplate(to, name, language, components = [], options = {}) {
   const config = getWhatsAppConfig(options);
+  const resolvedComponents = await ensureTemplateComponents(
+    name,
+    language,
+    components
+  );
   const payload = {
     messaging_product: "whatsapp",
     to,
@@ -283,7 +395,7 @@ async function sendTemplate(to, name, language, components = [], options = {}) {
     template: {
       name,
       language: { code: language },
-      components,
+      components: resolvedComponents,
     },
   };
   const result = await sendWhatsAppMessage(payload, options);
@@ -329,6 +441,7 @@ module.exports = {
   sendList,
   sendLocation,
   sendImage,
+  sendVideo,
   sendTemplate,
   parseInteractiveSelection,
   sendInteractiveList: sendList,

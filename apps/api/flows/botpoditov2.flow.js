@@ -105,6 +105,7 @@ module.exports = {
       id: "HORARIOS_NAV",
       type: "text",
       text: "¿Necesitas algo más?",
+      delayMs: 1500,
       buttons: [
         { label: "⬅️ Volver al menu", next: "MAIN_MENU" },
         { label: "✅ Finalizar", next: "CIERRE_HORARIO_UBICACION" },

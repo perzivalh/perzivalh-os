@@ -14,6 +14,10 @@ const { BOT_FLOW_ID, FIRST_NOTICE_MS } = require("../config/flowInactivity");
 const MAX_LIST_TITLE = 24;
 const BUTTON_TITLE_LIMIT = 20;
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function getCurrentLineId() {
   return getTenantContext().channel?.phone_number_id || null;
 }
@@ -103,6 +107,16 @@ async function setConversationToPending(waId) {
 async function sendNode(waId, flow, node, visited) {
   if (!node) {
     return;
+  }
+
+  const delayMs =
+    Number.isFinite(node.delayMs) && node.delayMs > 0
+      ? node.delayMs
+      : Number.isFinite(node.delaySeconds) && node.delaySeconds > 0
+        ? Math.round(node.delaySeconds * 1000)
+        : 0;
+  if (delayMs > 0) {
+    await sleep(delayMs);
   }
 
   const lineId = getCurrentLineId();

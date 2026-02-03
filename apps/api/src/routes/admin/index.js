@@ -710,10 +710,39 @@ router.post("/campaigns", requireAuth, requireRole(["admin", "marketing"]), asyn
     if (!name || !templateId) {
         return res.status(400).json({ error: "missing_fields" });
     }
+    let resolvedTemplateId = templateId;
+    const existingTemplate = await prisma.template.findUnique({
+        where: { id: templateId },
+    });
+    if (!existingTemplate) {
+        const metaTemplate = await prisma.metaTemplate.findUnique({
+            where: { id: templateId },
+        });
+        if (!metaTemplate) {
+            return res.status(400).json({ error: "template_not_found" });
+        }
+        const templateByName = await prisma.template.findUnique({
+            where: { name: metaTemplate.name },
+        });
+        if (templateByName) {
+            resolvedTemplateId = templateByName.id;
+        } else {
+            const createdTemplate = await prisma.template.create({
+                data: {
+                    name: metaTemplate.name,
+                    language: metaTemplate.language || "es",
+                    category: metaTemplate.category || null,
+                    body_preview: metaTemplate.body_text || metaTemplate.footer_text || "",
+                    is_active: metaTemplate.status === "APPROVED",
+                },
+            });
+            resolvedTemplateId = createdTemplate.id;
+        }
+    }
     const campaign = await prisma.campaign.create({
         data: {
             name,
-            template_id: templateId,
+            template_id: resolvedTemplateId,
             audience_filter: audienceFilter,
             status: scheduledFor ? "scheduled" : "draft",
             created_by_user_id: req.user.id,

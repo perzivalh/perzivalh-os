@@ -5,6 +5,19 @@ const logger = require("./lib/logger");
 const { getTenantContext } = require("./tenancy/tenantContext");
 const prisma = require("./db");
 
+const MAX_VIDEO_BYTES = 16 * 1024 * 1024;
+
+async function getRemoteContentLength(url) {
+  try {
+    const response = await axios.head(url, { timeout: 5000 });
+    const length = Number(response.headers?.["content-length"]);
+    return Number.isFinite(length) ? length : null;
+  } catch (error) {
+    logger.warn("media.head_failed", { url, message: error.message || error });
+    return null;
+  }
+}
+
 function getTemplateParamCount(text) {
   if (!text) return 0;
   let maxIndex = 0;
@@ -355,6 +368,14 @@ async function sendVideo(to, videoUrl, caption = null, options = {}) {
   const config = getWhatsAppConfig(options);
   if (!videoUrl) {
     return sendText(to, "Video no disponible por ahora.");
+  }
+  const contentLength = await getRemoteContentLength(videoUrl);
+  if (contentLength && contentLength > MAX_VIDEO_BYTES) {
+    logger.warn("video.too_large", { bytes: contentLength, url: videoUrl });
+    return sendText(
+      to,
+      "El video es demasiado pesado para enviarlo por WhatsApp. Intentaremos enviarlo en otra ocasión."
+    );
   }
   const payload = {
     messaging_product: "whatsapp",

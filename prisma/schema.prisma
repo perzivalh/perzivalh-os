@@ -32,6 +32,7 @@ enum MessageType {
   text
   interactive
   image
+  video
   location
   template
   unknown

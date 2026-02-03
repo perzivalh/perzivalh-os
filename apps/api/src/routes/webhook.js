@@ -136,7 +136,14 @@ function extractIncomingText(message) {
 }
 
 function mapMessageType(type) {
-    const allowed = new Set(["text", "interactive", "image", "location", "template"]);
+    const allowed = new Set([
+        "text",
+        "interactive",
+        "image",
+        "location",
+        "template",
+        "video",
+    ]);
     return allowed.has(type) ? type : "unknown";
 }
 
@@ -227,20 +234,34 @@ router.post("/webhook", async (req, res) => {
     const statuses = value?.statuses;
     if (Array.isArray(statuses) && statuses.length > 0 && campaignJobQueue) {
         setImmediate(async () => {
-            for (const statusUpdate of statuses) {
-                try {
-                    await campaignJobQueue.handleMessageStatusUpdate(
-                        statusUpdate.id,
-                        statusUpdate.status,
-                        statusUpdate.timestamp
-                    );
-                } catch (error) {
-                    logger.error("Message status update error", {
-                        wamid: statusUpdate.id,
-                        error: error.message,
-                    });
-                }
+            const statusTenantContext = await resolveTenantContextByPhoneNumberId(phoneNumberId);
+            if (!statusTenantContext) {
+                logger.warn("tenant.not_resolved", { phone_number_id: phoneNumberId });
+                return;
             }
+
+            prisma.runWithPrisma(
+                statusTenantContext.prisma,
+                () => {
+                    void (async () => {
+                        for (const statusUpdate of statuses) {
+                            try {
+                                await campaignJobQueue.handleMessageStatusUpdate(
+                                    statusUpdate.id,
+                                    statusUpdate.status,
+                                    statusUpdate.timestamp
+                                );
+                            } catch (error) {
+                                logger.error("Message status update error", {
+                                    wamid: statusUpdate.id,
+                                    error: error.message,
+                                });
+                            }
+                        }
+                    })();
+                },
+                { tenantId: statusTenantContext.tenantId, channel: statusTenantContext.channel }
+            );
         });
     }
 

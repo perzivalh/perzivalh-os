@@ -96,6 +96,7 @@ function App() {
     length: 0,
   });
   const loadConversationRef = useRef(0);
+  const scrollOnLoadRef = useRef(false);
   const rolePermissionsVersion = useRef(0);
   const [settingsSection, setSettingsSection] = useState("users");
   const [settingsTab, setSettingsTab] = useState("list");
@@ -366,6 +367,14 @@ function App() {
       lastMessage &&
       prev.lastId &&
       lastId !== prev.lastId;
+
+    if (scrollOnLoadRef.current && messages.length > 0) {
+      scrollOnLoadRef.current = false;
+      requestAnimationFrame(() => {
+        scrollChatToBottom();
+      });
+      return;
+    }
 
     if (hasNewMessage) {
       if (isAtBottom) {
@@ -828,6 +837,7 @@ function App() {
   }
 
   async function loadConversation(conversationId) {
+    scrollOnLoadRef.current = true;
     const cached = getCachedConversation(conversationId);
     const quickConversation = conversations.find((item) => item.id === conversationId);
     setLoadingConversation(!cached);
@@ -840,6 +850,9 @@ function App() {
       setMessagesCursor(cached.cursor || null);
       setMessagesHasMore(Boolean(cached.hasMore));
       scheduleDayLabelUpdate();
+      requestAnimationFrame(() => {
+        scrollChatToBottom();
+      });
     }
     const requestId = loadConversationRef.current + 1;
     loadConversationRef.current = requestId;

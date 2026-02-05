@@ -637,7 +637,7 @@ module.exports = {
     {
       id: "SVC_PODOGERIATRIA_STEP_1",
       type: "image",
-      url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podogeriatr%C3%ADa/1.jpg",
+      url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podogeriatria/1.jpg",
       text:
         "Tratamos afecciones comunes como UÑAS ENGROSADAS, CALLOS, DUREZAS Y DEFORMIDADES. Prevenimos úlceras en pacientes con diabetes, orientamos sobre calzado adecuado y PROMOVEMOS EL AUTOCUIDADO para mantener la movilidad, aliviar el dolor y mejorar la calidad de vida para las personas de la tercera edad. 🩹🩺",
       next: "SVC_PODOGERIATRIA_STEP_2",
@@ -645,7 +645,7 @@ module.exports = {
     {
       id: "SVC_PODOGERIATRIA_STEP_2",
       type: "image",
-      url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podogeriatr%C3%ADa/2.jpg",
+      url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podogeriatria/2.jpg",
       text:
         "El servicio de PODOGERIATRÍA tiene un costo de 200 Bs. 💵\nRealizamos cortes de uñas cuidadosos, revisamos lesiones, tratamos durezas y controlamos cualquier condición que pueda afectar la salud de sus pies.\nNuestro objetivo es brindar comodidad, prevenir complicaciones y mejorar su calidad de vida.",
       next: "SVC_PODOGERIATRIA_STEP_3",

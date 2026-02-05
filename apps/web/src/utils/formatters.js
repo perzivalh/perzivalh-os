@@ -64,25 +64,7 @@ export function formatMessageDayLabel(value) {
     if (diffDays === 1) {
         return "Ayer";
     }
-    const months = [
-        "Ene",
-        "Feb",
-        "Mar",
-        "Abr",
-        "May",
-        "Jun",
-        "Jul",
-        "Ago",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dic",
-    ];
-    const label = `${date.getDate()} ${months[date.getMonth()]}`;
-    if (date.getFullYear() !== now.getFullYear()) {
-        return `${label} ${date.getFullYear()}`;
-    }
-    return label;
+    return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
 }
 
 export function formatDuration(seconds) {

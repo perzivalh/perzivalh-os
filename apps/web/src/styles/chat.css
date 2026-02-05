@@ -527,11 +527,11 @@ body[data-theme="dark"] .chat-avatar {
   align-self: center;
   padding: 0.25rem 0.8rem;
   border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 0.7rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  background: rgba(0, 0, 0, 0.08);
+  color: rgba(28, 43, 74, 0.7);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
 .message {
@@ -572,6 +572,31 @@ body[data-theme="dark"] .message.note {
   background: rgba(251, 191, 36, 0.18);
 }
 
+body[data-theme="dark"] .day-pill {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.chat-day-sticky {
+  position: sticky;
+  top: 10px;
+  z-index: 2;
+  align-self: center;
+  padding: 0.3rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.12);
+  color: rgba(28, 43, 74, 0.75);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(8px);
+  margin-bottom: 0.4rem;
+}
+
+body[data-theme="dark"] .chat-day-sticky {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.78);
+}
+
 .message-text {
   white-space: pre-wrap;
   line-height: 1.45;
@@ -588,18 +613,8 @@ body[data-theme="dark"] .message.note {
   letter-spacing: 0.02em;
 }
 
-.message.out .message-meta::after {
-  content: "✓✓";
-  font-size: 0.75rem;
-  color: #4aa3ff;
-}
-
 body[data-theme="dark"] .message-meta {
   color: rgba(255, 255, 255, 0.45);
-}
-
-body[data-theme="dark"] .message.out .message-meta::after {
-  color: #5aa6ff;
 }
 
 body[data-theme="dark"] .chat-body {

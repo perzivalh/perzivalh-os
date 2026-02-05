@@ -309,6 +309,73 @@ router.get("/conversations/:id", requireAuth, async (req, res) => {
         return res.status(404).json({ error: "not_found" });
     }
 
+    const limit = Math.min(Number(req.query.limit) || 0, 200);
+    const before = req.query.before ? new Date(req.query.before) : null;
+    const windowHoursRaw = Number(req.query.window_hours || req.query.hours || 0);
+    const windowHours = Number.isFinite(windowHoursRaw) && windowHoursRaw > 0
+        ? Math.min(windowHoursRaw, 168)
+        : 48;
+    const usePaged = limit > 0 || before;
+
+    if (usePaged) {
+        const take = limit > 0 ? limit : 80;
+        const now = Date.now();
+        const windowStart = new Date(now - windowHours * 60 * 60 * 1000);
+        const baseWhere = { conversation_id: conversationId };
+        let where = baseWhere;
+
+        if (before && !Number.isNaN(before.getTime())) {
+            where = {
+                ...baseWhere,
+                created_at: { lt: before },
+            };
+        } else {
+            where = {
+                ...baseWhere,
+                created_at: { gte: windowStart },
+            };
+        }
+
+        let rows = await prisma.message.findMany({
+            where,
+            orderBy: { created_at: "desc" },
+            take: take + 1,
+        });
+
+        let hasMore = rows.length > take;
+        if (hasMore) {
+            rows = rows.slice(0, take);
+        }
+
+        if (!before && rows.length < take) {
+            const oldest = rows[rows.length - 1]?.created_at || windowStart;
+            const remaining = take - rows.length;
+            const extra = await prisma.message.findMany({
+                where: {
+                    ...baseWhere,
+                    created_at: { lt: oldest },
+                },
+                orderBy: { created_at: "desc" },
+                take: remaining + 1,
+            });
+            const extraHasMore = extra.length > remaining;
+            const extraRows = extraHasMore ? extra.slice(0, remaining) : extra;
+            rows = rows.concat(extraRows);
+            hasMore = hasMore || extraHasMore;
+        }
+
+        const messages = rows.slice().reverse();
+        const nextCursor = messages.length
+            ? messages[0].created_at.toISOString()
+            : null;
+        return res.json({
+            conversation,
+            messages,
+            has_more: hasMore,
+            next_cursor: nextCursor,
+        });
+    }
+
     const messages = await prisma.message.findMany({
         where: { conversation_id: conversationId },
         orderBy: { created_at: "asc" },

@@ -22,7 +22,7 @@ function NavRail({
   const brandInitial = (brandName || "P").trim().charAt(0) || "P";
   return (
     <aside className="nav-rail">
-      <button className="rail-logo" type="button" title="Perzivalh">
+      <button className="rail-logo" type="button" title={brandName || "Logo"}>
         {logoUrl ? (
           <img src={logoUrl} alt={brandName || "Logo"} />
         ) : (

@@ -73,6 +73,7 @@ function AdminView({
   pageError,
   isOffline = false,
   onDismissError,
+  brandName = "",
 }) {
   const roleAccess = rolePermissions?.[currentRole];
 
@@ -111,7 +112,7 @@ function AdminView({
       <aside className="settings-sidebar">
         <div className="settings-header">
           <div className="settings-title">CONFIGURACION</div>
-          <div className="settings-version">PODOPIE OS V2.0</div>
+          <div className="settings-version">{(brandName || "Empresa").toUpperCase()} OS V2.0</div>
         </div>
         {settingsMenu.map((group) => (
           <div className="settings-group" key={group.title}>
@@ -204,6 +205,7 @@ function AdminView({
             handleTemplateSubmitToMeta={handleTemplateSubmitToMeta}
             handleTemplateDelete={handleTemplateDelete}
             handleSyncTemplates={handleSyncTemplates}
+            brandName={brandName}
           />
         )}
 

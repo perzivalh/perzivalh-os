@@ -86,8 +86,16 @@ function App() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [hasUnread, setHasUnread] = useState(false);
+  const [scrollDayLabel, setScrollDayLabel] = useState("");
   const messageInputRef = useRef(null);
   const chatBodyRef = useRef(null);
+  const dayLabelRafRef = useRef(null);
+  const lastMessageMetaRef = useRef({
+    conversationId: null,
+    lastId: null,
+    length: 0,
+  });
+  const loadConversationRef = useRef(0);
   const rolePermissionsVersion = useRef(0);
   const [settingsSection, setSettingsSection] = useState("users");
   const [settingsTab, setSettingsTab] = useState("list");
@@ -206,6 +214,16 @@ function App() {
     is_active: true,
   });
   const [auditLogs, setAuditLogs] = useState([]);
+  const displayBrandName =
+    (branding?.brand_name || tenantMeta?.name || "Perzivalh").trim();
+  const [messagesHasMore, setMessagesHasMore] = useState(false);
+  const [messagesLoadingMore, setMessagesLoadingMore] = useState(false);
+  const [messagesCursor, setMessagesCursor] = useState(null);
+
+  const MESSAGE_WINDOW_HOURS = 48;
+  const INITIAL_MESSAGE_LIMIT = 80;
+  const LOAD_MORE_LIMIT = 60;
+  const MAX_MESSAGES_IN_MEMORY = 320;
 
   const navigateTo = useCallback((nextPath, options = {}) => {
     if (typeof window === "undefined") {
@@ -301,12 +319,44 @@ function App() {
 
   useEffect(() => {
     if (!activeConversation) {
+      setScrollDayLabel("");
       return;
     }
-    if (isAtBottom) {
-      scrollChatToBottom();
-    } else {
-      setHasUnread(true);
+    const lastMessage = messages[messages.length - 1];
+    const lastId =
+      lastMessage?.id ||
+      lastMessage?.created_at ||
+      (messages.length ? `${messages.length}` : null);
+    const prev = lastMessageMetaRef.current;
+    const sameConversation = prev.conversationId === activeConversation.id;
+    const hasNewMessage =
+      sameConversation &&
+      lastMessage &&
+      prev.lastId &&
+      lastId !== prev.lastId;
+
+    if (hasNewMessage) {
+      if (isAtBottom) {
+        scrollChatToBottom();
+      } else {
+        setHasUnread(true);
+      }
+    } else if (isAtBottom) {
+      setHasUnread(false);
+    }
+
+    lastMessageMetaRef.current = {
+      conversationId: activeConversation.id,
+      lastId,
+      length: messages.length,
+    };
+    scheduleDayLabelUpdate();
+
+    if (isAtBottom && messages.length > MAX_MESSAGES_IN_MEMORY) {
+      const trimmed = messages.slice(-MAX_MESSAGES_IN_MEMORY);
+      setMessages(trimmed);
+      setMessagesCursor(trimmed[0]?.created_at || null);
+      setMessagesHasMore(true);
     }
   }, [messages, activeConversation?.id, isAtBottom]);
 
@@ -732,8 +782,15 @@ function App() {
 
   async function loadConversation(conversationId) {
     setLoadingConversation(true);
+    resetMessageState();
+    const requestId = loadConversationRef.current + 1;
+    loadConversationRef.current = requestId;
     try {
-      const data = await apiGet(`/api/conversations/${conversationId}`);
+      const query = `?limit=${INITIAL_MESSAGE_LIMIT}&window_hours=${MESSAGE_WINDOW_HOURS}`;
+      const data = await apiGet(`/api/conversations/${conversationId}${query}`);
+      if (loadConversationRef.current !== requestId) {
+        return;
+      }
       let conversation = data.conversation;
       const messages = data.messages || [];
 
@@ -754,11 +811,61 @@ function App() {
 
       setActiveConversation(conversation);
       setMessages(messages);
+      setMessagesHasMore(Boolean(data.has_more));
+      setMessagesCursor(data.next_cursor || messages[0]?.created_at || null);
       markConversationRead(conversation);
     } catch (error) {
       setPageError(normalizeError(error));
     } finally {
-      setLoadingConversation(false);
+      if (loadConversationRef.current === requestId) {
+        setLoadingConversation(false);
+      }
+    }
+  }
+
+  async function loadOlderMessages(conversationId) {
+    if (!messagesHasMore || messagesLoadingMore) {
+      return;
+    }
+    const cursor = messagesCursor;
+    if (!cursor) {
+      setMessagesHasMore(false);
+      return;
+    }
+    setMessagesLoadingMore(true);
+    const el = chatBodyRef.current;
+    const prevHeight = el ? el.scrollHeight : 0;
+    const prevScrollTop = el ? el.scrollTop : 0;
+    try {
+      const query = `?limit=${LOAD_MORE_LIMIT}&before=${encodeURIComponent(cursor)}`;
+      const data = await apiGet(`/api/conversations/${conversationId}${query}`);
+      if (activeConversation?.id !== conversationId) {
+        return;
+      }
+      const older = data.messages || [];
+      if (older.length) {
+        setMessages((prev) => {
+          const seen = new Set(prev.map((msg) => msg.id));
+          const uniqueOlder = older.filter((msg) => !seen.has(msg.id));
+          return [...uniqueOlder, ...prev];
+        });
+        setMessagesCursor(data.next_cursor || older[0]?.created_at || cursor);
+        setMessagesHasMore(Boolean(data.has_more));
+        requestAnimationFrame(() => {
+          const node = chatBodyRef.current;
+          if (!node) {
+            return;
+          }
+          const newHeight = node.scrollHeight;
+          node.scrollTop = newHeight - prevHeight + prevScrollTop;
+        });
+      } else {
+        setMessagesHasMore(false);
+      }
+    } catch (error) {
+      setPageError(normalizeError(error));
+    } finally {
+      setMessagesLoadingMore(false);
     }
   }
 
@@ -858,6 +965,7 @@ function App() {
     el.scrollTop = el.scrollHeight;
     setIsAtBottom(true);
     setHasUnread(false);
+    scheduleDayLabelUpdate();
   }
 
   function markConversationRead(conversation) {
@@ -885,11 +993,66 @@ function App() {
     if (atBottom) {
       setHasUnread(false);
     }
+    if (
+      el.scrollTop < 120 &&
+      messagesHasMore &&
+      !messagesLoadingMore &&
+      activeConversation
+    ) {
+      void loadOlderMessages(activeConversation.id);
+    }
+    scheduleDayLabelUpdate();
+  }
+
+  function resetMessageState() {
+    setMessages([]);
+    setMessagesCursor(null);
+    setMessagesHasMore(false);
+    setMessagesLoadingMore(false);
+    lastMessageMetaRef.current = {
+      conversationId: null,
+      lastId: null,
+      length: 0,
+    };
+  }
+
+  function scheduleDayLabelUpdate() {
+    if (dayLabelRafRef.current) {
+      return;
+    }
+    dayLabelRafRef.current = requestAnimationFrame(() => {
+      dayLabelRafRef.current = null;
+      updateVisibleDayLabel();
+    });
+  }
+
+  function updateVisibleDayLabel() {
+    const el = chatBodyRef.current;
+    if (!el) {
+      return;
+    }
+    const pills = el.querySelectorAll(".day-pill");
+    if (!pills.length) {
+      setScrollDayLabel("");
+      return;
+    }
+    const scrollTop = el.scrollTop;
+    const offset = 12;
+    let current = pills[0];
+    for (const pill of pills) {
+      if (pill.offsetTop - offset <= scrollTop) {
+        current = pill;
+      } else {
+        break;
+      }
+    }
+    const nextLabel = current.dataset.dayLabel || current.textContent || "";
+    setScrollDayLabel(nextLabel);
   }
 
   function handleBackToList() {
     setActiveConversation(null);
-    setMessages([]);
+    resetMessageState();
   }
 
   function handleQuickAction(text) {
@@ -1915,9 +2078,10 @@ function App() {
       ? `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
       : "";
     if (dayKey && dayKey !== lastDayKey) {
+      const dayLabel = formatMessageDayLabel(createdAt);
       messageBlocks.push(
-        <div className="day-pill" key={`day-${dayKey}`}>
-          {formatMessageDayLabel(createdAt)}
+        <div className="day-pill" data-day-label={dayLabel} key={`day-${dayKey}`}>
+          {dayLabel}
         </div>
       );
       lastDayKey = dayKey;
@@ -1927,6 +2091,8 @@ function App() {
         key={message.id}
         className={`message ${message.direction} ${message.type === "note" ? "note" : ""
           }`}
+        data-day-key={dayKey}
+        data-day-label={dayKey ? formatMessageDayLabel(createdAt) : ""}
       >
         <div className="message-text">{message.text || `[${message.type}]`}</div>
         <div className="message-meta">{formatDate(message.created_at)}</div>
@@ -1946,7 +2112,7 @@ function App() {
         onToggleTheme={toggleTheme}
         user={user}
         logoUrl={branding?.logo_url || ""}
-        brandName={branding?.brand_name || ""}
+        brandName={displayBrandName}
         isProfileOpen={isProfileOpen}
         onToggleProfile={() => setIsProfileOpen((prev) => !prev)}
         onLogout={handleLogout}
@@ -2008,6 +2174,7 @@ function App() {
           pageError={pageError}
           isOffline={isOffline}
           onDismissError={() => setPageError("")}
+          brandName={displayBrandName}
         />
       ) : view === "superadmin" ? (
         <main className="content content-page">
@@ -2025,7 +2192,7 @@ function App() {
                 activeConversation={activeConversation}
                 conversations={conversations}
                 channels={tenantChannels}
-                brandName={branding?.brand_name || ""}
+                brandName={displayBrandName}
                 lastReadMap={lastReadMap}
                 filters={filters}
                 showFilters={showFilters}
@@ -2046,6 +2213,7 @@ function App() {
                 loadingConversation={loadingConversation}
                 isInfoOpen={isInfoOpen}
                 hasUnread={hasUnread}
+                scrollDayLabel={scrollDayLabel}
                 activeName={activeName}
                 activePhone={activePhone}
                 activeStatusLabel={activeStatusLabel}
@@ -2094,6 +2262,7 @@ function App() {
               statusCounts={statusCounts}
               metrics={metrics}
               onRefresh={loadMetrics}
+              brandName={displayBrandName}
             />
           )}
           {view === "campaigns" && (
@@ -2115,6 +2284,7 @@ function App() {
               onLoadCampaignMessages={loadCampaignMessages}
               onSendCampaign={handleSendCampaign}
               formatDate={formatDate}
+              brandName={displayBrandName}
             />
           )}
 

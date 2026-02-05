@@ -29,7 +29,10 @@ function TemplateEditorView({
     onSubmitToMeta,
     onDiscard,
     odooFields,
+    brandName = "",
 }) {
+    const brandLabel = (brandName || "PODOPIE").trim();
+    const brandInitial = brandLabel.charAt(0).toUpperCase() || "P";
     const [formData, setFormData] = useState({
         name: "",
         category: "UTILITY",
@@ -254,7 +257,7 @@ function TemplateEditorView({
                             id="body-text-input"
                             value={formData.body_text}
                             onChange={(e) => handleInputChange("body_text", e.target.value)}
-                            placeholder="Hola {{1}}, te recordamos tu cita en PODOPIE para el día {{2}} a las {{3}}. Por favor, confirma tu asistencia."
+                            placeholder={`Hola {{1}}, te recordamos tu cita en ${brandLabel} para el día {{2}} a las {{3}}. Por favor, confirma tu asistencia.`}
                             rows={6}
                             disabled={!isDraft}
                         />
@@ -318,9 +321,9 @@ function TemplateEditorView({
                         <div className="phone-header">
                             <span className="back-arrow">←</span>
                             <div className="contact-info">
-                                <div className="avatar">P</div>
+                                <div className="avatar">{brandInitial}</div>
                                 <div>
-                                    <div className="contact-name">PODOPIE Clinic</div>
+                                    <div className="contact-name">{brandLabel}</div>
                                     <div className="contact-status">Online</div>
                                 </div>
                             </div>

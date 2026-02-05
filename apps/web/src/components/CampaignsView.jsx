@@ -29,7 +29,7 @@ const CAMPAIGN_TABS = [
   {
     id: "audiences",
     label: "Audiencias",
-    title: "PERZIVALH Audiencias",
+    title: "Audiencias",
     subtitle: "MÓDULO DE GESTIÓN Y CAMPAÑAS",
   },
   {
@@ -41,7 +41,7 @@ const CAMPAIGN_TABS = [
   {
     id: "new",
     label: "Campañas",
-    title: "Gestión de Campañas",
+    title: "Campañas",
     subtitle: "Historial de envíos y difusión WhatsApp",
   },
 ];
@@ -110,7 +110,9 @@ function CampaignsView({
   onLoadCampaignMessages,
   onSendCampaign,
   formatDate,
+  brandName,
 }) {
+  const brandLabel = (brandName || "Perzivalh").trim();
   const [templateSearch, setTemplateSearch] = useState("");
   const [templateCategory, setTemplateCategory] = useState("all");
   const [templatePreviewOpen, setTemplatePreviewOpen] = useState(false);
@@ -129,6 +131,14 @@ function CampaignsView({
   const formRef = useRef(null);
   const [audienceFlowOpen, setAudienceFlowOpen] = useState(false);
   const [audienceFlowTab, setAudienceFlowTab] = useState("dynamic");
+  const audienceFlowTabs = useMemo(
+    () =>
+      AUDIENCE_FLOW_TABS.map((tab) => ({
+        ...tab,
+        subtitle: tab.subtitle.replace(/Perzivalh/g, brandLabel),
+      })),
+    [brandLabel]
+  );
   const [automationSettings, setAutomationSettings] = useState({
     enabled: false,
     phone_number_id: null,
@@ -770,12 +780,12 @@ function CampaignsView({
   const activeTabMeta =
     CAMPAIGN_TABS.find((tab) => tab.id === activeTab) || CAMPAIGN_TABS[1];
   const campaignLaunchMeta = {
-    title: "PERZIVALH Campañas",
+    title: "Campañas",
     subtitle: "CONFIGURACIÓN DE NUEVO ENVÍO MASIVO",
   };
   const activeAudienceMeta =
-    AUDIENCE_FLOW_TABS.find((tab) => tab.id === audienceFlowTab) ||
-    AUDIENCE_FLOW_TABS[0];
+    audienceFlowTabs.find((tab) => tab.id === audienceFlowTab) ||
+    audienceFlowTabs[0];
   const headerMeta = audienceFlowOpen
     ? activeAudienceMeta
     : activeTab === "new" && campaignLaunchOpen

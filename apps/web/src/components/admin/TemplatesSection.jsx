@@ -34,7 +34,9 @@ function TemplatesSection({
     handleTemplateDelete,
     handleSyncTemplates,
     onLoadTemplates,
+    brandName = "",
 }) {
+    const brandLabel = (brandName || "PODOPIE").trim();
     const [view, setView] = useState("list"); // 'list' | 'editor'
     const [editingTemplate, setEditingTemplate] = useState(null);
     const [search, setSearch] = useState("");
@@ -431,7 +433,7 @@ function TemplatesSection({
                         </div>
                         <textarea
                             rows="6"
-                            placeholder="Hola {{1}}, te recordamos tu cita en PODOPIE para el día {{2}} a las {{3}}. Por favor, confirma tu asistencia."
+                            placeholder={`Hola {{1}}, te recordamos tu cita en ${brandLabel} para el día {{2}} a las {{3}}. Por favor, confirma tu asistencia.`}
                             value={editorForm.body_text}
                             onChange={(e) => setEditorForm({ ...editorForm, body_text: e.target.value })}
                         />
@@ -446,7 +448,7 @@ function TemplatesSection({
                             <span className="phone-back">←</span>
                             <div className="phone-contact">
                                 <div className="phone-avatar">🏥</div>
-                                <div className="phone-name">PODOPIE Clinic</div>
+                                <div className="phone-name">{brandLabel}</div>
                             </div>
                             <div className="phone-icons">📹 📞</div>
                         </div>

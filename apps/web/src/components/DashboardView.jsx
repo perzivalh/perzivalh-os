@@ -45,7 +45,9 @@ function buildPath(points) {
     .join(" ");
 }
 
-function DashboardView({ statusCounts, metrics, onRefresh }) {
+function DashboardView({ statusCounts, metrics, onRefresh, brandName }) {
+  const brandLabel = (brandName || "Empresa").trim();
+  const kicker = brandLabel ? `${brandLabel} Enterprise` : "Enterprise";
   const activeConversations = (statusCounts.open || 0) + (statusCounts.pending || 0);
   const responseMinutes = metrics?.avg_first_reply_seconds
     ? Number(metrics.avg_first_reply_seconds) / 60
@@ -109,7 +111,7 @@ function DashboardView({ statusCounts, metrics, onRefresh }) {
       <div className="dashboard-main">
         <header className="dashboard-header">
           <div>
-            <div className="dashboard-kicker">PODOPIE Enterprise</div>
+            <div className="dashboard-kicker">{kicker}</div>
             <h2 className="dashboard-title">Dashboard</h2>
             <div className="dashboard-subtitle">
               Marketing Analytics & WhatsApp CRM Overview

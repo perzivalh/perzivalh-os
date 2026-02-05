@@ -25,6 +25,7 @@ function ChatView({
   loadingConversation,
   isInfoOpen,
   hasUnread,
+  scrollDayLabel,
   activeName,
   activePhone,
   activeStatusLabel,
@@ -348,6 +349,11 @@ function ChatView({
             </header>
 
             <div className="chat-body" ref={chatBodyRef} onScroll={handleChatScroll}>
+              {scrollDayLabel && (
+                <div className="chat-day-sticky" aria-hidden="true">
+                  {scrollDayLabel}
+                </div>
+              )}
               {loadingConversation && <div className="empty">Cargando...</div>}
               {!loadingConversation && !activeConversation && (
                 <div className="empty">Selecciona una conversacion</div>

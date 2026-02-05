@@ -32,16 +32,16 @@ body[data-theme="dark"] {
   --panel-muted: #151515;
   --ink: #e6e6e6;
   --muted: #9a9a9a;
-  --accent: #c7c7c7;
-  --accent-strong: #e2e2e2;
-  --accent-soft: rgba(255, 255, 255, 0.08);
-  --accent-soft-2: rgba(255, 255, 255, 0.05);
+  --accent: #ef4444;
+  --accent-strong: #dc2626;
+  --accent-soft: rgba(239, 68, 68, 0.18);
+  --accent-soft-2: rgba(239, 68, 68, 0.1);
   --danger: #e86b6b;
   --success: #4bc28f;
   --border: #1f1f1f;
   --shadow: rgba(0, 0, 0, 0.6);
-  --scroll-thumb: rgba(255, 255, 255, 0.18);
-  --scroll-thumb-hover: rgba(255, 255, 255, 0.28);
+  --scroll-thumb: rgba(239, 68, 68, 0.35);
+  --scroll-thumb-hover: rgba(239, 68, 68, 0.55);
   --scroll-track: transparent;
 }
 

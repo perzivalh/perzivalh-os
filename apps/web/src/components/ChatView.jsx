@@ -13,7 +13,6 @@ function ChatView({
   statusOptions,
   statusLabels,
   formatListTime,
-  formatCompactDate,
   messageBlocks,
   messageDraft,
   messageMode,
@@ -352,7 +351,7 @@ function ChatView({
               {scrollDayLabel && (
                 <div className="chat-day-sticky" aria-hidden="true">
                   {scrollDayLabel}
-                </div>
+                  </div>
               )}
               {loadingConversation && <div className="empty">Cargando...</div>}
               {!loadingConversation && !activeConversation && (
@@ -365,9 +364,6 @@ function ChatView({
                   ) : (
                     <div className="empty-state">Sin mensajes</div>
                   )}
-                  <div className="chat-encryption">
-                    Los mensajes estan cifrados de extremo a extremo.
-                  </div>
                 </>
               )}
             </div>
@@ -388,19 +384,21 @@ function ChatView({
                   Conversacion tomada por otro operador.
                 </div>
               )}
-              <div className="quick-actions">
-                {quickActions.map((action) => (
-                  <button
-                    key={action}
-                    className="quick-action"
-                    type="button"
-                    onClick={() => handleQuickAction(action)}
-                    disabled={isAssignedToOther}
-                  >
-                    {action}
-                  </button>
-                ))}
-              </div>
+              {quickActions.length > 0 && (
+                <div className="quick-actions">
+                  {quickActions.map((action) => (
+                    <button
+                      key={action}
+                      className="quick-action"
+                      type="button"
+                      onClick={() => handleQuickAction(action)}
+                      disabled={isAssignedToOther}
+                    >
+                      {action}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="composer-row">
                 <select
                   className="message-mode"
@@ -434,34 +432,6 @@ function ChatView({
             </div>
             <div className="info-name">{activeName}</div>
             <div className="info-phone">{activePhone || "Sin telefono"}</div>
-            <button className="primary" type="button">
-              Abrir en Odoo
-            </button>
-          </div>
-
-          <div className="info-section">
-            <div className="section-title">Informacion del paciente</div>
-            <div className="info-row">
-              <span>Ultima visita</span>
-              <span>
-                {formatCompactDate(
-                  activeConversation?.last_visit_at ||
-                    activeConversation?.last_visit
-                )}
-              </span>
-            </div>
-            <div className="info-row">
-              <span>Tratamiento actual</span>
-              <span>
-                {activeConversation?.current_treatment ||
-                  activeConversation?.treatment ||
-                  "-"}
-              </span>
-            </div>
-            <div className="info-row">
-              <span>Alergias</span>
-              <span>{activeConversation?.allergies || "Ninguna reportada"}</span>
-            </div>
           </div>
 
           <div className="info-section">

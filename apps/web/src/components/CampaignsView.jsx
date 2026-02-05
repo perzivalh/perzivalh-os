@@ -599,6 +599,22 @@ function CampaignsView({
     return segments.find((segment) => segment.id === selectedAudienceId);
   }, [segments, selectedAudienceId]);
 
+  const previewButtons = useMemo(() => {
+    const raw = selectedTemplate?.buttons_json ?? selectedTemplate?.buttons ?? [];
+    if (Array.isArray(raw)) {
+      return raw;
+    }
+    if (typeof raw === "string") {
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        return [];
+      }
+    }
+    return [];
+  }, [selectedTemplate]);
+
   const audienceTotalPages = useMemo(() => {
     return Math.max(1, Math.ceil(audienceContactsTotal / audiencePageSize));
   }, [audienceContactsTotal, audiencePageSize]);
@@ -1961,10 +1977,15 @@ function CampaignsView({
                             selectedTemplate?.body_text ||
                             "Selecciona una plantilla para ver el contenido."}
                         </div>
-                        <div className="preview-actions">
-                          <button type="button">Ver Tutorial</button>
-                          <button type="button">Hablar con Soporte</button>
-                        </div>
+                        {previewButtons.length > 0 && (
+                          <div className="preview-actions">
+                            {previewButtons.map((btn, index) => (
+                              <button type="button" key={`preview-btn-${index}`}>
+                                {btn.text || btn.label || `Boton ${index + 1}`}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                         <div className="preview-time">10:45 AM</div>
                       </div>
                       <div className="preview-phone-input">

@@ -2077,6 +2077,61 @@ body[data-theme="dark"] .audience-rule-card {
   color: #d8b4fe;
 }
 
+@media (max-width: 900px) {
+  .campaigns-launch {
+    grid-template-columns: 1fr;
+  }
+
+  .campaigns-launch-preview {
+    border-left: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .campaigns-launch {
+    padding: 1rem;
+    gap: 1.2rem;
+  }
+
+  .launch-step {
+    grid-template-columns: 1fr;
+  }
+
+  .launch-step-number {
+    width: 28px;
+    height: 28px;
+  }
+
+  .launch-templates {
+    grid-template-columns: 1fr;
+  }
+
+  .campaigns-launch-preview {
+    padding: 1rem;
+  }
+
+  .preview-phone {
+    max-width: 100%;
+    border-width: 8px;
+    padding: 1rem;
+    min-height: 360px;
+  }
+
+  .preview-phone-body {
+    min-height: 220px;
+  }
+
+  .preview-actions button {
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .preview-phone {
+    border-width: 6px;
+  }
+}
+
 @media (min-width: 640px) {
   .campaigns-shell {
     padding: 0 1.5rem;

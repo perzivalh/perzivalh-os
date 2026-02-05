@@ -17,7 +17,6 @@ import NoticeBanner from "./components/NoticeBanner.jsx";
 import { STATUS_OPTIONS, BASE_ROLE_OPTIONS, DEFAULT_ROLE_PERMISSIONS } from "./constants";
 import {
   formatDate,
-  formatCompactDate,
   formatListTime,
   formatMessageDayLabel,
   formatDuration,
@@ -1214,7 +1213,32 @@ function App() {
       const data = await apiPatch(`/api/conversations/${activeConversation.id}/status`, {
         status,
       });
-      setActiveConversation(data.conversation);
+      let nextConversation = data.conversation;
+      if (status === "open" && nextConversation?.tags?.length) {
+        const pendingTag = nextConversation.tags.find(
+          (tag) => (tag.name || "").toLowerCase() === "pendiente"
+        );
+        if (pendingTag) {
+          try {
+            const tagResult = await apiPost(
+              `/api/conversations/${nextConversation.id}/tags`,
+              { add: [], remove: [pendingTag.name] }
+            );
+            nextConversation = tagResult.conversation || nextConversation;
+          } catch (error) {
+            nextConversation = {
+              ...nextConversation,
+              tags: nextConversation.tags.filter((tag) => tag.name !== pendingTag.name),
+            };
+          }
+        }
+      }
+      setActiveConversation(nextConversation);
+      setConversations((prev) =>
+        prev.map((item) =>
+          item.id === nextConversation.id ? { ...item, ...nextConversation } : item
+        )
+      );
     } catch (error) {
       setPageError(normalizeError(error));
     }
@@ -2109,7 +2133,7 @@ function App() {
   const canViewAdmin = hasPermission(roleAccess, "modules", "settings");
   const isAdmin = hasRole(user, ["admin"]);
   const canManageStatus = hasPermission(roleAccess, "modules", "chat", "write");
-  const quickActions = ["Confirmar Cita", "Solicitar Resultados", "Urgencia"];
+  const quickActions = [];
   const statusLabels = {
     open: "Bot activo",
     pending: "Pendiente",
@@ -2277,7 +2301,6 @@ function App() {
                 statusOptions={STATUS_OPTIONS}
                 statusLabels={statusLabels}
                 formatListTime={formatListTime}
-                formatCompactDate={formatCompactDate}
                 messageBlocks={messageBlocks}
                 messageDraft={messageDraft}
                 messageMode={messageMode}
@@ -2325,13 +2348,13 @@ function App() {
                 setMessageDraft={setMessageDraft}
                 scrollChatToBottom={scrollChatToBottom}
                 getInitial={getInitial}
-              PlusIcon={PlusIcon}
-              SearchIcon={SearchIcon}
-              VideoIcon={VideoIcon}
-              PhoneIcon={PhoneIcon}
-              InfoIcon={InfoIcon}
-              SendIcon={SendIcon}
-            />
+                PlusIcon={PlusIcon}
+                SearchIcon={SearchIcon}
+                VideoIcon={VideoIcon}
+                PhoneIcon={PhoneIcon}
+                InfoIcon={InfoIcon}
+                SendIcon={SendIcon}
+              />
           )}
           {view === "dashboard" && (
             <DashboardView

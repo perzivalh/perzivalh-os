@@ -3,7 +3,7 @@ import { apiGet, apiPatch, apiPost, apiDelete } from "../api";
 import BotSection from "./superadmin/BotSection";
 import { useToast } from "./ToastProvider.jsx";
 
-// Importar desde mÃ³dulos
+// Importar desde módulos
 import {
   EMPTY_PROVISION,
   PLAN_OPTIONS,
@@ -28,6 +28,7 @@ function SuperAdminView({
 }) {
   const [tenants, setTenants] = useState([]);
   const [channels, setChannels] = useState([]);
+  const [tenantChannelsDetailed, setTenantChannelsDetailed] = useState([]);
   const [tenantSearch, setTenantSearch] = useState("");
   const [error, setError] = useState("");
   const [statusNote, setStatusNote] = useState("Verificacion de red: sistema ok");
@@ -153,6 +154,7 @@ function SuperAdminView({
     setEditTenantActive(true);
     setBaselineActive(true);
     setTenantBots([]);
+    setTenantChannelsDetailed([]);
     setStatusNote("Verificacion de red: sistema ok");
     latestTenantRequest.current = "";
   }
@@ -203,6 +205,7 @@ function SuperAdminView({
     setEditTenantActive(true);
     setBaselineActive(true);
     setTenantBots([]);
+    setTenantChannelsDetailed([]);
     setDetailsLoading(true);
     setError("");
     try {
@@ -215,6 +218,7 @@ function SuperAdminView({
       const odoo = response.odoo || null;
       const database = response.database || null;
       const channel = response.channel || null;
+      setTenantChannelsDetailed(response.channels || []);
       const colors = branding?.colors || {};
       const nextForm = normalizeProvision({
         ...EMPTY_PROVISION,
@@ -244,6 +248,19 @@ function SuperAdminView({
       setError(err.message || "No se pudo cargar tenant.");
     } finally {
       setDetailsLoading(false);
+    }
+  }
+
+  async function loadTenantChannels(tenantId) {
+    if (!tenantId) return;
+    try {
+      const response = await apiGet(`/api/superadmin/tenants/${tenantId}/details`);
+      if (editTenantId && editTenantId !== tenantId) {
+        return;
+      }
+      setTenantChannelsDetailed(response.channels || []);
+    } catch (err) {
+      console.error("Error loading tenant channels", err);
     }
   }
 
@@ -339,6 +356,13 @@ function SuperAdminView({
   async function handleManageTenant(tenant) {
     setError("");
     navigate(`/superadmin/tenants/${tenant.id}`);
+  }
+
+  async function refreshLines() {
+    await loadData();
+    if (editTenantId) {
+      await loadTenantChannels(editTenantId);
+    }
   }
 
   function validateProvision() {
@@ -1011,13 +1035,17 @@ function SuperAdminView({
             {/* WhatsApp Lines Section - only show when editing existing tenant */}
             {editTenantId ? (
               <WhatsAppLinesSection
-                channels={channels.filter((c) => c.tenant_id === editTenantId)}
+                channels={
+                  tenantChannelsDetailed.length
+                    ? tenantChannelsDetailed
+                    : channels.filter((c) => c.tenant_id === editTenantId)
+                }
                 tenantId={editTenantId}
-                onRefresh={loadData}
+                onRefresh={refreshLines}
               />
             ) : (
               <div style={{ marginTop: "2rem", padding: "1rem", border: "1px dashed rgba(255,255,255,0.2)", borderRadius: "12px", color: "rgba(255,255,255,0.5)", fontSize: "0.8rem", textAlign: "center" }}>
-                Crea el tenant primero para configurar las lÃ­neas de WhatsApp.
+                Crea el tenant primero para configurar las líneas de WhatsApp.
               </div>
             )}
 

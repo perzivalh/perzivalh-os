@@ -548,14 +548,14 @@ module.exports = {
     {
       id: "SVC_PEDICURE_STEP_5",
       type: "image",
-      url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Pedicure%20Cl%C3%ADnico/5.jpg",
+      url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Pedicure%20Cl%C3%ADnico/5.jpeg",
       text: " ",
       next: "SVC_PEDICURE_STEP_6",
     },
     {
       id: "SVC_PEDICURE_STEP_6",
       type: "image",
-      url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Pedicure%20Cl%C3%ADnico/6.jpg",
+      url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Pedicure%20Cl%C3%ADnico/6.jpeg",
       text:
         "Estos paquetes se realizan únicamente bajo recomendación del especialista 🩺, ya que durante la valoración 🔍 se determinará si el paciente necesita o no dicho tratamiento ✅❌.",
       next: "SVC_PEDICURE_ACTIONS",

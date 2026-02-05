@@ -224,6 +224,38 @@ function App() {
   const INITIAL_MESSAGE_LIMIT = 80;
   const LOAD_MORE_LIMIT = 60;
   const MAX_MESSAGES_IN_MEMORY = 320;
+  const CACHE_MESSAGE_LIMIT = 120;
+  const MAX_CACHE_CONVERSATIONS = 5;
+  const CACHE_TTL_MS = 2 * 60 * 1000;
+  const messageCacheRef = useRef(new Map());
+
+  function pruneMessageCache() {
+    const cache = messageCacheRef.current;
+    while (cache.size > MAX_CACHE_CONVERSATIONS) {
+      const oldestKey = cache.keys().next().value;
+      cache.delete(oldestKey);
+    }
+  }
+
+  function getCachedConversation(conversationId) {
+    const cache = messageCacheRef.current;
+    const entry = cache.get(conversationId);
+    if (!entry) {
+      return null;
+    }
+    if (Date.now() - entry.updatedAt > CACHE_TTL_MS) {
+      cache.delete(conversationId);
+      return null;
+    }
+    return entry;
+  }
+
+  function setCachedConversation(conversationId, payload) {
+    const cache = messageCacheRef.current;
+    cache.delete(conversationId);
+    cache.set(conversationId, { ...payload, updatedAt: Date.now() });
+    pruneMessageCache();
+  }
 
   const navigateTo = useCallback((nextPath, options = {}) => {
     if (typeof window === "undefined") {
@@ -359,6 +391,21 @@ function App() {
       setMessagesHasMore(true);
     }
   }, [messages, activeConversation?.id, isAtBottom]);
+
+  useEffect(() => {
+    if (!activeConversation?.id) {
+      return;
+    }
+    if (!messages.length) {
+      return;
+    }
+    const payload = {
+      messages: messages.slice(-CACHE_MESSAGE_LIMIT),
+      cursor: messagesCursor || messages[0]?.created_at || null,
+      hasMore: messagesHasMore,
+    };
+    setCachedConversation(activeConversation.id, payload);
+  }, [messages, messagesCursor, messagesHasMore, activeConversation?.id]);
 
   useEffect(() => {
     if (view === "chats") {
@@ -781,8 +828,19 @@ function App() {
   }
 
   async function loadConversation(conversationId) {
-    setLoadingConversation(true);
+    const cached = getCachedConversation(conversationId);
+    const quickConversation = conversations.find((item) => item.id === conversationId);
+    setLoadingConversation(!cached);
     resetMessageState();
+    if (quickConversation) {
+      setActiveConversation(quickConversation);
+    }
+    if (cached) {
+      setMessages(cached.messages || []);
+      setMessagesCursor(cached.cursor || null);
+      setMessagesHasMore(Boolean(cached.hasMore));
+      scheduleDayLabelUpdate();
+    }
     const requestId = loadConversationRef.current + 1;
     loadConversationRef.current = requestId;
     try {
@@ -813,6 +871,11 @@ function App() {
       setMessages(messages);
       setMessagesHasMore(Boolean(data.has_more));
       setMessagesCursor(data.next_cursor || messages[0]?.created_at || null);
+      setCachedConversation(conversationId, {
+        messages: messages.slice(-CACHE_MESSAGE_LIMIT),
+        cursor: data.next_cursor || messages[0]?.created_at || null,
+        hasMore: Boolean(data.has_more),
+      });
       markConversationRead(conversation);
     } catch (error) {
       setPageError(normalizeError(error));

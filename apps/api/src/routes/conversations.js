@@ -317,6 +317,14 @@ router.get("/conversations/:id", requireAuth, async (req, res) => {
         : 48;
     const usePaged = limit > 0 || before;
 
+    const messageSelect = {
+        id: true,
+        text: true,
+        type: true,
+        direction: true,
+        created_at: true,
+    };
+
     if (usePaged) {
         const take = limit > 0 ? limit : 80;
         const now = Date.now();
@@ -340,6 +348,7 @@ router.get("/conversations/:id", requireAuth, async (req, res) => {
             where,
             orderBy: { created_at: "desc" },
             take: take + 1,
+            select: messageSelect,
         });
 
         let hasMore = rows.length > take;
@@ -357,6 +366,7 @@ router.get("/conversations/:id", requireAuth, async (req, res) => {
                 },
                 orderBy: { created_at: "desc" },
                 take: remaining + 1,
+                select: messageSelect,
             });
             const extraHasMore = extra.length > remaining;
             const extraRows = extraHasMore ? extra.slice(0, remaining) : extra;
@@ -380,6 +390,7 @@ router.get("/conversations/:id", requireAuth, async (req, res) => {
         where: { conversation_id: conversationId },
         orderBy: { created_at: "asc" },
         take: 500,
+        select: messageSelect,
     });
 
     return res.json({ conversation, messages });

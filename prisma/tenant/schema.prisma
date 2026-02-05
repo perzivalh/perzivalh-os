@@ -136,6 +136,7 @@ model Message {
   conversation    Conversation     @relation(fields: [conversation_id], references: [id])
 
   @@index([conversation_id, created_at])
+  @@index([conversation_id, created_at(sort: Desc)], map: "message_conversation_id_created_at_desc_idx")
 }
 
 model Tag {

@@ -101,7 +101,26 @@ export function normalizeError(error) {
         return "Error inesperado";
     }
     if (typeof error === "string") {
+        if (error === "offline") {
+            return "Sin conexión a internet. Revisa tu red y vuelve a intentar.";
+        }
+        if (error === "network_error") {
+            return "No se pudo conectar con el servidor. Intenta de nuevo.";
+        }
+        if (error === "request_failed") {
+            return "No se pudo completar la solicitud. Intenta nuevamente.";
+        }
         return error;
     }
-    return error.message || "Error inesperado";
+    const message = error.message || "Error inesperado";
+    if (message === "offline" || message.toLowerCase().includes("failed to fetch")) {
+        return "Sin conexión a internet. Revisa tu red y vuelve a intentar.";
+    }
+    if (message === "network_error" || message.toLowerCase().includes("networkerror")) {
+        return "No se pudo conectar con el servidor. Intenta de nuevo.";
+    }
+    if (message === "request_failed") {
+        return "No se pudo completar la solicitud. Intenta nuevamente.";
+    }
+    return message;
 }

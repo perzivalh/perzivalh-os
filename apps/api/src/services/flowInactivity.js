@@ -1,7 +1,7 @@
 const logger = require("../lib/logger");
 const prisma = require("../db");
 const sessionStore = require("../sessionStore");
-const { sendText } = require("../whatsapp");
+const { sendText, sendImage, sendVideo } = require("../whatsapp");
 const { resolveTenantContextByPhoneNumberId } = require("../tenancy/tenantResolver");
 const { getFlow } = require("../../flows");
 const {
@@ -19,22 +19,89 @@ function findNodeText(flow, nodeId) {
   return node?.text || null;
 }
 
-async function sendWithTenantContext(session, text) {
-  if (!text) {
-    return;
+function buildNodeMap(flow) {
+  const map = new Map();
+  for (const node of flow?.nodes || []) {
+    if (node?.id) {
+      map.set(node.id, node);
+    }
   }
+  return map;
+}
+
+function buildLinearSequence(flow, startId, limit = 12) {
+  if (!startId) {
+    return [];
+  }
+  const map = buildNodeMap(flow);
+  const sequence = [];
+  const visited = new Set();
+  let currentId = startId;
+
+  while (currentId && !visited.has(currentId) && sequence.length < limit) {
+    const node = map.get(currentId);
+    if (!node) {
+      break;
+    }
+    sequence.push(node);
+    visited.add(currentId);
+    if (node.terminal) {
+      break;
+    }
+    const hasButtons = Array.isArray(node.buttons) && node.buttons.length > 0;
+    if (hasButtons) {
+      break;
+    }
+    currentId = node.next || null;
+  }
+
+  return sequence;
+}
+
+async function sendWithTenantContext(session, sendFn) {
   const context = await resolveTenantContextByPhoneNumberId(session.phone_number_id);
   if (!context) {
     return;
   }
   await prisma.runWithPrisma(
     context.prisma,
-    () => sendText(session.wa_id, text),
+    () => sendFn(),
     { tenantId: context.tenantId, channel: context.channel }
   );
 }
 
-async function handleSession(session, now, flow, closingText) {
+async function sendNodeWithTenantContext(session, node) {
+  if (!node) {
+    return;
+  }
+  const bodyText = node.text || node.title || "";
+  if (node.type === "image") {
+    const url = node.url || node.media || node.image;
+    if (!url) {
+      return;
+    }
+    await sendWithTenantContext(session, () =>
+      sendImage(session.wa_id, url, bodyText || null)
+    );
+    return;
+  }
+  if (node.type === "video") {
+    const url = node.url || node.media || node.video;
+    if (!url) {
+      return;
+    }
+    await sendWithTenantContext(session, () =>
+      sendVideo(session.wa_id, url, bodyText || null)
+    );
+    return;
+  }
+  if (!bodyText) {
+    return;
+  }
+  await sendWithTenantContext(session, () => sendText(session.wa_id, bodyText));
+}
+
+async function handleSession(session, now, flow, closingText, closingSequence) {
   if (!session?.wa_id || !session.phone_number_id) {
     return;
   }
@@ -59,14 +126,25 @@ async function handleSession(session, now, flow, closingText) {
 
   if (noticeAt) {
     if (now - noticeAt >= FINAL_AFTER_NOTICE_MS) {
-      await sendWithTenantContext(session, closingText);
+      if (Array.isArray(closingSequence) && closingSequence.length > 0) {
+        for (const node of closingSequence) {
+          await sendNodeWithTenantContext(session, node);
+        }
+      } else {
+        await sendWithTenantContext(session, () =>
+          sendText(
+            session.wa_id,
+            closingText || "Gracias por escribirnos. Si necesitas algo mas, responde MENU."
+          )
+        );
+      }
       await sessionStore.clearSession(session.wa_id, session.phone_number_id);
     }
     return;
   }
 
   if (now - lastUserAt >= FIRST_NOTICE_MS) {
-    await sendWithTenantContext(session, REMINDER_TEXT);
+    await sendWithTenantContext(session, () => sendText(session.wa_id, REMINDER_TEXT));
     await sessionStore.updateSession(session.wa_id, session.phone_number_id, {
       inactivity_notice_at: new Date(now).toISOString(),
       next_due_at: new Date(now + FINAL_AFTER_NOTICE_MS),
@@ -85,6 +163,7 @@ async function processBotpoditoV2Inactivity() {
   const closingText =
     findNodeText(flow, "CIERRE_HORARIO_UBICACION") ||
     "Gracias por escribirnos. Si necesitas algo mas, responde MENU.";
+  const closingSequence = buildLinearSequence(flow, "CIERRE_HORARIO_UBICACION");
 
   const now = Date.now();
   let sessions = [];
@@ -121,7 +200,7 @@ async function processBotpoditoV2Inactivity() {
 
   for (const session of sessions) {
     try {
-      await handleSession(session, now, flow, closingText);
+      await handleSession(session, now, flow, closingText, closingSequence);
     } catch (error) {
       logger.error("flow_inactivity.session_failed", {
         message: error.message || error,

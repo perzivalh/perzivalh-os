@@ -19,10 +19,24 @@ async function request(path, options = {}) {
   if (authToken) {
     headers.Authorization = `Bearer ${authToken}`;
   }
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-  });
+  if (typeof window !== "undefined" && navigator && navigator.onLine === false) {
+    throw new Error("offline");
+  }
+  let response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    if (typeof window !== "undefined" && navigator && navigator.onLine === false) {
+      throw new Error("offline");
+    }
+    if (error instanceof TypeError) {
+      throw new Error("network_error");
+    }
+    throw error;
+  }
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     const errorMessage = errorBody.error || "request_failed";

@@ -3,6 +3,7 @@
  * Refactorizado para usar componentes modulares
  */
 import React from "react";
+import NoticeBanner from "./NoticeBanner.jsx";
 
 // Importar componentes de sección
 import UsersSection from "./admin/UsersSection";
@@ -70,6 +71,8 @@ function AdminView({
   handleRoleDelete,
   useShellLayout = false,
   pageError,
+  isOffline = false,
+  onDismissError,
 }) {
   const roleAccess = rolePermissions?.[currentRole];
 
@@ -213,7 +216,23 @@ function AdminView({
 
         {settingsSection === "odoo" && <OdooSection />}
 
-        {pageError && <div className="error-banner">{pageError}</div>}
+        {isOffline ? (
+          <NoticeBanner
+            variant="offline"
+            title="Sin conexión"
+            message="No podemos actualizar la información en tiempo real. Te mostramos lo último cargado."
+            actionLabel="Reintentar"
+            onAction={() => window.location.reload()}
+          />
+        ) : pageError ? (
+          <NoticeBanner
+            variant="error"
+            title="Ocurrió un problema"
+            message={pageError}
+            dismissLabel="Cerrar"
+            onDismiss={onDismissError}
+          />
+        ) : null}
       </div>
     </>
   );

@@ -11,6 +11,7 @@ import AdminView from "./components/AdminView.jsx";
 import SuperAdminView from "./components/SuperAdminView.jsx";
 import TemplatesView from "./components/TemplatesView.jsx";
 import TemplateEditorView from "./components/TemplateEditorView.jsx";
+import NoticeBanner from "./components/NoticeBanner.jsx";
 
 // Importar desde módulos
 import { STATUS_OPTIONS, BASE_ROLE_OPTIONS, DEFAULT_ROLE_PERMISSIONS } from "./constants";
@@ -71,6 +72,12 @@ function App() {
   );
   const [theme, setTheme] = useState(
     () => localStorage.getItem("theme") || "light"
+  );
+  const [isOffline, setIsOffline] = useState(
+    () =>
+      typeof window !== "undefined" && window.navigator
+        ? !window.navigator.onLine
+        : false
   );
   const [showFilters, setShowFilters] = useState(false);
   const [isInfoOpen, setIsInfoOpen] = useState(
@@ -253,6 +260,22 @@ function App() {
     document.body.dataset.theme = theme;
     localStorage.setItem("theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+    const handleStatus = () => {
+      setIsOffline(!window.navigator.onLine);
+    };
+    handleStatus();
+    window.addEventListener("online", handleStatus);
+    window.addEventListener("offline", handleStatus);
+    return () => {
+      window.removeEventListener("online", handleStatus);
+      window.removeEventListener("offline", handleStatus);
+    };
+  }, []);
 
   useEffect(() => {
     setHasUnread(false);
@@ -1781,6 +1804,15 @@ function App() {
         <div className="login-card">
           <div className="login-title">Perzivalh</div>
           <div className="login-subtitle">{loginSubtitle}</div>
+          {isOffline ? (
+            <NoticeBanner
+              variant="offline"
+              title="Sin conexión"
+              message="No tienes internet en este momento. Conéctate y vuelve a intentar iniciar sesión."
+              actionLabel="Reintentar"
+              onAction={() => window.location.reload()}
+            />
+          ) : null}
           <form className="login-form" onSubmit={handleLogin}>
             <label className="field">
               <span>Email</span>
@@ -1974,6 +2006,8 @@ function App() {
           formatDate={formatDate}
           useShellLayout
           pageError={pageError}
+          isOffline={isOffline}
+          onDismissError={() => setPageError("")}
         />
       ) : view === "superadmin" ? (
         <main className="content content-page">
@@ -2084,7 +2118,23 @@ function App() {
             />
           )}
 
-          {pageError && <div className="error-banner">{pageError}</div>}
+          {isOffline ? (
+            <NoticeBanner
+              variant="offline"
+              title="Sin conexión"
+              message="No podemos actualizar la información en tiempo real. Te mostramos lo último cargado."
+              actionLabel="Reintentar"
+              onAction={() => window.location.reload()}
+            />
+          ) : pageError ? (
+            <NoticeBanner
+              variant="error"
+              title="Ocurrió un problema"
+              message={pageError}
+              dismissLabel="Cerrar"
+              onDismiss={() => setPageError("")}
+            />
+          ) : null}
         </main>
       )}
     </div>

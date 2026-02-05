@@ -1,6 +1,7 @@
 ﻿import React, { useState } from "react";
 import { PlusIcon, SmartphoneIcon, EditIcon, TrashIcon } from "./icons";
 import { WhatsAppLineModal } from "./WhatsAppLineModal";
+import { apiDelete, apiPatch, apiPost } from "../../api";
 
 export function WhatsAppLinesSection({ channels = [], tenantId, onRefresh }) {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -17,23 +18,10 @@ export function WhatsAppLinesSection({ channels = [], tenantId, onRefresh }) {
     };
 
     const handleSave = async (data) => {
-        const url = editingLine
-            ? `/api/superadmin/channels/${editingLine.id}`
-            : `/api/superadmin/channels`;
-        const method = editingLine ? "PATCH" : "POST";
-
-        const res = await fetch(url, {
-            method,
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-            body: JSON.stringify(data),
-        });
-
-        if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.error || "Error al guardar");
+        if (editingLine) {
+            await apiPatch(`/api/superadmin/channels/${editingLine.id}`, data);
+        } else {
+            await apiPost("/api/superadmin/channels", data);
         }
 
         await onRefresh();
@@ -45,14 +33,7 @@ export function WhatsAppLinesSection({ channels = [], tenantId, onRefresh }) {
         }
 
         try {
-            const res = await fetch(`/api/superadmin/channels/${lineId}`, {
-                method: "DELETE",
-                headers: {
-                    Authorization: `Bearer ${localStorage.getItem("token")}`,
-                },
-            });
-
-            if (!res.ok) throw new Error("Error al eliminar");
+            await apiDelete(`/api/superadmin/channels/${lineId}`);
             await onRefresh();
         } catch (error) {
             console.error("Error deleting channel:", error);

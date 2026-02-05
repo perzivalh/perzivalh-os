@@ -1,4 +1,4 @@
-Ôªø/**
+/**
  * Flow: Botpodito V2
  * Flujograma v2 con contacto por llamada o mensaje
  */
@@ -7,7 +7,7 @@ module.exports = {
   name: "Botpodito V2",
   description: "Flujograma V2 con menu principal y contacto personalizado.",
   version: "1.0.0",
-  icon: "ü¶∂",
+  icon: "??",
   category: "salud",
 
   flow_name: "flujogramaV2",
@@ -18,18 +18,19 @@ module.exports = {
     {
       id: "WELCOME",
       type: "text",
-      text: "¬°Hola, {nombre de la persona}! üëã",
+      text: "°Hola, {nombre de la persona}! ??",
       next: "MAIN_MENU",
     },
     {
       id: "MAIN_MENU",
       type: "text",
-      text: "Soy PODITO ü§ñ, tu asistente virtual de PODOPIE ü¶∂‚ú® ¬øEn qu√© puedo ayudarte?",
+      text: "Soy PODITO ??, tu asistente virtual de PODOPIE ??? øEn quÈ puedo ayudarte?",
+      delayMs: 1500,
       buttons: [
-        { label: "üïí Horarios y ubicacion", next: "HORARIOS_INFO" },
-        { label: "üí∞ Precios", next: "PRECIOS_INFO" },
-        { label: "üßº Servicios", next: "SERVICIOS_MENU" },
-        { label: "üë®‚Äçüíª Atencion personal", next: "CONTACT_METHOD" },
+        { label: "?? Horarios y ubicacion", next: "HORARIOS_INFO" },
+        { label: "?? Precios", next: "PRECIOS_INFO" },
+        { label: "?? Servicios", next: "SERVICIOS_MENU" },
+        { label: "????? Atencion personal", next: "CONTACT_METHOD" },
       ],
     },
 
@@ -43,28 +44,28 @@ module.exports = {
       id: "HORARIOS_CENTRAL_HORARIO_IMG",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/centralHorario.jpg",
-      text: "ATENCI√ìN CENTRAL\nPuede venir en estos horarios ‚è∞",
+      text: "ATENCI”N CENTRAL\nPuede venir en estos horarios ?",
       next: "HORARIOS_CENTRAL_UBICACION_IMG",
     },
     {
       id: "HORARIOS_CENTRAL_UBICACION_IMG",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/centralUbicacion.jpg",
-      text: "Haz clic aqu√≠ para ver nuestra ubicaci√≥n en Google Maps:\nhttps://maps.app.goo.gl/eXTejzQhp8zm3EmT8",
+      text: "Haz clic aquÌ para ver nuestra ubicaciÛn en Google Maps:\nhttps://maps.app.goo.gl/eXTejzQhp8zm3EmT8",
       next: "HORARIOS_CENTRAL_LINEAS_IMG",
     },
     {
       id: "HORARIOS_CENTRAL_LINEAS_IMG",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/centralLineas.jpg",
-      text: "üöå L√≠neas que pasan: 74, 38, 7, 60, 51, 36, 37, 89, Trufi",
+      text: "?? LÌneas que pasan: 74, 38, 7, 60, 51, 36, 37, 89, Trufi",
       next: "HORARIOS_CENTRAL_VIDEO",
     },
     {
       id: "HORARIOS_CENTRAL_VIDEO",
       type: "video",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/centralComoLlegar.mp4",
-      text: "Mediante este video puedes encontrar la central de PODOPIE üìå‚¨ÜÔ∏è",
+      text: "Mediante este video puedes encontrar la central de PODOPIE ????",
       next: "HORARIOS_SUCURSAL_TITLE",
     },
     {
@@ -78,38 +79,38 @@ module.exports = {
       id: "HORARIOS_SUCURSAL_HORARIO_IMG",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/sucursalHorario.jpg",
-      text: "ATENCI√ìN SUCURSAL\nPuede venir en estos horarios ‚è∞",
+      text: "ATENCI”N SUCURSAL\nPuede venir en estos horarios ?",
       next: "HORARIOS_SUCURSAL_UBICACION_IMG",
     },
     {
       id: "HORARIOS_SUCURSAL_UBICACION_IMG",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/sucursalUbicacion.jpg",
-      text: "Haz clic aqu√≠ para ver nuestra ubicaci√≥n en Google Maps:\nhttps://maps.app.goo.gl/eXTejzQhp8zm3EmT8",
+      text: "Haz clic aquÌ para ver nuestra ubicaciÛn en Google Maps:\nhttps://maps.app.goo.gl/eXTejzQhp8zm3EmT8",
       next: "HORARIOS_SUCURSAL_LINEAS_IMG",
     },
     {
       id: "HORARIOS_SUCURSAL_LINEAS_IMG",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/sucursalLineas.jpg",
-      text: "üöå L√≠neas que pasan: 8, 10, 11, 30, 33, 54, 55, 56, 57, 58, 68, 78, 86, 104, 72, 73, Trufi",
+      text: "?? LÌneas que pasan: 8, 10, 11, 30, 33, 54, 55, 56, 57, 58, 68, 78, 86, 104, 72, 73, Trufi",
       next: "HORARIOS_SUCURSAL_VIDEO",
     },
     {
       id: "HORARIOS_SUCURSAL_VIDEO",
       type: "video",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/sucursalComoLlegar.mp4",
-      text: "Mediante este video puedes encontrar la sucursal de PODOPIE üìå‚¨ÜÔ∏è",
+      text: "Mediante este video puedes encontrar la sucursal de PODOPIE ????",
       next: "HORARIOS_NAV",
     },
     {
       id: "HORARIOS_NAV",
       type: "text",
-      text: "¬øNecesitas algo m√°s?",
+      text: "øNecesitas algo m·s?",
       delayMs: 1500,
       buttons: [
-        { label: "‚¨ÖÔ∏è Volver al menu", next: "MAIN_MENU" },
-        { label: "‚úÖ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "?? Volver al menu", next: "MAIN_MENU" },
+        { label: "? Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
 
@@ -117,44 +118,49 @@ module.exports = {
       id: "PRECIOS_INFO",
       type: "text",
       text:
-        "üí∞ Precios PODOPIE\n\nTe comparto nuestro tarifario general.\n\n¬øQuieres que te ayude a elegir el servicio adecuado?",
+        "?? Precios PODOPIE\n\nTe comparto nuestro tarifario general.\n\nøQuieres que te ayude a elegir el servicio adecuado?",
       next: "PRECIOS_IMG_1",
     },
     {
       id: "PRECIOS_IMG_1",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/precios1.jpg",
+      text: " ",
       next: "PRECIOS_IMG_2",
     },
     {
       id: "PRECIOS_IMG_2",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/precios2.jpg",
+      text: " ",
       next: "PRECIOS_IMG_3",
     },
     {
       id: "PRECIOS_IMG_3",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/precios3.jpg",
+      text: " ",
       next: "PRECIOS_ACTIONS",
     },
     {
       id: "PRECIOS_ACTIONS",
       type: "text",
-      text: "¬øNecesitas un servicio en espec√≠fico?",
+      text: "øNecesitas un servicio en especÌfico?",
+      delayMs: 1500,
       buttons: [
-        { label: "üë®‚Äçüíª Atencion personal", next: "CONTACT_METHOD" },
-        { label: "‚ùå No", next: "PRECIOS_MAS" },
-        { label: "‚úÖ Si", next: "SERVICIOS_MENU" },
+        { label: "????? Atencion personal", next: "CONTACT_METHOD" },
+        { label: "? No", next: "PRECIOS_MAS" },
+        { label: "? Si", next: "SERVICIOS_MENU" },
       ],
     },
     {
       id: "PRECIOS_MAS",
       type: "text",
-      text: "¬øNecesitas algo m√°s? Si quieres volver al men√∫ principal o terminar la conversaci√≥n, elige una opci√≥n.",
+      text: "øNecesitas algo m·s? Si quieres volver al men˙ principal o terminar la conversaciÛn, elige una opciÛn.",
+      delayMs: 1500,
       buttons: [
-        { label: "‚¨ÖÔ∏è Volver al menu", next: "MAIN_MENU" },
-        { label: "‚úÖ Finalizar", next: "CIERRE_PRECIOS_SERVICIOS" },
+        { label: "?? Volver al menu", next: "MAIN_MENU" },
+        { label: "? Finalizar", next: "CIERRE_PRECIOS_SERVICIOS" },
       ],
     },
 
@@ -162,20 +168,21 @@ module.exports = {
       id: "SERVICIOS_MENU",
       type: "text",
       text: "SELECCIONA EL SERVICIO QUE NECESITES",
+      delayMs: 1500,
       buttons: [
-        { label: "ü¶∂ U√±ero", next: "UNERO_TIPO_TRAT" },
-        { label: "ü¶† Hongos", next: "HONGOS_TIPO_TRAT" },
-        { label: "üíÖ Pedicure", next: "SVC_PEDICURE_INFO" },
-        { label: "üßí Podopediatria", next: "SVC_PODOPEDIATRIA_INFO" },
-        { label: "üßì Podogeriatria", next: "SVC_PODOGERIATRIA_INFO" },
-        { label: "üß∞ Otros", next: "OTROS_MENU" },
+        { label: "?? UÒero", next: "UNERO_TIPO_TRAT" },
+        { label: "?? Hongos", next: "HONGOS_TIPO_TRAT" },
+        { label: "?? Pedicure", next: "SVC_PEDICURE_INFO" },
+        { label: "?? Podopediatria", next: "SVC_PODOPEDIATRIA_INFO" },
+        { label: "?? Podogeriatria", next: "SVC_PODOGERIATRIA_INFO" },
+        { label: "?? Otros", next: "OTROS_MENU" },
       ],
     },
 
     {
       id: "UNERO_TIPO_TRAT",
       type: "text",
-      text: "INFORMACION DEL SERVICIO\nTIPO DE TRATAMIENTO",
+      text: "InformaciÛn de UÒero",
       next: "UNERO_INFO_1",
     },
     {
@@ -183,7 +190,7 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/U%C3%B1ero/1.jpg",
       text:
-        "U√±ero es una inflamaci√≥n que se produce cuando una u√±a crece de forma anormal y se clava en la piel que la rodea, causando dolor, enrojecimiento e hinchaz√≥n.",
+        "UÒero es una inflamaciÛn que se produce cuando una uÒa crece de forma anormal y se clava en la piel que la rodea, causando dolor, enrojecimiento e hinchazÛn.",
       next: "UNERO_INFO_2",
     },
     {
@@ -191,7 +198,7 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/U%C3%B1ero/2.jpg",
       text:
-        "El servicio de extracci√≥n de UNO O VARIOS U√ëEROS EN UN PIE tiene un costo de 200 BS üí∞.",
+        "El servicio de extracciÛn de UNO O VARIOS U—EROS EN UN PIE tiene un costo de 200 BS ??.",
       next: "UNERO_INFO_3",
     },
     {
@@ -199,14 +206,14 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/U%C3%B1ero/3.jpg",
       text:
-        "Si desea la extracci√≥n de U√ëEROS EN AMBOS PIES, el costo es de 300 BS por todos los u√±eros en ambos pies. üíµ",
+        "Si desea la extracciÛn de U—EROS EN AMBOS PIES, el costo es de 300 BS por todos los uÒeros en ambos pies. ??",
       next: "UNERO_INFO_4",
     },
     {
       id: "UNERO_INFO_4",
       type: "text",
       text:
-        "Con una correcta extracci√≥n del u√±ero, puedes disfrutar de una rutina diaria m√°s tranquila y c√≥moda üíÜ‚Äç‚ôÇÔ∏èüíÜ‚Äç‚ôÄÔ∏è\nOlv√≠date del dolor, la inflamaci√≥n y las molestias, y vuelve a caminar con total bienestar üë£üòä",
+        "Con una correcta extracciÛn del uÒero, puedes disfrutar de una rutina diaria m·s tranquila y cÛmoda ??????????\nOlvÌdate del dolor, la inflamaciÛn y las molestias, y vuelve a caminar con total bienestar ????",
       next: "UNERO_INFO_5",
     },
     {
@@ -214,23 +221,24 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/U%C3%B1ero/podomix.jpg",
       text:
-        "Si necesita un paquete completo ü¶∂‚ú® tiene una opci√≥n accesible y detallada por realizarse, PODOMIX incluye una valoraci√≥n profesional üë®‚Äç‚öïÔ∏èüìã, extracci√≥n de u√±eros ‚úÇÔ∏èü¶∂ y pedicure cl√≠nico üßºüíÖ, todo por un costo de 300 Bs üí∞.\nEste paquete se realiza √∫nicamente bajo recomendaci√≥n del especialista ü©∫, ya que durante la valoraci√≥n üîç se determinar√° si el paciente necesita o no dicho tratamiento ‚úÖ‚ùå.",
+        "Si necesita un paquete completo ??? tiene una opciÛn accesible y detallada por realizarse, PODOMIX incluye una valoraciÛn profesional ???????, extracciÛn de uÒeros ???? y pedicure clÌnico ????, todo por un costo de 300 Bs ??.\nEste paquete se realiza ˙nicamente bajo recomendaciÛn del especialista ??, ya que durante la valoraciÛn ?? se determinar· si el paciente necesita o no dicho tratamiento ??.",
       next: "UNERO_TIPO_TRAT_OPTIONS",
     },
     {
       id: "UNERO_TIPO_TRAT_OPTIONS",
       type: "text",
       text:
-        "ü¶∂‚ú® Nuestro servicio de u√±ero cuenta con dos tipos de procedimientos\nElige la opci√≥n que mejor se adapte a tu caso y conoce todos los detalles üëáüòä",
+        "??? Nuestro servicio de uÒero cuenta con dos tipos de procedimientos\nElige la opciÛn que mejor se adapte a tu caso y conoce todos los detalles ????",
+      delayMs: 1500,
       buttons: [
-        { label: "‚úÇÔ∏è Matricectomia", next: "TRAT_MATRICECTOMIA_INFO" },
-        { label: "ü¶¥ Ortesis", next: "TRAT_ORTESIS_INFO" },
+        { label: "?? Matricectomia", next: "TRAT_MATRICECTOMIA_INFO" },
+        { label: "?? Ortesis", next: "TRAT_ORTESIS_INFO" },
       ],
     },
     {
       id: "HONGOS_TIPO_TRAT",
       type: "text",
-      text: "INFORMACION DEL SERVICIO\nTIPO DE TRATAMIENTO",
+      text: "InformaciÛn de Hongos",
       next: "HONGOS_INFO_1",
     },
     {
@@ -238,7 +246,7 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/1.jpg",
       text:
-        "En nuestro centro, ofrecemos una variedad de tratamientos para hongos en las u√±as, incluyendo opciones T√ìPICAS, SIST√âMICO, L√ÅSER, OZONO y ALTA FRECUENCIA. Los tratamientos m√°s solicitados son el T√ìPICO y el tratamiento L√ÅSER, cada uno con sus propias caracter√≠sticas y beneficios. ü¶∂",
+        "En nuestro centro, ofrecemos una variedad de tratamientos para hongos en las uÒas, incluyendo opciones T”PICAS, SIST…MICO, L¡SER, OZONO y ALTA FRECUENCIA. Los tratamientos m·s solicitados son el T”PICO y el tratamiento L¡SER, cada uno con sus propias caracterÌsticas y beneficios. ??",
       next: "HONGOS_PACKS_TITLE",
     },
     {
@@ -251,49 +259,54 @@ module.exports = {
       id: "HONGOS_PACK_1",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/2.jpeg",
+      text: " ",
       next: "HONGOS_PACK_2",
     },
     {
       id: "HONGOS_PACK_2",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/3.jpeg",
+      text: " ",
       next: "HONGOS_PACK_3",
     },
     {
       id: "HONGOS_PACK_3",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/4.jpeg",
+      text: " ",
       next: "HONGOS_PACK_4",
     },
     {
       id: "HONGOS_PACK_4",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/5.jpeg",
+      text: " ",
       next: "HONGOS_PACK_NOTE",
     },
     {
       id: "HONGOS_PACK_NOTE",
       type: "text",
       text:
-        "Estos paquetes se realizan √∫nicamente bajo recomendaci√≥n del especialista ü©∫, ya que durante la valoraci√≥n üîç se determinar√° si el paciente necesita o no dicho tratamiento ‚úÖ‚ùå.",
+        "Estos paquetes se realizan ˙nicamente bajo recomendaciÛn del especialista ??, ya que durante la valoraciÛn ?? se determinar· si el paciente necesita o no dicho tratamiento ??.",
       next: "HONGOS_TIPO_TRAT_OPTIONS",
     },
     {
       id: "HONGOS_TIPO_TRAT_OPTIONS",
       type: "text",
       text:
-        "ü¶∂‚ú® Nuestro servicio de hongos (onicomicosis) cuenta con tres tipos de procedimientos\nElige la opci√≥n que mejor se adapte a tu caso y conoce todos los detalles üëáüòä",
+        "??? Nuestro servicio de hongos (onicomicosis) cuenta con tres tipos de procedimientos\nElige la opciÛn que mejor se adapte a tu caso y conoce todos los detalles ????",
+      delayMs: 1500,
       buttons: [
-        { label: "üß¥ Topico", next: "TRAT_TOPICO_INFO" },
-        { label: "üî¶ Laser", next: "TRAT_LASER_INFO" },
-        { label: "üíä Sistemico", next: "TRAT_SISTEMICO_INFO" },
+        { label: "?? Topico", next: "TRAT_TOPICO_INFO" },
+        { label: "?? Laser", next: "TRAT_LASER_INFO" },
+        { label: "?? Sistemico", next: "TRAT_SISTEMICO_INFO" },
       ],
     },
 
     {
       id: "TRAT_MATRICECTOMIA_INFO",
       type: "text",
-      text: "INFORMACION DEL TRATAMIENTO",
+      text: "InformaciÛn de tratamiento: MatricectomÌa",
       next: "TRAT_MATRICECTOMIA_STEP_1",
     },
     {
@@ -301,7 +314,7 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/U%C3%B1ero/Matricectomia/1.jpg",
       text:
-        "PROTOCOLO PRE-QUIRUGICO. ü©∫\n- El paciente debe asistir a la microcirug√≠a con chinelas o calzado abierto y ropa c√≥moda, evitando zapatos cerrados y en el caso de mujeres, faldas o vestidos.\n- Es obligatorio firmar el consentimiento informado antes del procedimiento.\n- Si el caso lo requiere, el profesional de salud podr√° solicitar pruebas especiales previas a la cirug√≠a.",
+        "PROTOCOLO PRE-QUIRUGICO. ??\n- El paciente debe asistir a la microcirugÌa con chinelas o calzado abierto y ropa cÛmoda, evitando zapatos cerrados y en el caso de mujeres, faldas o vestidos.\n- Es obligatorio firmar el consentimiento informado antes del procedimiento.\n- Si el caso lo requiere, el profesional de salud podr· solicitar pruebas especiales previas a la cirugÌa.",
       next: "TRAT_MATRICECTOMIA_STEP_2",
     },
     {
@@ -309,14 +322,14 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/U%C3%B1ero/Matricectomia/2.jpg",
       text:
-        "Tarifas seg√∫n el tipo de procedimiento:\n‚Ä¢ Unilateral (un solo lado) en un dedo de un pie: 800 Bs.\n‚Ä¢ Bilateral (ambos lados) en un dedo de un pie: 1.000 Bs.\n‚Ä¢ Unilateral en ambos pies (un lado de un dedo en cada pie): 1.600 Bs.\n‚Ä¢ Bilateral en ambos pies (ambos lados de un dedo en cada pie): 2.000 Bs.\n‚Ä¢ Combinado: unilateral en un pie y bilateral en el otro: 1.800 Bs.\nCuraciones: ü©π\n‚Ä¢ Primer curativo (obligatorio): gratuito, dentro de las primeras 48 horas.\n‚Ä¢ Curativos posteriores: 50 Bs por sesi√≥n.",
+        "Tarifas seg˙n el tipo de procedimiento:\nï Unilateral (un solo lado) en un dedo de un pie: 800 Bs.\nï Bilateral (ambos lados) en un dedo de un pie: 1.000 Bs.\nï Unilateral en ambos pies (un lado de un dedo en cada pie): 1.600 Bs.\nï Bilateral en ambos pies (ambos lados de un dedo en cada pie): 2.000 Bs.\nï Combinado: unilateral en un pie y bilateral en el otro: 1.800 Bs.\nCuraciones: ??\nï Primer curativo (obligatorio): gratuito, dentro de las primeras 48 horas.\nï Curativos posteriores: 50 Bs por sesiÛn.",
       next: "TRAT_MATRICECTOMIA_STEP_3",
     },
     {
       id: "TRAT_MATRICECTOMIA_STEP_3",
       type: "text",
       text:
-        "Valoraci√≥n prequir√∫rgica:\nLa decisi√≥n de realizar la matricectom√≠a depender√° de una evaluaci√≥n individual por parte de un pod√≥logo o m√©dico cirujano especialista, considerando la gravedad del caso y la historia cl√≠nica del paciente.",
+        "ValoraciÛn prequir˙rgica:\nLa decisiÛn de realizar la matricectomÌa depender· de una evaluaciÛn individual por parte de un podÛlogo o mÈdico cirujano especialista, considerando la gravedad del caso y la historia clÌnica del paciente.",
       next: "TRAT_MATRICECTOMIA_STEP_4",
     },
     {
@@ -329,18 +342,19 @@ module.exports = {
     {
       id: "TRAT_MATRICECTOMIA_ACTIONS",
       type: "text",
-      text: "¬øTienes alguna otra duda?",
+      text: "øTienes alguna otra duda?",
+      delayMs: 1500,
       buttons: [
-        { label: "üë®‚Äçüíª Atencion personal", next: "CONTACT_METHOD" },
-        { label: "‚¨ÖÔ∏è Volver al menu", next: "MAIN_MENU" },
-        { label: "üßº Volver a servicios", next: "SERVICIOS_MENU" },
-        { label: "‚úÖ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "????? Atencion personal", next: "CONTACT_METHOD" },
+        { label: "?? Volver al menu", next: "MAIN_MENU" },
+        { label: "?? Volver a servicios", next: "SERVICIOS_MENU" },
+        { label: "? Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
       id: "TRAT_ORTESIS_INFO",
       type: "text",
-      text: "INFORMACION DEL TRATAMIENTO",
+      text: "InformaciÛn de tratamiento: Ortesis",
       next: "TRAT_ORTESIS_STEP_1",
     },
     {
@@ -348,31 +362,32 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/U%C3%B1ero/Ortesis/IMAGEN%201.jpg",
       text:
-        "ü¶∂‚ú® La ortesis ungueal es un tratamiento que corrige la forma de la u√±a del pie, ayudando a que crezca correctamente y evitando que se encarne üíÖüòä",
+        "??? La ortesis ungueal es un tratamiento que corrige la forma de la uÒa del pie, ayudando a que crezca correctamente y evitando que se encarne ????",
       next: "TRAT_ORTESIS_STEP_2",
     },
     {
       id: "TRAT_ORTESIS_STEP_2",
       type: "text",
       text:
-        "‚ú®ü¶∂ La ortesis ungueal ayuda a levantar la u√±a y evitar que se encarne, siendo un tratamiento eficaz para prevenir el u√±ero y aliviar molestias de forma segura üíÖüíô",
+        "??? La ortesis ungueal ayuda a levantar la uÒa y evitar que se encarne, siendo un tratamiento eficaz para prevenir el uÒero y aliviar molestias de forma segura ????",
       next: "TRAT_ORTESIS_ACTIONS",
     },
     {
       id: "TRAT_ORTESIS_ACTIONS",
       type: "text",
-      text: "¬øTienes alguna otra duda?",
+      text: "øTienes alguna otra duda?",
+      delayMs: 1500,
       buttons: [
-        { label: "üë®‚Äçüíª Atencion personal", next: "CONTACT_METHOD" },
-        { label: "‚¨ÖÔ∏è Volver al menu", next: "MAIN_MENU" },
-        { label: "üßº Volver a servicios", next: "SERVICIOS_MENU" },
-        { label: "‚úÖ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "????? Atencion personal", next: "CONTACT_METHOD" },
+        { label: "?? Volver al menu", next: "MAIN_MENU" },
+        { label: "?? Volver a servicios", next: "SERVICIOS_MENU" },
+        { label: "? Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
       id: "TRAT_TOPICO_INFO",
       type: "text",
-      text: "INFORMACION DEL TRATAMIENTO",
+      text: "InformaciÛn de tratamiento: TÛpico",
       next: "TRAT_TOPICO_STEP_1",
     },
     {
@@ -380,31 +395,32 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/T%C3%B3pico/IMAGEN%202.jpg",
       text:
-        "TRATAMIENTO T√ìPICO:\n* Costo: 150 Bs (Incluye diagn√≥stico, revisi√≥n y limpieza).\n* Este tratamiento se sugiere realizarlo con una LACA ANTIMIC√ìTICA cuyo costo var√≠a seg√∫n la laca. Es importante seguir las indicaciones para obtener los mejores resultados, el costo de la laca antimic√≥tica es aparte. üíß",
+        "TRATAMIENTO T”PICO:\n* Costo: 150 Bs (Incluye diagnÛstico, revisiÛn y limpieza).\n* Este tratamiento se sugiere realizarlo con una LACA ANTIMIC”TICA cuyo costo varÌa seg˙n la laca. Es importante seguir las indicaciones para obtener los mejores resultados, el costo de la laca antimicÛtica es aparte. ??",
       next: "TRAT_TOPICO_STEP_2",
     },
     {
       id: "TRAT_TOPICO_STEP_2",
       type: "text",
       text:
-        "Para cualquier dato adicional, no dude en contactarnos por este medio, a nuestro WhatsApp o llamando a la l√≠nea de atenci√≥n al cliente 62100083. üì±",
+        "Para cualquier dato adicional, no dude en contactarnos por este medio, a nuestro WhatsApp o llamando a la lÌnea de atenciÛn al cliente 62100083. ??",
       next: "TRAT_TOPICO_ACTIONS",
     },
     {
       id: "TRAT_TOPICO_ACTIONS",
       type: "text",
-      text: "¬øTienes alguna otra duda?",
+      text: "øTienes alguna otra duda?",
+      delayMs: 1500,
       buttons: [
-        { label: "üë®‚Äçüíª Atencion personal", next: "CONTACT_METHOD" },
-        { label: "‚¨ÖÔ∏è Volver al menu", next: "MAIN_MENU" },
-        { label: "üßº Volver a servicios", next: "SERVICIOS_MENU" },
-        { label: "‚úÖ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "????? Atencion personal", next: "CONTACT_METHOD" },
+        { label: "?? Volver al menu", next: "MAIN_MENU" },
+        { label: "?? Volver a servicios", next: "SERVICIOS_MENU" },
+        { label: "? Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
       id: "TRAT_LASER_INFO",
       type: "text",
-      text: "INFORMACION DEL TRATAMIENTO",
+      text: "InformaciÛn de tratamiento: L·ser",
       next: "TRAT_LASER_STEP_1",
     },
     {
@@ -412,7 +428,7 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/L%C3%A1ser/1.jpg",
       text:
-        "El TRATAMIENTO L√ÅSER es una opci√≥n eficaz y moderna para eliminar los hongos en las u√±as. Utilizamos equipos podol√≥gicos con LUZ L√ÅSER INDOLORA, garantizando que no existan efectos secundarios, con resultados que no da√±an la u√±a en su crecimiento, en algunos casos sin necesidad de medicaci√≥n oral. ü©π",
+        "El TRATAMIENTO L¡SER es una opciÛn eficaz y moderna para eliminar los hongos en las uÒas. Utilizamos equipos podolÛgicos con LUZ L¡SER INDOLORA, garantizando que no existan efectos secundarios, con resultados que no daÒan la uÒa en su crecimiento, en algunos casos sin necesidad de medicaciÛn oral. ??",
       next: "TRAT_LASER_STEP_2",
     },
     {
@@ -420,14 +436,14 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/L%C3%A1ser/2.jpg",
       text:
-        "TRATAMIENTO L√ÅSER: ‚ö°\n‚ö°ü¶∂ Tratamiento r√°pido y efectivo, con resultados visibles en menos tiempo.\nLas sesiones se programan seg√∫n tu disponibilidad semanal üìÖ\nAmbas opciones son efectivas, pero el l√°ser act√∫a m√°s r√°pido üõë‚ú®",
+        "TRATAMIENTO L¡SER: ?\n??? Tratamiento r·pido y efectivo, con resultados visibles en menos tiempo.\nLas sesiones se programan seg˙n tu disponibilidad semanal ??\nAmbas opciones son efectivas, pero el l·ser act˙a m·s r·pido ???",
       next: "TRAT_LASER_STEP_3",
     },
     {
       id: "TRAT_LASER_STEP_3",
       type: "text",
       text:
-        "Recuerda que cada caso es √∫nico, por eso te invitamos a una evaluaci√≥n personalizada con nuestros especialistas üéØüë©‚Äç‚öïÔ∏èüë®‚Äç‚öïÔ∏è",
+        "Recuerda que cada caso es ˙nico, por eso te invitamos a una evaluaciÛn personalizada con nuestros especialistas ????????????",
       next: "TRAT_LASER_STEP_4",
     },
     {
@@ -435,31 +451,32 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/L%C3%A1ser/3.jpg",
       text:
-        "¬øCU√ÅNTAS SESIONES L√ÅSER NECESITO? ü§î\nEl pod√≥logo EVAL√öA TU CASO y te recomienda un ESTIMADO DE SESIONES, las mismas pueden son programadas de manera semanal o con intervalos de 5 a 7 d√≠as. Con este tratamiento LASER en 10, 20, 30 SESI√ìNES o m√°s seg√∫n sea tu caso espec√≠fico SE VER√ÅN LOS RESULTADOS, el tiempo PUEDE VARIAR SEG√öN EL ESTADO DE LAS U√ëAS DE TUS PIES, esto se ajusta a tu disponibilidad econ√≥mica y tu tiempo, asegurando que recibas el tratamiento que mejor se adapte a tus necesidades. ü•º",
+        "øCU¡NTAS SESIONES L¡SER NECESITO? ??\nEl podÛlogo EVAL⁄A TU CASO y te recomienda un ESTIMADO DE SESIONES, las mismas pueden son programadas de manera semanal o con intervalos de 5 a 7 dÌas. Con este tratamiento LASER en 10, 20, 30 SESI”NES o m·s seg˙n sea tu caso especÌfico SE VER¡N LOS RESULTADOS, el tiempo PUEDE VARIAR SEG⁄N EL ESTADO DE LAS U—AS DE TUS PIES, esto se ajusta a tu disponibilidad econÛmica y tu tiempo, asegurando que recibas el tratamiento que mejor se adapte a tus necesidades. ??",
       next: "TRAT_LASER_STEP_5",
     },
     {
       id: "TRAT_LASER_STEP_5",
       type: "text",
       text:
-        "Para cualquier dato adicional, no dude en contactarnos por este medio, a nuestro WhatsApp o llamando a la l√≠nea de atenci√≥n al cliente 62100083. üì±",
+        "Para cualquier dato adicional, no dude en contactarnos por este medio, a nuestro WhatsApp o llamando a la lÌnea de atenciÛn al cliente 62100083. ??",
       next: "TRAT_LASER_ACTIONS",
     },
     {
       id: "TRAT_LASER_ACTIONS",
       type: "text",
-      text: "¬øTienes alguna otra duda?",
+      text: "øTienes alguna otra duda?",
+      delayMs: 1500,
       buttons: [
-        { label: "üë®‚Äçüíª Atencion personal", next: "CONTACT_METHOD" },
-        { label: "‚¨ÖÔ∏è Volver al menu", next: "MAIN_MENU" },
-        { label: "üßº Volver a servicios", next: "SERVICIOS_MENU" },
-        { label: "‚úÖ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "????? Atencion personal", next: "CONTACT_METHOD" },
+        { label: "?? Volver al menu", next: "MAIN_MENU" },
+        { label: "?? Volver a servicios", next: "SERVICIOS_MENU" },
+        { label: "? Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
       id: "TRAT_SISTEMICO_INFO",
       type: "text",
-      text: "INFORMACION DEL TRATAMIENTO",
+      text: "InformaciÛn de tratamiento: SistÈmico",
       next: "TRAT_SISTEMICO_STEP_1",
     },
     {
@@ -467,7 +484,7 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/Sist%C3%A9mico/1.jpg",
       text:
-        "Tambi√©n te ofrecemos un TRATAMIENTO SIST√âMICO eficaz para combatir los hongos desde la ra√≠z. üîù",
+        "TambiÈn te ofrecemos un TRATAMIENTO SIST…MICO eficaz para combatir los hongos desde la raÌz. ??",
       next: "TRAT_SISTEMICO_STEP_2",
     },
     {
@@ -475,25 +492,26 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/Sist%C3%A9mico/2.jpg",
       text:
-        "Nuestro enfoque combina tecnolog√≠a podol√≥gica avanzada, diagn√≥stico preciso y seguimiento profesional para lograr resultados visibles y duraderos. üí™\n- Evaluaci√≥n personalizada.\n- Tratamiento m√©dico supervisado.\n- Resultados progresivos y seguros",
+        "Nuestro enfoque combina tecnologÌa podolÛgica avanzada, diagnÛstico preciso y seguimiento profesional para lograr resultados visibles y duraderos. ??\n- EvaluaciÛn personalizada.\n- Tratamiento mÈdico supervisado.\n- Resultados progresivos y seguros",
       next: "TRAT_SISTEMICO_ACTIONS",
     },
     {
       id: "TRAT_SISTEMICO_ACTIONS",
       type: "text",
-      text: "¬øTienes alguna otra duda?",
+      text: "øTienes alguna otra duda?",
+      delayMs: 1500,
       buttons: [
-        { label: "üë®‚Äçüíª Atencion personal", next: "CONTACT_METHOD" },
-        { label: "‚¨ÖÔ∏è Volver al menu", next: "MAIN_MENU" },
-        { label: "üßº Volver a servicios", next: "SERVICIOS_MENU" },
-        { label: "‚úÖ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "????? Atencion personal", next: "CONTACT_METHOD" },
+        { label: "?? Volver al menu", next: "MAIN_MENU" },
+        { label: "?? Volver a servicios", next: "SERVICIOS_MENU" },
+        { label: "? Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
 
     {
       id: "SVC_PEDICURE_INFO",
       type: "text",
-      text: "INFORMACION DEL SERVICIO",
+      text: "InformaciÛn de Pedicura ClÌnica",
       next: "SVC_PEDICURE_STEP_1",
     },
     {
@@ -501,7 +519,7 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Pedicure%20Cl%C3%ADnico/1.jpg",
       text:
-        "La PEDICURA CL√çNICA es un servicio especializado que es diferente a la pedicura tradicional est√©tica. Se realiza por nuestros pod√≥logos y se enfoca en TRATAR AFECCIONES DE LOS PIES Y EN LA PREVENCI√ìN DE PROBLEMAS FUTUROS. ü¶∂ üõ°",
+        "La PEDICURA CLÕNICA es un servicio especializado que es diferente a la pedicura tradicional estÈtica. Se realiza por nuestros podÛlogos y se enfoca en TRATAR AFECCIONES DE LOS PIES Y EN LA PREVENCI”N DE PROBLEMAS FUTUROS. ?? ??",
       next: "SVC_PEDICURE_STEP_2",
     },
     {
@@ -509,7 +527,7 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Pedicure%20Cl%C3%ADnico/2.jpg",
       text:
-        "Costo de la PEDICURA CL√çNICA es de 100 Bs. Este servicio incluye limpieza, corte correcto de u√±as, eliminaci√≥n de callosidades leves y recomendaciones personalizadas para el cuidado de tus pies. üíµ\nNuestros pod√≥logos te dar√°n ASESORAMIENTO PERSONALIZADO para la salud de tus pies, incluyendo el uso del calzado adecuado y consejos en la higiene de tus pies. üßº",
+        "Costo de la PEDICURA CLÕNICA es de 100 Bs. Este servicio incluye limpieza, corte correcto de uÒas, eliminaciÛn de callosidades leves y recomendaciones personalizadas para el cuidado de tus pies. ??\nNuestros podÛlogos te dar·n ASESORAMIENTO PERSONALIZADO para la salud de tus pies, incluyendo el uso del calzado adecuado y consejos en la higiene de tus pies. ??",
       next: "SVC_PEDICURE_STEP_3",
     },
     {
@@ -517,20 +535,21 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Pedicure%20Cl%C3%ADnico/3.jpg",
       text:
-        "Si en la consulta se detecta la necesidad de tratar U√ëEROS, FISURAS, VERRUGAS, HONGOS E HIPERQUERATOSIS el precio variar√° seg√∫n el servicio a realizar, as√≠ usted decide si desea el SERVICIO ADICIONAL en ese momento. üë£üö∂‚Äç‚ôÇÔ∏èüö∂‚Äç‚ôÄÔ∏è",
+        "Si en la consulta se detecta la necesidad de tratar U—EROS, FISURAS, VERRUGAS, HONGOS E HIPERQUERATOSIS el precio variar· seg˙n el servicio a realizar, asÌ usted decide si desea el SERVICIO ADICIONAL en ese momento. ????????????",
       next: "SVC_PEDICURE_STEP_4",
     },
     {
       id: "SVC_PEDICURE_STEP_4",
       type: "text",
       text:
-        "Estamos ubicados en Santa Cruz de la Sierra, tercer Anillo interno y rotonda Av. Alemana.\nPara cualquier dato adicional, no dude en contactarnos por este medio, a nuestro WhatsApp o llamando a la l√≠nea de atenci√≥n al cliente 62100083. üì±",
+        "Estamos ubicados en Santa Cruz de la Sierra, tercer Anillo interno y rotonda Av. Alemana.\nPara cualquier dato adicional, no dude en contactarnos por este medio, a nuestro WhatsApp o llamando a la lÌnea de atenciÛn al cliente 62100083. ??",
       next: "SVC_PEDICURE_STEP_5",
     },
     {
       id: "SVC_PEDICURE_STEP_5",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Pedicure%20Cl%C3%ADnico/5.jpg",
+      text: " ",
       next: "SVC_PEDICURE_STEP_6",
     },
     {
@@ -538,24 +557,25 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Pedicure%20Cl%C3%ADnico/6.jpg",
       text:
-        "Estos paquetes se realizan √∫nicamente bajo recomendaci√≥n del especialista ü©∫, ya que durante la valoraci√≥n üîç se determinar√° si el paciente necesita o no dicho tratamiento ‚úÖ‚ùå.",
+        "Estos paquetes se realizan ˙nicamente bajo recomendaciÛn del especialista ??, ya que durante la valoraciÛn ?? se determinar· si el paciente necesita o no dicho tratamiento ??.",
       next: "SVC_PEDICURE_ACTIONS",
     },
     {
       id: "SVC_PEDICURE_ACTIONS",
       type: "text",
-      text: "¬øTienes alguna otra duda?",
+      text: "øTienes alguna otra duda?",
+      delayMs: 1500,
       buttons: [
-        { label: "üë®‚Äçüíª Atencion personal", next: "CONTACT_METHOD" },
-        { label: "‚¨ÖÔ∏è Volver al menu", next: "MAIN_MENU" },
-        { label: "üßº Volver a servicios", next: "SERVICIOS_MENU" },
-        { label: "‚úÖ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "????? Atencion personal", next: "CONTACT_METHOD" },
+        { label: "?? Volver al menu", next: "MAIN_MENU" },
+        { label: "?? Volver a servicios", next: "SERVICIOS_MENU" },
+        { label: "? Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
       id: "SVC_PODOPEDIATRIA_INFO",
       type: "text",
-      text: "INFORMACION DEL SERVICIO",
+      text: "InformaciÛn de PodopediatrÌa",
       next: "SVC_PODOPEDIATRIA_STEP_1",
     },
     {
@@ -563,14 +583,14 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podopediatr%C3%ADa/1.jpg",
       text:
-        "La PODOPEDIATR√çA se enfoca en el diagn√≥stico, tratamiento y prevenci√≥n de las afecciones podol√≥gicas de los ni√±os desde su nacimiento hasta la adolescencia, ASEGURANDO UN CORRECTO DESARROLLO y evitando problemas futuros en sus pies. üë∂üèΩ\n¬°Los pies de tus peque√±os necesitan un cuidado especializado! üßë‚Äç‚öïÔ∏èüë©‚Äç‚öïÔ∏è",
+        "La PODOPEDIATRÕA se enfoca en el diagnÛstico, tratamiento y prevenciÛn de las afecciones podolÛgicas de los niÒos desde su nacimiento hasta la adolescencia, ASEGURANDO UN CORRECTO DESARROLLO y evitando problemas futuros en sus pies. ????\n°Los pies de tus pequeÒos necesitan un cuidado especializado! ??????????",
       next: "SVC_PODOPEDIATRIA_STEP_2",
     },
     {
       id: "SVC_PODOPEDIATRIA_STEP_2",
       type: "text",
       text:
-        "En la especialidad de PODOPEDIATR√çA adaptamos el tratamiento a cada ni√±o mediante una evaluaci√≥n integral. ü§±üèΩ\n- Analizamos el desarrollo, antecedentes y estructura del pie.\n- Detectamos deformidades o lesiones.\n- Trabajamos con los padres, orientando sobre cuidado y calzado.\nEl progreso depende de la edad, la afecci√≥n y el seguimiento del tratamiento recomendado. üïí",
+        "En la especialidad de PODOPEDIATRÕA adaptamos el tratamiento a cada niÒo mediante una evaluaciÛn integral. ????\n- Analizamos el desarrollo, antecedentes y estructura del pie.\n- Detectamos deformidades o lesiones.\n- Trabajamos con los padres, orientando sobre cuidado y calzado.\nEl progreso depende de la edad, la afecciÛn y el seguimiento del tratamiento recomendado. ??",
       next: "SVC_PODOPEDIATRIA_STEP_3",
     },
     {
@@ -578,7 +598,7 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podopediatr%C3%ADa/2.jpg",
       text:
-        "Costo de la PEDICURA CL√çNICA es de 100 Bs. Este servicio incluye limpieza, corte correcto de u√±as, eliminaci√≥n de callosidades leves y recomendaciones personalizadas para el cuidado de tus pies. üíµ\nNuestros pod√≥logos te dar√°n ASESORAMIENTO PERSONALIZADO para la salud de tus pies, incluyendo el uso del calzado adecuado y consejos en la higiene de tus pies. üßº",
+        "Costo de la PEDICURA CLÕNICA es de 100 Bs. Este servicio incluye limpieza, corte correcto de uÒas, eliminaciÛn de callosidades leves y recomendaciones personalizadas para el cuidado de tus pies. ??\nNuestros podÛlogos te dar·n ASESORAMIENTO PERSONALIZADO para la salud de tus pies, incluyendo el uso del calzado adecuado y consejos en la higiene de tus pies. ??",
       next: "SVC_PODOPEDIATRIA_STEP_4",
     },
     {
@@ -586,31 +606,32 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podopediatr%C3%ADa/3.jpg",
       text:
-        "Si en la consulta se detecta la necesidad de tratar U√ëEROS, FISURAS, VERRUGAS, HONGOS E HIPERQUERATOSIS el precio variar√° seg√∫n el servicio a realizar, as√≠ usted decide si desea el SERVICIO ADICIONAL en ese momento. üë£üö∂‚Äç‚ôÇÔ∏èüö∂‚Äç‚ôÄÔ∏è",
+        "Si en la consulta se detecta la necesidad de tratar U—EROS, FISURAS, VERRUGAS, HONGOS E HIPERQUERATOSIS el precio variar· seg˙n el servicio a realizar, asÌ usted decide si desea el SERVICIO ADICIONAL en ese momento. ????????????",
       next: "SVC_PODOPEDIATRIA_STEP_5",
     },
     {
       id: "SVC_PODOPEDIATRIA_STEP_5",
       type: "text",
       text:
-        "Estamos ubicados en Santa Cruz de la Sierra, tercer Anillo interno y rotonda Av. Alemana.\nPara cualquier dato adicional, no dude en contactarnos por este medio, a nuestro WhatsApp o llamando a la l√≠nea de atenci√≥n al cliente 62100083. üì±",
+        "Estamos ubicados en Santa Cruz de la Sierra, tercer Anillo interno y rotonda Av. Alemana.\nPara cualquier dato adicional, no dude en contactarnos por este medio, a nuestro WhatsApp o llamando a la lÌnea de atenciÛn al cliente 62100083. ??",
       next: "SVC_PODOPEDIATRIA_ACTIONS",
     },
     {
       id: "SVC_PODOPEDIATRIA_ACTIONS",
       type: "text",
-      text: "¬øTienes alguna otra duda?",
+      text: "øTienes alguna otra duda?",
+      delayMs: 1500,
       buttons: [
-        { label: "üë®‚Äçüíª Atencion personal", next: "CONTACT_METHOD" },
-        { label: "‚¨ÖÔ∏è Volver al menu", next: "MAIN_MENU" },
-        { label: "üßº Volver a servicios", next: "SERVICIOS_MENU" },
-        { label: "‚úÖ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "????? Atencion personal", next: "CONTACT_METHOD" },
+        { label: "?? Volver al menu", next: "MAIN_MENU" },
+        { label: "?? Volver a servicios", next: "SERVICIOS_MENU" },
+        { label: "? Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
       id: "SVC_PODOGERIATRIA_INFO",
       type: "text",
-      text: "INFORMACION DEL SERVICIO",
+      text: "InformaciÛn de PodogeriatrÌa",
       next: "SVC_PODOGERIATRIA_STEP_1",
     },
     {
@@ -618,7 +639,7 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podogeriatr%C3%ADa/1.jpg",
       text:
-        "Tratamos afecciones comunes como U√ëAS ENGROSADAS, CALLOS, DUREZAS Y DEFORMIDADES. Prevenimos √∫lceras en pacientes con diabetes, orientamos sobre calzado adecuado y PROMOVEMOS EL AUTOCUIDADO para mantener la movilidad, aliviar el dolor y mejorar la calidad de vida para las personas de la tercera edad. ü©πü©∫",
+        "Tratamos afecciones comunes como U—AS ENGROSADAS, CALLOS, DUREZAS Y DEFORMIDADES. Prevenimos ˙lceras en pacientes con diabetes, orientamos sobre calzado adecuado y PROMOVEMOS EL AUTOCUIDADO para mantener la movilidad, aliviar el dolor y mejorar la calidad de vida para las personas de la tercera edad. ????",
       next: "SVC_PODOGERIATRIA_STEP_2",
     },
     {
@@ -626,47 +647,49 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podogeriatr%C3%ADa/2.jpg",
       text:
-        "El servicio de PODOGERIATR√çA tiene un costo de 200 Bs. üíµ\nRealizamos cortes de u√±as cuidadosos, revisamos lesiones, tratamos durezas y controlamos cualquier condici√≥n que pueda afectar la salud de sus pies.\nNuestro objetivo es brindar comodidad, prevenir complicaciones y mejorar su calidad de vida.",
+        "El servicio de PODOGERIATRÕA tiene un costo de 200 Bs. ??\nRealizamos cortes de uÒas cuidadosos, revisamos lesiones, tratamos durezas y controlamos cualquier condiciÛn que pueda afectar la salud de sus pies.\nNuestro objetivo es brindar comodidad, prevenir complicaciones y mejorar su calidad de vida.",
       next: "SVC_PODOGERIATRIA_STEP_3",
     },
     {
       id: "SVC_PODOGERIATRIA_STEP_3",
       type: "text",
       text:
-        "Este servicio podol√≥gico est√° enfocado en los pies de los adultos mayores, con pies m√°s sensibles, enfermedades cr√≥nicas como la diabetes y problemas circulatorios hacen que los pies sean m√°s vulnerables a diversas afecciones, como piel fr√°gil, mala circulaci√≥n, u√±as engrosadas o deformidades. ü§∂üèΩ",
+        "Este servicio podolÛgico est· enfocado en los pies de los adultos mayores, con pies m·s sensibles, enfermedades crÛnicas como la diabetes y problemas circulatorios hacen que los pies sean m·s vulnerables a diversas afecciones, como piel fr·gil, mala circulaciÛn, uÒas engrosadas o deformidades. ????",
       next: "SVC_PODOGERIATRIA_ACTIONS",
     },
     {
       id: "SVC_PODOGERIATRIA_ACTIONS",
       type: "text",
-      text: "¬øTienes alguna otra duda?",
+      text: "øTienes alguna otra duda?",
+      delayMs: 1500,
       buttons: [
-        { label: "üë®‚Äçüíª Atencion personal", next: "CONTACT_METHOD" },
-        { label: "‚¨ÖÔ∏è Volver al menu", next: "MAIN_MENU" },
-        { label: "üßº Volver a servicios", next: "SERVICIOS_MENU" },
-        { label: "‚úÖ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "????? Atencion personal", next: "CONTACT_METHOD" },
+        { label: "?? Volver al menu", next: "MAIN_MENU" },
+        { label: "?? Volver a servicios", next: "SERVICIOS_MENU" },
+        { label: "? Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
 
     {
       id: "OTROS_MENU",
       type: "text",
-      text: "Selecciona la patolog√≠a que presentas ü©∫ para enviarte la informaci√≥n correcta üìãüì®",
+      text: "Selecciona la patologÌa que presentas ?? para enviarte la informaciÛn correcta ????",
+      delayMs: 1500,
       buttons: [
-        { label: "ü¶∂ Callosidad", next: "OTR_CALLOSIDAD_INFO" },
-        { label: "ü¶† Verruga plantar", next: "OTR_VERRUGA_PLANTAR_INFO" },
-        { label: "üíß Heloma", next: "OTR_HELOMA_INFO" },
-        { label: "‚úÇÔ∏è Extraccion de u√±a", next: "OTR_EXTRACCION_UNA_INFO" },
-        { label: "üèÉ Pie de atleta", next: "OTR_PIE_ATLETA_INFO" },
-        { label: "üß™ Pie diabetico", next: "OTR_PIE_DIABETICO_INFO" },
-        { label: "üë®‚Äçüíª Atencion personal", next: "CONTACT_METHOD" },
+        { label: "?? Callosidad", next: "OTR_CALLOSIDAD_INFO" },
+        { label: "?? Verruga plantar", next: "OTR_VERRUGA_PLANTAR_INFO" },
+        { label: "?? Heloma", next: "OTR_HELOMA_INFO" },
+        { label: "?? Extraccion de uÒa", next: "OTR_EXTRACCION_UNA_INFO" },
+        { label: "?? Pie de atleta", next: "OTR_PIE_ATLETA_INFO" },
+        { label: "?? Pie diabetico", next: "OTR_PIE_DIABETICO_INFO" },
+        { label: "????? Atencion personal", next: "CONTACT_METHOD" },
       ],
     },
 
     {
       id: "OTR_CALLOSIDAD_INFO",
       type: "text",
-      text: "INFORMACION DEL SERVICIO",
+      text: "InformaciÛn de Callosidad",
       next: "OTR_CALLOSIDAD_STEP_1",
     },
     {
@@ -674,7 +697,7 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/1.%20Callosidades/1.jpg",
       text:
-        "En PODOPIE, comprendemos lo importante que es mantener tus pies saludables y sin molestias. ‚öï\nPor eso, ofrecemos un tratamiento especializado para la ELIMINACI√ìN DE CALLOSIDADES, realizado por profesionales pod√≥logos capacitados, que utilizan t√©cnicas seguras y completamente indoloras. ü©π",
+        "En PODOPIE, comprendemos lo importante que es mantener tus pies saludables y sin molestias. ?\nPor eso, ofrecemos un tratamiento especializado para la ELIMINACI”N DE CALLOSIDADES, realizado por profesionales podÛlogos capacitados, que utilizan tÈcnicas seguras y completamente indoloras. ??",
       next: "OTR_CALLOSIDAD_STEP_2",
     },
     {
@@ -682,7 +705,7 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/1.%20Callosidades/2.jpg",
       text:
-        "- El pod√≥logo analiza las callosidades, identificando sus causas (fricci√≥n, calzado inadecuado o alteraciones biomec√°nicas).\n- Con instrumentos esterilizados, retira la piel engrosada usando bistur√≠ o limas, preservando la piel sana.\n- Programa visitas peri√≥dicas de seguimiento para controlar diariamente las callosidades y ajustar el tratamiento seg√∫n las necesidades espec√≠ficas del paciente.\n- Este servicio tiene un costo de 150 Bs y nos enfocamos solamente en eliminar la mayor cantidad de hiperqueratosis en las zonas afectadas. üíµ",
+        "- El podÛlogo analiza las callosidades, identificando sus causas (fricciÛn, calzado inadecuado o alteraciones biomec·nicas).\n- Con instrumentos esterilizados, retira la piel engrosada usando bisturÌ o limas, preservando la piel sana.\n- Programa visitas periÛdicas de seguimiento para controlar diariamente las callosidades y ajustar el tratamiento seg˙n las necesidades especÌficas del paciente.\n- Este servicio tiene un costo de 150 Bs y nos enfocamos solamente en eliminar la mayor cantidad de hiperqueratosis en las zonas afectadas. ??",
       next: "OTR_CALLOSIDAD_STEP_3",
     },
     {
@@ -690,24 +713,25 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/1.%20Callosidades/235a0c02-2a0e-4d93-a3b1-031880e3a7d3.jpg",
       text:
-        "Si necesita un paquete completo ü¶∂‚ú® tiene una opci√≥n accesible y detallada por realizarse, PODOCALLOS incluye una valoraci√≥n profesional üë®‚Äç‚öïÔ∏èüìã, pedicure cl√≠nico üßºüíÖ, tratamiento y limpieza de callosidades, todo por un costo de 200 Bs üí∞.\nEste paquete se realiza √∫nicamente bajo recomendaci√≥n del especialista ü©∫, ya que durante la valoraci√≥n üîç se determinar√° si el paciente necesita o no dicho tratamiento ‚úÖ‚ùå.",
+        "Si necesita un paquete completo ??? tiene una opciÛn accesible y detallada por realizarse, PODOCALLOS incluye una valoraciÛn profesional ???????, pedicure clÌnico ????, tratamiento y limpieza de callosidades, todo por un costo de 200 Bs ??.\nEste paquete se realiza ˙nicamente bajo recomendaciÛn del especialista ??, ya que durante la valoraciÛn ?? se determinar· si el paciente necesita o no dicho tratamiento ??.",
       next: "OTR_CALLOSIDAD_ACTIONS",
     },
     {
       id: "OTR_CALLOSIDAD_ACTIONS",
       type: "text",
-      text: "¬øTienes alguna otra duda?",
+      text: "øTienes alguna otra duda?",
+      delayMs: 1500,
       buttons: [
-        { label: "üë®‚Äçüíª Atencion personal", next: "CONTACT_METHOD" },
-        { label: "‚¨ÖÔ∏è Volver al menu", next: "MAIN_MENU" },
-        { label: "üß∞ Volver a servicios", next: "OTROS_MENU" },
-        { label: "‚úÖ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "????? Atencion personal", next: "CONTACT_METHOD" },
+        { label: "?? Volver al menu", next: "MAIN_MENU" },
+        { label: "?? Volver a servicios", next: "OTROS_MENU" },
+        { label: "? Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
       id: "OTR_VERRUGA_PLANTAR_INFO",
       type: "text",
-      text: "INFORMACION DEL SERVICIO",
+      text: "InformaciÛn de Verruga Plantar",
       next: "OTR_VERRUGA_STEP_1",
     },
     {
@@ -715,14 +739,14 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/2.%20Verruga%20plantar/1.jpg",
       text:
-        "El VPH son lesiones duras y rugosas causadas por el Virus del Papiloma Humano. Se transmiten principalmente en lugares p√∫blicos h√∫medos, como piscinas o duchas. ü¶∂\n¬øTe duelen esas molestas verrugas en la planta del pie? ü§ï\n¬°En PODOPIE tenemos la soluci√≥n!",
+        "El VPH son lesiones duras y rugosas causadas por el Virus del Papiloma Humano. Se transmiten principalmente en lugares p˙blicos h˙medos, como piscinas o duchas. ??\nøTe duelen esas molestas verrugas en la planta del pie? ??\n°En PODOPIE tenemos la soluciÛn!",
       next: "OTR_VERRUGA_STEP_2",
     },
     {
       id: "OTR_VERRUGA_STEP_2",
       type: "text",
       text:
-        "El pod√≥logo examina las verrugas y selecciona el tratamiento adecuado, que puede incluir cremas, cauterizaci√≥n o eliminaci√≥n quir√∫rgica en casos graves.üîé\nSe asesora al paciente sobre c√≥mo evitar la expansi√≥n del VPH y se programan seguimientos para garantizar la curaci√≥n.",
+        "El podÛlogo examina las verrugas y selecciona el tratamiento adecuado, que puede incluir cremas, cauterizaciÛn o eliminaciÛn quir˙rgica en casos graves.??\nSe asesora al paciente sobre cÛmo evitar la expansiÛn del VPH y se programan seguimientos para garantizar la curaciÛn.",
       next: "OTR_VERRUGA_STEP_3",
     },
     {
@@ -730,31 +754,32 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/2.%20Verruga%20plantar/2.jpg",
       text:
-        "Precio del servicio. üíµ\n- Verrugas simple, 200 Bs.\n- Verrugas dobles, 400 Bs.\n- Verrugas m√∫ltiples, 800 Bs",
+        "Precio del servicio. ??\n- Verrugas simple, 200 Bs.\n- Verrugas dobles, 400 Bs.\n- Verrugas m˙ltiples, 800 Bs",
       next: "OTR_VERRUGA_STEP_4",
     },
     {
       id: "OTR_VERRUGA_STEP_4",
       type: "text",
       text:
-        "Nuestro tratamiento especializado es eficaz, seguro y no invasivo, dise√±ado para eliminar las verrugas plantares y aliviar el dolor que causan. üõë",
+        "Nuestro tratamiento especializado es eficaz, seguro y no invasivo, diseÒado para eliminar las verrugas plantares y aliviar el dolor que causan. ??",
       next: "OTR_VERRUGA_ACTIONS",
     },
     {
       id: "OTR_VERRUGA_ACTIONS",
       type: "text",
-      text: "¬øTienes alguna otra duda?",
+      text: "øTienes alguna otra duda?",
+      delayMs: 1500,
       buttons: [
-        { label: "üë®‚Äçüíª Atencion personal", next: "CONTACT_METHOD" },
-        { label: "‚¨ÖÔ∏è Volver al menu", next: "MAIN_MENU" },
-        { label: "üß∞ Volver a servicios", next: "OTROS_MENU" },
-        { label: "‚úÖ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "????? Atencion personal", next: "CONTACT_METHOD" },
+        { label: "?? Volver al menu", next: "MAIN_MENU" },
+        { label: "?? Volver a servicios", next: "OTROS_MENU" },
+        { label: "? Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
       id: "OTR_HELOMA_INFO",
       type: "text",
-      text: "INFORMACION DEL SERVICIO",
+      text: "InformaciÛn de Heloma",
       next: "OTR_HELOMA_STEP_1",
     },
     {
@@ -762,24 +787,25 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/3.%20Heloma/f12c6c99-9fbd-4e0a-8ee2-d36909000335.jpg",
       text:
-        "Un heloma es una lesi√≥n en la piel del pie ü¶∂, conocida com√∫nmente como callo, que se forma por presi√≥n o fricci√≥n constante üëüüîÅ. Se caracteriza por un engrosamiento de la piel üß± y puede causar dolor üòñ, especialmente al caminar üö∂‚Äç‚ôÇÔ∏è o al usar calzado ajustado üëû. Suele aparecer en la planta del pie üë£ o en los dedos ü¶∂‚ú®.\nEl tratamiento de heloma consiste en la eliminaci√≥n segura del callo, alivio del dolor, y recomendaciones personalizadas para evitar que reaparezca üë£‚ú®\nEl consto del tratamiento tiene un valor de 100 Bs.",
+        "Un heloma es una lesiÛn en la piel del pie ??, conocida com˙nmente como callo, que se forma por presiÛn o fricciÛn constante ????. Se caracteriza por un engrosamiento de la piel ?? y puede causar dolor ??, especialmente al caminar ????? o al usar calzado ajustado ??. Suele aparecer en la planta del pie ?? o en los dedos ???.\nEl tratamiento de heloma consiste en la eliminaciÛn segura del callo, alivio del dolor, y recomendaciones personalizadas para evitar que reaparezca ???\nEl consto del tratamiento tiene un valor de 100 Bs.",
       next: "OTR_HELOMA_ACTIONS",
     },
     {
       id: "OTR_HELOMA_ACTIONS",
       type: "text",
-      text: "¬øTienes alguna otra duda?",
+      text: "øTienes alguna otra duda?",
+      delayMs: 1500,
       buttons: [
-        { label: "üë®‚Äçüíª Atencion personal", next: "CONTACT_METHOD" },
-        { label: "‚¨ÖÔ∏è Volver al menu", next: "MAIN_MENU" },
-        { label: "üß∞ Volver a servicios", next: "OTROS_MENU" },
-        { label: "‚úÖ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "????? Atencion personal", next: "CONTACT_METHOD" },
+        { label: "?? Volver al menu", next: "MAIN_MENU" },
+        { label: "?? Volver a servicios", next: "OTROS_MENU" },
+        { label: "? Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
       id: "OTR_EXTRACCION_UNA_INFO",
       type: "text",
-      text: "INFORMACION DEL SERVICIO",
+      text: "InformaciÛn de ExtracciÛn de UÒa",
       next: "OTR_EXTRACCION_STEP_1",
     },
     {
@@ -787,45 +813,46 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/4.%20Extracci%C3%B3n%20de%20u%C3%B1a/IMAGEN%201.jpg",
       text:
-        "En PODOPIE realizamos la extracci√≥n profesional de u√±as de forma segura, limpia y sin dolor, utilizando anestesia local y t√©cnicas especializadas.",
+        "En PODOPIE realizamos la extracciÛn profesional de uÒas de forma segura, limpia y sin dolor, utilizando anestesia local y tÈcnicas especializadas.",
       next: "OTR_EXTRACCION_STEP_2",
     },
     {
       id: "OTR_EXTRACCION_STEP_2",
       type: "text",
       text:
-        "üîç ¬øEn qu√© casos se recomienda la extracci√≥n?\n‚Ä¢ Golpes fuertes que provocan hematomas o desprendimiento\n‚Ä¢ U√±as parcialmente sueltas o fracturadas\n‚Ä¢ Infecciones severas con riesgo de complicaci√≥n",
+        "?? øEn quÈ casos se recomienda la extracciÛn?\nï Golpes fuertes que provocan hematomas o desprendimiento\nï UÒas parcialmente sueltas o fracturadas\nï Infecciones severas con riesgo de complicaciÛn",
       next: "OTR_EXTRACCION_STEP_3",
     },
     {
       id: "OTR_EXTRACCION_STEP_3",
       type: "text",
       text:
-        "IMPORTANTE: ‚ö†Ô∏è\nNo siempre es necesario quitar la u√±a. En PODOPIE solo realizamos la extracci√≥n si es cl√≠nicamente justificado, ya que quitar la u√±a no elimina los hongos ni cura los u√±eros por s√≠ solo. Por eso, cada caso es evaluado individualmente",
+        "IMPORTANTE: ??\nNo siempre es necesario quitar la uÒa. En PODOPIE solo realizamos la extracciÛn si es clÌnicamente justificado, ya que quitar la uÒa no elimina los hongos ni cura los uÒeros por sÌ solo. Por eso, cada caso es evaluado individualmente",
       next: "OTR_EXTRACCION_STEP_4",
     },
     {
       id: "OTR_EXTRACCION_STEP_4",
       type: "text",
       text:
-        "‚úÖ ¬øQu√© incluye el procedimiento?\n‚Ä¢ Evaluaci√≥n podol√≥gica completa\n‚Ä¢ Extracci√≥n con anestesia local (sin dolor)\n‚Ä¢ Limpieza y cuidado del lecho ungueal\n‚Ä¢ Recomendaciones post-procedimiento\nüí∞ Costo: 200 Bs por u√±a",
+        "? øQuÈ incluye el procedimiento?\nï EvaluaciÛn podolÛgica completa\nï ExtracciÛn con anestesia local (sin dolor)\nï Limpieza y cuidado del lecho ungueal\nï Recomendaciones post-procedimiento\n?? Costo: 200 Bs por uÒa",
       next: "OTR_EXTRACCION_ACTIONS",
     },
     {
       id: "OTR_EXTRACCION_ACTIONS",
       type: "text",
-      text: "¬øTienes alguna otra duda?",
+      text: "øTienes alguna otra duda?",
+      delayMs: 1500,
       buttons: [
-        { label: "üë®‚Äçüíª Atencion personal", next: "CONTACT_METHOD" },
-        { label: "‚¨ÖÔ∏è Volver al menu", next: "MAIN_MENU" },
-        { label: "üß∞ Volver a servicios", next: "OTROS_MENU" },
-        { label: "‚úÖ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "????? Atencion personal", next: "CONTACT_METHOD" },
+        { label: "?? Volver al menu", next: "MAIN_MENU" },
+        { label: "?? Volver a servicios", next: "OTROS_MENU" },
+        { label: "? Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
       id: "OTR_PIE_ATLETA_INFO",
       type: "text",
-      text: "INFORMACION DEL SERVICIO",
+      text: "InformaciÛn de Pie de Atleta",
       next: "OTR_PIE_ATLETA_STEP_1",
     },
     {
@@ -833,7 +860,7 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/5.%20Pie%20de%20atleta/1.jpg",
       text:
-        "El pie de atleta es una infecci√≥n causada por hongos que afecta principalmente la piel de los pies, sobre todo entre los dedos. Es una afecci√≥n bastante com√∫n y contagiosa, que suele aparecer cuando los pies permanecen h√∫medos y calientes por mucho tiempo, como al usar zapatos cerrados durante horas.",
+        "El pie de atleta es una infecciÛn causada por hongos que afecta principalmente la piel de los pies, sobre todo entre los dedos. Es una afecciÛn bastante com˙n y contagiosa, que suele aparecer cuando los pies permanecen h˙medos y calientes por mucho tiempo, como al usar zapatos cerrados durante horas.",
       next: "OTR_PIE_ATLETA_STEP_2",
     },
     {
@@ -841,24 +868,25 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/5.%20Pie%20de%20atleta/2.jpg",
       text:
-        "üõ°Ô∏è Prevenci√≥n\nPara evitar el pie de atleta se recomienda:\n‚Ä¢ Secar bien los pies, especialmente entre los dedos\n‚Ä¢ Usar calcetines limpios y transpirables\n‚Ä¢ Evitar caminar descalzo en lugares p√∫blicos\n‚Ä¢ No compartir objetos personales\nüí∞ Costo: 100 Bs",
+        "??? PrevenciÛn\nPara evitar el pie de atleta se recomienda:\nï Secar bien los pies, especialmente entre los dedos\nï Usar calcetines limpios y transpirables\nï Evitar caminar descalzo en lugares p˙blicos\nï No compartir objetos personales\n?? Costo: 100 Bs",
       next: "OTR_PIE_ATLETA_ACTIONS",
     },
     {
       id: "OTR_PIE_ATLETA_ACTIONS",
       type: "text",
-      text: "¬øTienes alguna otra duda?",
+      text: "øTienes alguna otra duda?",
+      delayMs: 1500,
       buttons: [
-        { label: "üë®‚Äçüíª Atencion personal", next: "CONTACT_METHOD" },
-        { label: "‚¨ÖÔ∏è Volver al menu", next: "MAIN_MENU" },
-        { label: "üß∞ Volver a servicios", next: "OTROS_MENU" },
-        { label: "‚úÖ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "????? Atencion personal", next: "CONTACT_METHOD" },
+        { label: "?? Volver al menu", next: "MAIN_MENU" },
+        { label: "?? Volver a servicios", next: "OTROS_MENU" },
+        { label: "? Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
     {
       id: "OTR_PIE_DIABETICO_INFO",
       type: "text",
-      text: "INFORMACION DEL SERVICIO",
+      text: "InformaciÛn de Pie DiabÈtico",
       next: "OTR_PIE_DIABETICO_STEP_1",
     },
     {
@@ -866,7 +894,7 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/6.%20Paciente%20Diab%C3%A9tico/1.jpg",
       text:
-        "En PODOPIE contamos con un servicio especializado en podolog√≠a para pacientes diab√©ticos, enfocado en la prevenci√≥n de complicaciones como √∫lceras, infecciones y lesiones que pueden poner en riesgo la salud del pie. ü©∏ üë£\n¬øPOR QU√â ES IMPORTANTE? ü§∑üèΩ‚Äç‚ôÇÔ∏è\nLas personas con diabetes pueden tener da√±o en los nervios (neuropat√≠a) o problemas de circulaci√≥n, lo que hace que un mal corte de u√±as o UNA PEQUE√ëA LESI√ìN pueda CONVERTIRSE EN UNA COMPLICACI√ìN SERIA. ‚öï",
+        "En PODOPIE contamos con un servicio especializado en podologÌa para pacientes diabÈticos, enfocado en la prevenciÛn de complicaciones como ˙lceras, infecciones y lesiones que pueden poner en riesgo la salud del pie. ?? ??\nøPOR QU… ES IMPORTANTE? ???????\nLas personas con diabetes pueden tener daÒo en los nervios (neuropatÌa) o problemas de circulaciÛn, lo que hace que un mal corte de uÒas o UNA PEQUE—A LESI”N pueda CONVERTIRSE EN UNA COMPLICACI”N SERIA. ?",
       next: "OTR_PIE_DIABETICO_STEP_2",
     },
     {
@@ -874,7 +902,7 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/6.%20Paciente%20Diab%C3%A9tico/2.jpg",
       text:
-        "Ofrecemos atenci√≥n podol√≥gica especializada para pacientes diab√©ticos, que incluye evaluaci√≥n de la sensibilidad y circulaci√≥n, corte seguro de u√±as, prevenci√≥n de √∫lceras, control de infecciones si existieran, desbridamiento si es necesario, asesor√≠a sobre el uso de calzado adecuado y educaci√≥n para el autocuidado. ü¶∂",
+        "Ofrecemos atenciÛn podolÛgica especializada para pacientes diabÈticos, que incluye evaluaciÛn de la sensibilidad y circulaciÛn, corte seguro de uÒas, prevenciÛn de ˙lceras, control de infecciones si existieran, desbridamiento si es necesario, asesorÌa sobre el uso de calzado adecuado y educaciÛn para el autocuidado. ??",
       next: "OTR_PIE_DIABETICO_STEP_3",
     },
     {
@@ -882,18 +910,19 @@ module.exports = {
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/6.%20Paciente%20Diab%C3%A9tico/58369928-c3fd-4e9b-a79b-992a866b37d6.jpg",
       text:
-        "Si necesita un paquete completo ü¶∂ü©µ tiene una opci√≥n accesible y detallada por realizarse, PODODIABETIK incluye un chequeo m√©dico ü©∫üìã, revisi√≥n podal üë£üîç, profilaxis podal üßºü¶∂ e hidrataci√≥n podal üíß‚ú®, todo por un costo de 150 Bs üíµ.\nEste paquete se realiza √∫nicamente bajo recomendaci√≥n del especialista ü©∫, ya que durante la valoraci√≥n üîç se determinar√° si el paciente necesita o no dicho tratamiento ‚úÖ‚ùå.",
+        "Si necesita un paquete completo ???? tiene una opciÛn accesible y detallada por realizarse, PODODIABETIK incluye un chequeo mÈdico ????, revisiÛn podal ????, profilaxis podal ???? e hidrataciÛn podal ???, todo por un costo de 150 Bs ??.\nEste paquete se realiza ˙nicamente bajo recomendaciÛn del especialista ??, ya que durante la valoraciÛn ?? se determinar· si el paciente necesita o no dicho tratamiento ??.",
       next: "OTR_PIE_DIABETICO_ACTIONS",
     },
     {
       id: "OTR_PIE_DIABETICO_ACTIONS",
       type: "text",
-      text: "¬øTienes alguna otra duda?",
+      text: "øTienes alguna otra duda?",
+      delayMs: 1500,
       buttons: [
-        { label: "üë®‚Äçüíª Atencion personal", next: "CONTACT_METHOD" },
-        { label: "‚¨ÖÔ∏è Volver al menu", next: "MAIN_MENU" },
-        { label: "üß∞ Volver a servicios", next: "OTROS_MENU" },
-        { label: "‚úÖ Finalizar", next: "CIERRE_HORARIO_UBICACION" },
+        { label: "????? Atencion personal", next: "CONTACT_METHOD" },
+        { label: "?? Volver al menu", next: "MAIN_MENU" },
+        { label: "?? Volver a servicios", next: "OTROS_MENU" },
+        { label: "? Finalizar", next: "CIERRE_HORARIO_UBICACION" },
       ],
     },
 
@@ -901,9 +930,10 @@ module.exports = {
       id: "CONTACT_METHOD",
       type: "text",
       text: "Seleccion de forma de atencion",
+      delayMs: 1500,
       buttons: [
-        { label: "üìû Llamada", next: "ACTION_CALL" },
-        { label: "üí¨ Mensaje", next: "ACTION_MESSAGE" },
+        { label: "?? Llamada", next: "ACTION_CALL" },
+        { label: "?? Mensaje", next: "ACTION_MESSAGE" },
       ],
     },
     {
@@ -929,82 +959,86 @@ module.exports = {
       id: "CIERRE_PRECIOS_IMG_1",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/precios1.jpg",
+      text: " ",
       next: "CIERRE_PRECIOS_IMG_2",
     },
     {
       id: "CIERRE_PRECIOS_IMG_2",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/precios2.jpg",
+      text: " ",
       next: "CIERRE_PRECIOS_IMG_3",
     },
     {
       id: "CIERRE_PRECIOS_IMG_3",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/precios3.jpg",
+      text: " ",
       next: "CIERRE_PRECIOS_FINAL",
     },
     {
       id: "CIERRE_PRECIOS_FINAL",
       type: "text",
       text:
-        "Agradecemos sinceramente su confianza ü§ù. Quedamos a su disposici√≥n para atender cualquier necesidad o inconveniente podol√≥gico que pudiera presentarse ü¶∂‚ú®. Saludos.",
+        "Agradecemos sinceramente su confianza ??. Quedamos a su disposiciÛn para atender cualquier necesidad o inconveniente podolÛgico que pudiera presentarse ???. Saludos.",
       terminal: true,
     },
     {
       id: "CIERRE_HORARIO_UBICACION",
       type: "text",
-      text: "ATENCION CENTRAL",
+      text: "ATENCI”N CENTRAL",
       next: "CIERRE_HORARIO_CENTRAL_1",
     },
     {
       id: "CIERRE_HORARIO_CENTRAL_1",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/centralHorario.jpg",
-      text: "Puede venir en estos horarios ‚è∞",
+      text: "Puede venir en estos horarios ?",
       next: "CIERRE_HORARIO_CENTRAL_2",
     },
     {
       id: "CIERRE_HORARIO_CENTRAL_2",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/centralUbicacion.jpg",
-      text: "Haz clic aqu√≠ para ver nuestra ubicaci√≥n en Google Maps:\nhttps://maps.app.goo.gl/eXTejzQhp8zm3EmT8",
+      text: "Haz clic aquÌ para ver nuestra ubicaciÛn en Google Maps:\nhttps://maps.app.goo.gl/eXTejzQhp8zm3EmT8",
       next: "CIERRE_HORARIO_CENTRAL_3",
     },
     {
       id: "CIERRE_HORARIO_CENTRAL_3",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/centralLineas.jpg",
-      text: "üöå L√≠neas que pasan: 74, 38, 7, 60, 51, 36, 37, 89, Trufi",
+      text: "?? LÌneas que pasan: 74, 38, 7, 60, 51, 36, 37, 89, Trufi",
       next: "CIERRE_HORARIO_SUCURSAL_TITLE",
     },
     {
       id: "CIERRE_HORARIO_SUCURSAL_TITLE",
       type: "text",
-      text: "ATENCION SUCURSAL",
+      text: "ATENCI”N SUCURSAL",
       next: "CIERRE_HORARIO_SUCURSAL_1",
     },
     {
       id: "CIERRE_HORARIO_SUCURSAL_1",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/sucursalHorario.jpg",
-      text: "Puede venir en estos horarios ‚è∞",
+      text: "Puede venir en estos horarios ?",
       next: "CIERRE_HORARIO_SUCURSAL_2",
     },
     {
       id: "CIERRE_HORARIO_SUCURSAL_2",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/sucursalUbicacion.jpg",
-      text: "Haz clic aqu√≠ para ver nuestra ubicaci√≥n en Google Maps:\nhttps://maps.app.goo.gl/eXTejzQhp8zm3EmT8",
+      text: "Haz clic aquÌ para ver nuestra ubicaciÛn en Google Maps:\nhttps://maps.app.goo.gl/eXTejzQhp8zm3EmT8",
       next: "CIERRE_HORARIO_SUCURSAL_3",
     },
     {
       id: "CIERRE_HORARIO_SUCURSAL_3",
       type: "image",
       url: "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/sucursalLineas.jpg",
-      text: "üöå L√≠neas que pasan: 8, 10, 11, 30, 33, 54, 55, 56, 57, 58, 68, 78, 86, 104, 72, 73, Trufi",
+      text: "?? LÌneas que pasan: 8, 10, 11, 30, 33, 54, 55, 56, 57, 58, 68, 78, 86, 104, 72, 73, Trufi",
       terminal: true,
     },
   ],
 
   useLegacyHandler: false,
 };
+

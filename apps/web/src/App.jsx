@@ -2365,6 +2365,7 @@ function App() {
                 messageMode={messageMode}
                 quickActions={quickActions}
                 tagInput={tagInput}
+                setTagInput={setTagInput}
                 noteInput={noteInput}
                 notesList={notesList}
                 latestNote={latestNote}

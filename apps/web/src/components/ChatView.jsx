@@ -18,6 +18,7 @@ function ChatView({
   messageMode,
   quickActions,
   tagInput,
+  setTagInput,
   noteInput,
   notesList,
   latestNote,
@@ -114,8 +115,8 @@ function ChatView({
           </button>
         </div>
 
-        <div className="chat-search">
-          <SearchIcon className="search-icon" />
+        <div className="chat-search ui-search">
+          <SearchIcon className="search-icon ui-search-icon" />
           <input
             type="text"
             placeholder="Buscar pacientes o mensajes"

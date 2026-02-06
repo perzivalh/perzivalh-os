@@ -90,10 +90,14 @@
   border: none;
   background: var(--accent);
   color: #fff;
-  border-radius: 12px;
+  border-radius: 999px;
   padding: 0.6rem 1.1rem;
   font-weight: 600;
   white-space: nowrap;
+}
+
+.campaigns-primary:hover {
+  background: var(--accent-strong);
 }
 
 .campaigns-primary--dropdown {
@@ -207,22 +211,7 @@
 }
 
 .templates-search {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  border: 1px solid var(--border);
-  background: var(--panel);
-  border-radius: 999px;
-  padding: 0.55rem 0.9rem;
-  min-width: 0;
   flex: 1 1 260px;
-}
-
-.templates-search input {
-  border: none;
-  background: transparent;
-  padding: 0;
-  width: 100%;
   min-width: 0;
 }
 
@@ -242,6 +231,7 @@
   border: 2px solid var(--muted);
   position: relative;
   flex-shrink: 0;
+  transition: border-color 0.2s ease;
 }
 
 .template-search-icon::after {
@@ -253,6 +243,15 @@
   right: -4px;
   bottom: -2px;
   transform: rotate(45deg);
+  transition: background 0.2s ease;
+}
+
+.ui-search:focus-within .template-search-icon {
+  border-color: var(--accent);
+}
+
+.ui-search:focus-within .template-search-icon::after {
+  background: var(--accent);
 }
 
 .template-grid {
@@ -393,30 +392,7 @@
 }
 
 .audiences-search {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  border: 1px solid var(--border);
-  background: var(--panel);
-  border-radius: 999px;
-  padding: 0.55rem 0.9rem;
   min-width: 0;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-}
-
-.audiences-search:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-  background: var(--panel);
-}
-
-.audiences-search input {
-  border: none;
-  background: transparent;
-  padding: 0;
-  width: 100%;
-  min-width: 0;
-  outline: none;
 }
 
 .audience-list {
@@ -594,31 +570,8 @@
 }
 
 .audiences-search-field {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  border: 1px solid var(--border);
-  background: var(--panel);
-  border-radius: 999px;
-  padding: 0.55rem 0.9rem;
   flex: 1 1 260px;
   min-width: 0;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-}
-
-.audiences-search-field:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-  background: var(--panel);
-}
-
-.audiences-search-field input {
-  border: none;
-  background: transparent;
-  padding: 0;
-  width: 100%;
-  min-width: 0;
-  outline: none;
 }
 
 .audiences-total {
@@ -962,21 +915,6 @@
 }
 
 .campaigns-search {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  border: 1px solid var(--border);
-  background: var(--panel);
-  border-radius: 8px;
-  padding: 0.45rem 0.75rem;
-  min-width: 0;
-}
-
-.campaigns-search input {
-  border: none;
-  background: transparent;
-  padding: 0;
-  width: 100%;
   min-width: 0;
 }
 
@@ -1080,8 +1018,9 @@
 
 .campaigns-table {
   border: 1px solid var(--border);
-  border-radius: 0;
+  border-radius: 16px;
   overflow: visible;
+  background: var(--panel);
   width: 100%;
   min-width: 0;
 }
@@ -1110,7 +1049,7 @@
   font-size: 0.7rem;
   color: var(--muted);
   font-weight: 700;
-  background: transparent;
+  background: var(--panel-muted);
 }
 
 .campaigns-table-row {
@@ -1119,7 +1058,7 @@
 }
 
 .campaigns-table-row:hover {
-  background: rgba(15, 23, 42, 0.04);
+  background: var(--panel-muted);
 }
 
 .campaigns-table-title {
@@ -1353,20 +1292,15 @@
 }
 
 .launch-template-search {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: var(--panel-muted);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 0.4rem 0.5rem;
+  gap: 0.6rem;
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 0.55rem 0.9rem;
 }
 
 .launch-template-search input {
   flex: 1;
-  border: none;
-  background: transparent;
-  padding: 0.45rem 0.6rem;
+  padding: 0;
   color: var(--ink);
 }
 
@@ -2499,14 +2433,18 @@ body[data-theme="dark"] .audiences-table {
 }
 
 body[data-theme="dark"] .campaigns-filter-item,
-body[data-theme="dark"] .campaigns-search,
 body[data-theme="dark"] .campaigns-filter-chip,
-body[data-theme="dark"] .campaigns-table,
 body[data-theme="dark"] .launch-template,
-body[data-theme="dark"] .launch-template-search,
 body[data-theme="dark"] .launch-schedule-option,
 body[data-theme="dark"] .preview-summary {
   background: transparent;
+  border-color: #2a2a2a;
+}
+
+body[data-theme="dark"] .campaigns-search,
+body[data-theme="dark"] .campaigns-table,
+body[data-theme="dark"] .launch-template-search {
+  background: #141414;
   border-color: #2a2a2a;
 }
 

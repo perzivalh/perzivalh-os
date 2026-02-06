@@ -63,7 +63,8 @@ function TemplatesView({
                     </span>
                 </div>
                 <div className="templates-actions">
-                    <div className="search-box">
+                    <div className="search-box ui-search">
+                        <span className="template-search-icon ui-search-icon" aria-hidden="true" />
                         <input
                             type="text"
                             placeholder="Buscar plantillas..."

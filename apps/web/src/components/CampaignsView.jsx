@@ -1831,8 +1831,8 @@ function CampaignsView({
           {activeTab === "templates" && (
             <section className="campaigns-panel templates-panel">
               <div className="templates-toolbar">
-                <label className="templates-search">
-                  <span className="template-search-icon" aria-hidden="true" />
+                <label className="templates-search ui-search">
+                  <span className="template-search-icon ui-search-icon" aria-hidden="true" />
                   <input
                     type="text"
                     placeholder="Buscar por nombre de plantilla..."
@@ -1924,8 +1924,8 @@ function CampaignsView({
             <section className="campaigns-panel audiences-panel">
               <div className="audiences-layout">
                 <div className="audiences-list">
-                  <label className="audiences-search">
-                    <span className="template-search-icon" aria-hidden="true" />
+                  <label className="audiences-search ui-search">
+                    <span className="template-search-icon ui-search-icon" aria-hidden="true" />
                     <input
                       type="text"
                       placeholder="Buscar lista..."
@@ -2057,8 +2057,8 @@ function CampaignsView({
                     </div>
                   </div>
                   <div className="audiences-search-row">
-                    <label className="audiences-search-field">
-                      <span className="template-search-icon" aria-hidden="true" />
+                    <label className="audiences-search-field ui-search">
+                      <span className="template-search-icon ui-search-icon" aria-hidden="true" />
                       <input
                         type="text"
                         placeholder="Buscar contacto en esta lista..."
@@ -2282,8 +2282,8 @@ function CampaignsView({
               {!campaignLaunchOpen ? (
                 <div className="campaigns-dashboard">
                   <aside className="campaigns-sidebar">
-                    <label className="campaigns-search">
-                      <span className="template-search-icon" aria-hidden="true" />
+                    <label className="campaigns-search ui-search">
+                      <span className="template-search-icon ui-search-icon" aria-hidden="true" />
                       <input
                         type="text"
                         placeholder="Buscar campaña..."
@@ -2582,7 +2582,8 @@ function CampaignsView({
                       <span className="launch-step-number">3</span>
                       <div className="launch-card">
                         <div className="launch-step-title">Elegir Plantilla de Meta</div>
-                        <div className="launch-template-search">
+                        <div className="launch-template-search ui-search">
+                          <span className="template-search-icon ui-search-icon" aria-hidden="true" />
                           <input
                             type="text"
                             placeholder="Buscar plantilla..."

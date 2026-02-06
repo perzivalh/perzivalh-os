@@ -55,19 +55,13 @@
 }
 
 .chat-search {
-  display: flex;
-  align-items: center;
   gap: 0.6rem;
-  background: var(--panel-muted);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 0.55rem 0.75rem;
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 0.55rem 0.9rem;
 }
 
 .chat-search input {
-  border: none;
-  background: transparent;
-  padding: 0;
   width: 100%;
 }
 
@@ -641,6 +635,11 @@ body[data-theme="dark"] .chat-shell .icon-button {
   border-color: rgba(239, 68, 68, 0.28);
 }
 
+body[data-theme="dark"] .chat-shell .chat-search {
+  background: #141414;
+  border-color: #2a2a2a;
+}
+
 body[data-theme="dark"] .chat-shell .icon-button,
 body[data-theme="dark"] .chat-shell .quick-action,
 body[data-theme="dark"] .chat-shell .message-mode {
@@ -648,7 +647,7 @@ body[data-theme="dark"] .chat-shell .message-mode {
 }
 
 body[data-theme="dark"] .chat-shell .chat-search input {
-  color: #fee2e2;
+  color: #e5e7eb;
 }
 
 body[data-theme="dark"] .conversation-item.active {

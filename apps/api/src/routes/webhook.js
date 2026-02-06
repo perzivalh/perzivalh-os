@@ -124,18 +124,24 @@ function extractContactName(value) {
 }
 
 function extractIncomingText(message) {
-    if (message.type === "text") {
-        return message.text?.body || "";
-    }
-    if (message.type === "interactive") {
-        const selection = parseInteractiveSelection(message);
-        if (!selection) return "";
-        return [selection.id, selection.title].filter(Boolean).join(" | ");
-    }
-    return "";
+  if (message.type === "text") {
+    return message.text?.body || "";
+  }
+  if (message.type === "button") {
+    return message.button?.text || message.button?.payload || "";
+  }
+  if (message.type === "interactive") {
+    const selection = parseInteractiveSelection(message);
+    if (!selection) return "";
+    return [selection.id, selection.title].filter(Boolean).join(" | ");
+  }
+  return "";
 }
 
 function mapMessageType(type) {
+    if (type === "button") {
+        return "interactive";
+    }
     const allowed = new Set([
         "text",
         "interactive",
@@ -438,7 +444,7 @@ router.post("/webhook", async (req, res) => {
                             continue;
                         }
 
-                        if (message.type === "interactive") {
+                        if (message.type === "interactive" || message.type === "button") {
                             const selection = parseInteractiveSelection(message);
                             const selectionText = normalizeText(selection?.title || selection?.id || "");
                             if (isHandoffRequest(selectionText)) {

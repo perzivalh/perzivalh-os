@@ -436,6 +436,15 @@ async function sendTemplate(to, name, language, components = [], options = {}) {
 }
 
 function parseInteractiveSelection(message) {
+  if (!message) {
+    return null;
+  }
+  if (message.type === "button") {
+    return {
+      id: message.button?.payload || message.button?.text,
+      title: message.button?.text,
+    };
+  }
   if (message.type !== "interactive") {
     return null;
   }

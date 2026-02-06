@@ -915,7 +915,10 @@ router.delete("/campaigns/:id", requireAuth, requireRole(["admin", "marketing"])
     if (campaign.status === "sending") {
         return res.status(400).json({ error: "Sending campaigns cannot be deleted" });
     }
-    await prisma.campaign.delete({ where: { id: campaign.id } });
+    await prisma.$transaction([
+        prisma.campaignMessage.deleteMany({ where: { campaign_id: campaign.id } }),
+        prisma.campaign.delete({ where: { id: campaign.id } }),
+    ]);
     await logAudit({
         userId: req.user.id,
         action: "campaign.deleted",

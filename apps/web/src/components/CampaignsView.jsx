@@ -128,6 +128,17 @@ function CampaignsView({
   const [campaignLaunchOpen, setCampaignLaunchOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState(null);
   const [launchTemplateSearch, setLaunchTemplateSearch] = useState("");
+  const [openCampaignMenuId, setOpenCampaignMenuId] = useState(null);
+  const [openContactMenuId, setOpenContactMenuId] = useState(null);
+  const [contactEditOpen, setContactEditOpen] = useState(false);
+  const [contactSaving, setContactSaving] = useState(false);
+  const [contactEditForm, setContactEditForm] = useState({
+    id: "",
+    name: "",
+    phone: "",
+    email: "",
+    vat: "",
+  });
   const [campaignScheduleMode, setCampaignScheduleMode] = useState(
     campaignForm.send_now === false || campaignForm.scheduled_for ? "schedule" : "now"
   );
@@ -887,6 +898,82 @@ function CampaignsView({
     const confirmed = window.confirm(`¿Reenviar la campaña "${campaign.name}"?`);
     if (!confirmed) return;
     onResendCampaign(campaign.id);
+  }
+
+  function toggleCampaignMenu(id) {
+    setOpenCampaignMenuId((prev) => (prev === id ? null : id));
+  }
+
+  function toggleContactMenu(id) {
+    setOpenContactMenuId((prev) => (prev === id ? null : id));
+  }
+
+  function handleOpenContactEdit(contact) {
+    if (!contact?.id) {
+      return;
+    }
+    setContactEditForm({
+      id: contact.id,
+      name: contact.name || "",
+      phone: contact.phone_e164 || contact.phone || "",
+      email: contact.email || "",
+      vat: contact.vat || "",
+    });
+    setContactEditOpen(true);
+    setOpenContactMenuId(null);
+  }
+
+  async function handleSaveContact(event) {
+    event.preventDefault();
+    if (!contactEditForm.id) {
+      return;
+    }
+    setContactSaving(true);
+    try {
+      const result = await apiPut(`/api/contacts/${contactEditForm.id}`, {
+        name: contactEditForm.name,
+        phone: contactEditForm.phone,
+        email: contactEditForm.email,
+        vat: contactEditForm.vat,
+      });
+      if (result?.contact) {
+        setAudienceContacts((prev) =>
+          prev.map((item) => (item.id === result.contact.id ? result.contact : item))
+        );
+      }
+      setContactEditOpen(false);
+      pushToast({ message: "Contacto actualizado" });
+      await loadAudienceContacts(selectedAudience, {
+        page: audiencePage,
+        search: audienceContactSearch,
+      });
+    } catch (err) {
+      pushToast({ type: "error", message: err.message || "No se pudo actualizar" });
+    } finally {
+      setContactSaving(false);
+    }
+  }
+
+  async function handleDeleteContact(contact) {
+    if (!contact?.id) {
+      return;
+    }
+    const confirmed = window.confirm(`¿Eliminar el contacto "${contact.name || contact.phone_e164 || "Sin nombre"}"?`);
+    if (!confirmed) {
+      return;
+    }
+    try {
+      await apiDelete(`/api/contacts/${contact.id}`);
+      setAudienceContacts((prev) => prev.filter((item) => item.id !== contact.id));
+      setOpenContactMenuId(null);
+      pushToast({ message: "Contacto eliminado" });
+      await loadAudienceContacts(selectedAudience, {
+        page: audiencePage,
+        search: audienceContactSearch,
+      });
+    } catch (err) {
+      pushToast({ type: "error", message: err.message || "No se pudo eliminar" });
+    }
   }
 
   function handleSubmitCampaign(event) {
@@ -1726,9 +1813,34 @@ function CampaignsView({
                             <div className="audiences-status">
                               {(contact.status || "ACTIVO").toUpperCase()}
                             </div>
-                            <button className="audiences-menu" type="button" aria-label="Opciones">
-                              ...
-                            </button>
+                            <div className="audiences-menu-wrapper">
+                              <button
+                                className="audiences-menu"
+                                type="button"
+                                aria-label="Opciones"
+                                onClick={() => toggleContactMenu(contact.id)}
+                                disabled={!contact.id}
+                              >
+                                ...
+                              </button>
+                              {openContactMenuId === contact.id && (
+                                <div className="audiences-menu-dropdown">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenContactEdit(contact)}
+                                  >
+                                    Editar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="danger"
+                                    onClick={() => handleDeleteContact(contact)}
+                                  >
+                                    Eliminar
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -1896,6 +2008,8 @@ function CampaignsView({
                         const statusLabel = STATUS_LABELS[campaign.status] || campaign.status;
                         const isSending = campaign.status === "sending";
                         const canResend = ["sent", "failed"].includes(campaign.status);
+                        const canEdit = !isSending;
+                        const canDelete = !isSending;
                         return (
                           <div className="campaigns-table-row" key={campaign.id}>
                             <div className="campaigns-table-title">
@@ -1919,33 +2033,54 @@ function CampaignsView({
                               {statusLabel}
                             </div>
                             <div className="campaigns-row-actions">
-                              {!isSending && (
+                              <div className="campaigns-row-menu">
                                 <button
-                                  className="campaigns-row-btn"
+                                  className="campaigns-row-menu-btn"
                                   type="button"
-                                  onClick={() => handleEditCampaign(campaign)}
+                                  aria-label="Opciones"
+                                  onClick={() => toggleCampaignMenu(campaign.id)}
                                 >
-                                  Editar
+                                  ...
                                 </button>
-                              )}
-                              {canResend && (
-                                <button
-                                  className="campaigns-row-btn"
-                                  type="button"
-                                  onClick={() => handleResendCampaignClick(campaign)}
-                                >
-                                  Reenviar
-                                </button>
-                              )}
-                              {!isSending && (
-                                <button
-                                  className="campaigns-row-btn danger"
-                                  type="button"
-                                  onClick={() => handleDeleteCampaignClick(campaign)}
-                                >
-                                  Eliminar
-                                </button>
-                              )}
+                                {openCampaignMenuId === campaign.id && (
+                                  <div className="campaigns-row-dropdown">
+                                    {canEdit && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          handleEditCampaign(campaign);
+                                          setOpenCampaignMenuId(null);
+                                        }}
+                                      >
+                                        Editar
+                                      </button>
+                                    )}
+                                    {canResend && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          handleResendCampaignClick(campaign);
+                                          setOpenCampaignMenuId(null);
+                                        }}
+                                      >
+                                        Reenviar
+                                      </button>
+                                    )}
+                                    {canDelete && (
+                                      <button
+                                        type="button"
+                                        className="danger"
+                                        onClick={() => {
+                                          handleDeleteCampaignClick(campaign);
+                                          setOpenCampaignMenuId(null);
+                                        }}
+                                      >
+                                        Eliminar
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         );
@@ -2350,6 +2485,76 @@ function CampaignsView({
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      {contactEditOpen && (
+        <div className="modal-overlay" onClick={() => setContactEditOpen(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Editar contacto</h2>
+              <button
+                className="modal-close"
+                type="button"
+                onClick={() => setContactEditOpen(false)}
+              >
+                x
+              </button>
+            </div>
+            <form className="modal-body" onSubmit={handleSaveContact}>
+              <label className="field">
+                <span>Nombre</span>
+                <input
+                  type="text"
+                  value={contactEditForm.name}
+                  onChange={(event) =>
+                    setContactEditForm((prev) => ({ ...prev, name: event.target.value }))
+                  }
+                />
+              </label>
+              <label className="field">
+                <span>Teléfono</span>
+                <input
+                  type="text"
+                  value={contactEditForm.phone}
+                  onChange={(event) =>
+                    setContactEditForm((prev) => ({ ...prev, phone: event.target.value }))
+                  }
+                />
+              </label>
+              <label className="field">
+                <span>Email</span>
+                <input
+                  type="email"
+                  value={contactEditForm.email}
+                  onChange={(event) =>
+                    setContactEditForm((prev) => ({ ...prev, email: event.target.value }))
+                  }
+                />
+              </label>
+              <label className="field">
+                <span>CI / NIT</span>
+                <input
+                  type="text"
+                  value={contactEditForm.vat}
+                  onChange={(event) =>
+                    setContactEditForm((prev) => ({ ...prev, vat: event.target.value }))
+                  }
+                />
+              </label>
+              <div className="modal-actions">
+                <button
+                  className="btn-secondary"
+                  type="button"
+                  onClick={() => setContactEditOpen(false)}
+                >
+                  Cancelar
+                </button>
+                <button className="btn-primary" type="submit" disabled={contactSaving}>
+                  {contactSaving ? "Guardando..." : "Guardar"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -99,4 +99,32 @@ router.post("/contacts/refresh-odoo", requireRole(["admin", "marketing"]), async
     }
 });
 
+/**
+ * PUT /api/contacts/:id
+ * Update a local contact
+ */
+router.put("/contacts/:id", requireRole(["admin", "marketing"]), async (req, res) => {
+    try {
+        const contact = await contactImportService.updateContact(req.params.id, req.body || {});
+        res.json({ contact });
+    } catch (error) {
+        logger.error("Failed to update contact", { error: error.message });
+        res.status(error.message === "not_found" ? 404 : 500).json({ error: error.message });
+    }
+});
+
+/**
+ * DELETE /api/contacts/:id
+ * Delete a local contact
+ */
+router.delete("/contacts/:id", requireRole(["admin", "marketing"]), async (req, res) => {
+    try {
+        await contactImportService.deleteContact(req.params.id);
+        res.json({ success: true });
+    } catch (error) {
+        logger.error("Failed to delete contact", { error: error.message });
+        res.status(error.message === "not_found" ? 404 : 500).json({ error: error.message });
+    }
+});
+
 module.exports = router;

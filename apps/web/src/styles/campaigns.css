@@ -711,6 +711,42 @@
   color: var(--muted);
 }
 
+.audiences-menu-wrapper {
+  position: relative;
+  display: inline-flex;
+  justify-content: flex-end;
+}
+
+.audiences-menu-dropdown {
+  position: absolute;
+  top: 28px;
+  right: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+  display: grid;
+  min-width: 140px;
+  z-index: 10;
+}
+
+.audiences-menu-dropdown button {
+  border: none;
+  background: transparent;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+.audiences-menu-dropdown button:hover {
+  background: var(--panel-muted);
+}
+
+.audiences-menu-dropdown .danger {
+  color: #dc2626;
+}
+
 .audiences-pagination {
   display: flex;
   flex-wrap: wrap;
@@ -969,10 +1005,10 @@
 .campaigns-table-head,
 .campaigns-table-row {
   display: grid;
-  grid-template-columns: 2.2fr 1.1fr 1.1fr 0.9fr 0.9fr 0.9fr 0.9fr minmax(180px, 1fr);
+  grid-template-columns: 2.2fr 1.1fr 1.1fr 0.9fr 0.9fr 0.9fr 0.9fr 64px;
   gap: 0.75rem;
   align-items: center;
-  min-width: 980px;
+  min-width: 940px;
   padding: 0.8rem 1rem;
 }
 
@@ -1054,31 +1090,54 @@
 
 .campaigns-row-actions {
   display: flex;
-  flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 0.4rem;
 }
 
-.campaigns-row-btn {
+.campaigns-row-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.campaigns-row-menu-btn {
   border: 1px solid var(--border);
   background: var(--panel);
-  color: var(--ink);
-  border-radius: 10px;
-  padding: 0.35rem 0.6rem;
-  font-size: 0.72rem;
+  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
-.campaigns-row-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+.campaigns-row-dropdown {
+  position: absolute;
+  top: 38px;
+  right: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+  display: grid;
+  min-width: 150px;
+  z-index: 10;
 }
 
-.campaigns-row-btn.danger {
-  border-color: rgba(220, 38, 38, 0.45);
-  background: rgba(220, 38, 38, 0.08);
+.campaigns-row-dropdown button {
+  border: none;
+  background: transparent;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+.campaigns-row-dropdown button:hover {
+  background: var(--panel-muted);
+}
+
+.campaigns-row-dropdown .danger {
   color: #dc2626;
 }
 
@@ -1203,6 +1262,7 @@
   display: grid;
   gap: 0.35rem;
   min-height: 120px;
+  color: var(--ink);
 }
 
 .launch-template.selected {
@@ -1219,11 +1279,18 @@
 
 .launch-template-title {
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .launch-template-preview {
   font-size: 0.8rem;
   color: var(--muted);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 
 .launch-empty {
@@ -1277,6 +1344,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  color: var(--ink);
 }
 
 .launch-schedule-option.active {
@@ -1439,6 +1507,7 @@
   border-radius: 8px;
   padding: 0.85rem;
   background: transparent;
+  color: var(--ink);
 }
 
 .preview-summary-title {
@@ -1456,6 +1525,14 @@
   justify-content: space-between;
   font-size: 0.85rem;
   margin-bottom: 0.5rem;
+}
+
+.preview-summary-row span {
+  color: var(--muted);
+}
+
+.preview-summary-row strong {
+  color: var(--ink);
 }
 
 .campaigns-history-header {
@@ -2102,10 +2179,35 @@ body[data-theme="dark"] .audience-menu {
   color: #b8b8b8;
 }
 
+body[data-theme="dark"] .audiences-menu-dropdown {
+  background: #121212;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+body[data-theme="dark"] .audiences-menu-dropdown button {
+  color: #e5e7eb;
+}
+
+body[data-theme="dark"] .audiences-menu-dropdown button:hover {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+body[data-theme="dark"] .audiences-menu-dropdown .danger {
+  color: #fecaca;
+}
+
 body[data-theme="dark"] .template-preview {
   background: #1a1a1a;
   border-color: #2a2a2a;
   color: #b8b8b8;
+}
+
+body[data-theme="dark"] .template-name {
+  color: #e5e7eb;
+}
+
+body[data-theme="dark"] .template-category {
+  color: #94a3b8;
 }
 
 body[data-theme="dark"] .audience-hero,
@@ -2129,6 +2231,32 @@ body[data-theme="dark"] .preview-summary {
   border-color: #2a2a2a;
 }
 
+body[data-theme="dark"] .launch-template {
+  color: #e5e7eb;
+}
+
+body[data-theme="dark"] .launch-template-title {
+  color: #e5e7eb;
+}
+
+body[data-theme="dark"] .launch-template-preview {
+  color: #9ca3af;
+}
+
+body[data-theme="dark"] .launch-schedule-option {
+  color: #e5e7eb;
+  background: rgba(239, 68, 68, 0.06);
+}
+
+body[data-theme="dark"] .launch-schedule-option.active {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fecaca;
+}
+
+body[data-theme="dark"] input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) saturate(0) brightness(1.2);
+}
+
 body[data-theme="dark"] .campaigns-launch,
 body[data-theme="dark"] .campaigns-launch-preview,
 body[data-theme="dark"] .launch-card {
@@ -2137,7 +2265,7 @@ body[data-theme="dark"] .launch-card {
 }
 
 body[data-theme="dark"] .launch-template-search button,
-body[data-theme="dark"] .campaigns-row-btn {
+body[data-theme="dark"] .campaigns-row-menu-btn {
   background: rgba(239, 68, 68, 0.08);
   border-color: rgba(239, 68, 68, 0.3);
   color: #fecaca;
@@ -2147,10 +2275,21 @@ body[data-theme="dark"] .launch-template-search input {
   color: #fee2e2;
 }
 
-body[data-theme="dark"] .campaigns-row-btn.danger {
-  background: rgba(239, 68, 68, 0.16);
-  border-color: rgba(239, 68, 68, 0.55);
-  color: #fee2e2;
+body[data-theme="dark"] .campaigns-row-dropdown {
+  background: #121212;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+body[data-theme="dark"] .campaigns-row-dropdown button {
+  color: #e5e7eb;
+}
+
+body[data-theme="dark"] .campaigns-row-dropdown button:hover {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+body[data-theme="dark"] .campaigns-row-dropdown .danger {
+  color: #fecaca;
 }
 
 body[data-theme="dark"] .audience-rule-card {

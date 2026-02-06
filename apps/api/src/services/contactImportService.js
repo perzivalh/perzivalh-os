@@ -364,6 +364,63 @@ async function getContactStats() {
 }
 
 /**
+ * Update a local contact
+ */
+async function updateContact(contactId, payload = {}) {
+    const existing = await prisma.odooContact.findUnique({
+        where: { id: contactId },
+    });
+    if (!existing) {
+        throw new Error("not_found");
+    }
+    const updates = {};
+    if (typeof payload.name === "string") {
+        updates.name = payload.name.trim() || existing.name;
+    }
+    if (payload.email !== undefined) {
+        const email = typeof payload.email === "string" ? payload.email.trim() : "";
+        updates.email = email || null;
+    }
+    if (payload.vat !== undefined) {
+        const vat = typeof payload.vat === "string" ? payload.vat.trim() : "";
+        updates.vat = vat || null;
+    }
+    if (payload.phone !== undefined) {
+        const phoneRaw = typeof payload.phone === "string" ? payload.phone.trim() : "";
+        if (!phoneRaw) {
+            updates.phone_raw = null;
+            updates.phone_e164 = null;
+        } else {
+            const variants = normalizePhone(phoneRaw);
+            const phoneE164 =
+                variants.find((p) => p.startsWith("+")) ||
+                (variants[0] ? `+591${variants[0]}` : null);
+            updates.phone_raw = phoneRaw;
+            updates.phone_e164 = phoneE164;
+        }
+    }
+    updates.last_synced_at = new Date();
+
+    return prisma.odooContact.update({
+        where: { id: contactId },
+        data: updates,
+    });
+}
+
+/**
+ * Delete a local contact
+ */
+async function deleteContact(contactId) {
+    await prisma.campaignRecipient.updateMany({
+        where: { odoo_contact_id: contactId },
+        data: { odoo_contact_id: null },
+    });
+    return prisma.odooContact.delete({
+        where: { id: contactId },
+    });
+}
+
+/**
  * Get Odoo field options for variable mapping
  * Returns available fields that can be used in template variables
  */
@@ -389,4 +446,6 @@ module.exports = {
     getContacts,
     getContactStats,
     getOdooFieldOptions,
+    updateContact,
+    deleteContact,
 };

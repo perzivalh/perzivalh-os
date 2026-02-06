@@ -4,6 +4,40 @@
  */
 const { getControlClient } = require("../control/controlClient");
 const { getFlow } = require("../../flows");
+const { decryptString } = require("../core/crypto");
+
+function normalizeConfigForRuntime(config) {
+    if (!config || typeof config !== "object") {
+        return config;
+    }
+    const next = { ...config };
+    if (next.ai && next.ai.key_encrypted) {
+        try {
+            next.ai = {
+                ...next.ai,
+                key: decryptString(next.ai.key_encrypted),
+            };
+        } catch (error) {
+            next.ai = { ...next.ai };
+        }
+    }
+    return next;
+}
+
+function sanitizeConfigForUi(config) {
+    if (!config || typeof config !== "object") {
+        return config;
+    }
+    const next = { ...config };
+    if (next.ai) {
+        const { key_encrypted, key, ...rest } = next.ai;
+        next.ai = {
+            ...rest,
+            key_present: Boolean(key_encrypted || key),
+        };
+    }
+    return next;
+}
 
 /**
  * Obtiene el flow activo para un tenant
@@ -42,7 +76,7 @@ async function getActiveTenantFlow(tenantId) {
     return {
         tenantBotId: tenantBot.id,
         flowId: tenantBot.flow_id,
-        config: tenantBot.config,
+        config: normalizeConfigForRuntime(tenantBot.config),
         flow,
     };
 }
@@ -70,7 +104,7 @@ async function getTenantBots(tenantId) {
             id: tb.id,
             flow_id: tb.flow_id,
             is_active: tb.is_active,
-            config: tb.config,
+            config: sanitizeConfigForUi(tb.config),
             created_at: tb.created_at,
             updated_at: tb.updated_at,
             flow_name: flow?.name || tb.flow_id,

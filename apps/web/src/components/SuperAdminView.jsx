@@ -297,12 +297,13 @@ function SuperAdminView({
     }
   }
 
-  async function handleAddBot(flowId) {
+  async function handleAddBot(flowId, config = null) {
     if (!editTenantId) return;
     try {
       const response = await apiPost("/api/superadmin/tenant-bots", {
         tenant_id: editTenantId,
         flow_id: flowId,
+        config,
       });
       if (response.tenant_bot) {
         setTenantBots((prev) => [response.tenant_bot, ...prev]);
@@ -331,6 +332,7 @@ function SuperAdminView({
             const response = await apiPost("/api/superadmin/tenant-bots", {
               tenant_id: bot.tenant_id,
               flow_id: bot.flow_id,
+              config: bot.config || null,
             });
             if (response?.tenant_bot && bot.is_active === false) {
               await apiPatch(`/api/superadmin/tenant-bots/${response.tenant_bot.id}`, {
@@ -350,6 +352,26 @@ function SuperAdminView({
     } catch (err) {
       setError(err.message || "Error al eliminar bot.");
       pushToast({ type: "error", message: err.message || "Error al eliminar bot" });
+    }
+  }
+
+  async function handleUpdateBotConfig(botId, config) {
+    try {
+      const response = await apiPatch(`/api/superadmin/tenant-bots/${botId}`, {
+        config,
+      });
+      if (response?.tenant_bot) {
+        setTenantBots((prev) =>
+          prev.map((b) => (b.id === botId ? response.tenant_bot : b))
+        );
+      }
+      pushToast({ message: "Configuracion IA actualizada" });
+    } catch (err) {
+      setError(err.message || "Error al actualizar configuracion del bot.");
+      pushToast({
+        type: "error",
+        message: err.message || "Error al actualizar configuracion del bot",
+      });
     }
   }
 
@@ -1059,6 +1081,7 @@ function SuperAdminView({
                 onToggleBot={handleToggleBot}
                 onAddBot={handleAddBot}
                 onRemoveBot={handleRemoveBot}
+                onUpdateBotConfig={handleUpdateBotConfig}
               />
             )}
           </>

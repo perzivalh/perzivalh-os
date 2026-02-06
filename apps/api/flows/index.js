@@ -1,7 +1,7 @@
-/**
+﻿/**
  * Flow Loader
  * Escanea la carpeta flows/ y exporta todos los flows disponibles
- * Los flows nuevos se agregan automáticamente al hacer commit
+ * Los flows nuevos se agregan automÃ¡ticamente al hacer commit
  */
 const fs = require("fs");
 const path = require("path");
@@ -49,13 +49,15 @@ function getFlowsList() {
         name: flow.name || flow.id,
         description: flow.description || "",
         version: flow.version || "1.0.0",
-        icon: flow.icon || "🤖",
+        icon: flow.icon || "ðŸ¤–",
         category: flow.category || "general",
+        requires_ai: Boolean(flow.requires_ai || flow.ai?.enabled),
+        ai: flow.ai || null,
     }));
 }
 
 /**
- * Obtiene un flow específico por ID
+ * Obtiene un flow especÃ­fico por ID
  * @param {string} flowId
  * @returns {Object|null}
  */
@@ -69,3 +71,4 @@ module.exports = {
     getFlowsList,
     getFlow,
 };
+

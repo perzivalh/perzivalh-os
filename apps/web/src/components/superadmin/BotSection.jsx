@@ -2,7 +2,7 @@
  * BotSection (Super Admin)
  * Solo permite asignar o quitar bots a un tenant.
  */
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 
 function BotIcon() {
   return (
@@ -22,18 +22,60 @@ function BotSection({
   loading,
   onAddBot,
   onRemoveBot,
+  onUpdateBotConfig,
 }) {
   const [selectedFlow, setSelectedFlow] = useState("");
+  const [selectedAiProvider, setSelectedAiProvider] = useState("openai");
+  const [selectedAiKey, setSelectedAiKey] = useState("");
+  const [botDrafts, setBotDrafts] = useState({});
 
   const usedFlowIds = new Set(tenantBots.map((tb) => tb.flow_id));
   const unusedFlows = availableFlows.filter((flow) => !usedFlowIds.has(flow.id));
+  const flowById = useMemo(() => {
+    return new Map(availableFlows.map((flow) => [flow.id, flow]));
+  }, [availableFlows]);
+  const selectedFlowMeta = unusedFlows.find((flow) => flow.id === selectedFlow);
+  const selectedRequiresAi = Boolean(selectedFlowMeta?.requires_ai);
 
   function handleAdd() {
     if (!selectedFlow) {
       return;
     }
-    onAddBot(selectedFlow);
+    const config = selectedRequiresAi
+      ? {
+          ai: {
+            provider: selectedAiProvider,
+            key: selectedAiKey || undefined,
+          },
+        }
+      : null;
+    onAddBot(selectedFlow, config);
     setSelectedFlow("");
+    setSelectedAiKey("");
+  }
+
+  function updateDraft(botId, updates) {
+    setBotDrafts((prev) => ({
+      ...prev,
+      [botId]: { ...(prev[botId] || {}), ...updates },
+    }));
+  }
+
+  function handleSaveConfig(bot) {
+    if (!onUpdateBotConfig) {
+      return;
+    }
+    const draft = botDrafts[bot.id] || {};
+    const provider = draft.provider || bot.config?.ai?.provider || "openai";
+    const keyValue = draft.key || "";
+    const config = {
+      ai: {
+        provider,
+        ...(keyValue ? { key: keyValue } : {}),
+      },
+    };
+    onUpdateBotConfig(bot.id, config);
+    updateDraft(bot.id, { key: "" });
   }
 
   return (
@@ -76,6 +118,50 @@ function BotSection({
                   <span className="sa-bot-item-desc">
                     {bot.flow_description || "Sin descripcion"}
                   </span>
+                  {flowById.get(bot.flow_id)?.requires_ai && (
+                    <div className="sa-bot-ai-config">
+                      <div className="sa-ai-field">
+                        <label className="sa-select-label">Proveedor IA</label>
+                        <select
+                          className="sa-select-styled"
+                          value={
+                            botDrafts[bot.id]?.provider ||
+                            bot.config?.ai?.provider ||
+                            "openai"
+                          }
+                          onChange={(event) =>
+                            updateDraft(bot.id, { provider: event.target.value })
+                          }
+                        >
+                          <option value="openai">OpenAI</option>
+                          <option value="gemini">Gemini</option>
+                        </select>
+                      </div>
+                      <div className="sa-ai-field">
+                        <label className="sa-select-label">API Key</label>
+                        <input
+                          type="password"
+                          className="sa-input"
+                          placeholder={
+                            bot.config?.ai?.key_present
+                              ? "******** (configurada)"
+                              : "Pegue la API key"
+                          }
+                          value={botDrafts[bot.id]?.key || ""}
+                          onChange={(event) =>
+                            updateDraft(bot.id, { key: event.target.value })
+                          }
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className="sa-btn-assign sa-btn-save"
+                        onClick={() => handleSaveConfig(bot)}
+                      >
+                        Guardar IA
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -112,6 +198,31 @@ function BotSection({
             ))}
           </select>
         </div>
+        {selectedRequiresAi && (
+          <div className="sa-ai-assign">
+            <div className="sa-ai-field">
+              <label className="sa-select-label">Proveedor IA</label>
+              <select
+                className="sa-select-styled"
+                value={selectedAiProvider}
+                onChange={(event) => setSelectedAiProvider(event.target.value)}
+              >
+                <option value="openai">OpenAI</option>
+                <option value="gemini">Gemini</option>
+              </select>
+            </div>
+            <div className="sa-ai-field">
+              <label className="sa-select-label">API Key</label>
+              <input
+                type="password"
+                className="sa-input"
+                placeholder="Pegue la API key"
+                value={selectedAiKey}
+                onChange={(event) => setSelectedAiKey(event.target.value)}
+              />
+            </div>
+          </div>
+        )}
         <button
           type="button"
           className="sa-btn-assign"

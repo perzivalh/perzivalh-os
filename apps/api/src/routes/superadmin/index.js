@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Rutas de Superadmin - index
  * Centraliza todas las rutas de /api/superadmin/*
  */
@@ -29,6 +29,50 @@ function requireSuperAdmin(req, res, next) {
         return res.status(403).json({ error: "forbidden" });
     }
     return next();
+}
+
+function sanitizeTenantBotConfig(config) {
+    if (!config || typeof config !== "object") {
+        return config;
+    }
+    const next = { ...config };
+    if (next.ai) {
+        const { key_encrypted, key, ...rest } = next.ai;
+        next.ai = {
+            ...rest,
+            key_present: Boolean(key_encrypted || key),
+        };
+    }
+    return next;
+}
+
+function normalizeTenantBotConfig(config) {
+    if (!config || typeof config !== "object") {
+        return config;
+    }
+    const next = { ...config };
+    if (next.ai) {
+        const ai = { ...next.ai };
+        if (ai.key) {
+            ai.key_encrypted = encryptString(String(ai.key));
+            delete ai.key;
+        } else {
+            delete ai.key;
+        }
+        next.ai = ai;
+    }
+    return next;
+}
+
+function mergeTenantBotConfig(baseConfig, patchConfig) {
+    if (!baseConfig && !patchConfig) {
+        return null;
+    }
+    const merged = { ...(baseConfig || {}), ...(patchConfig || {}) };
+    if (baseConfig?.ai || patchConfig?.ai) {
+        merged.ai = { ...(baseConfig?.ai || {}), ...(patchConfig?.ai || {}) };
+    }
+    return merged;
 }
 
 async function validateTenantDatabaseConnection(dbUrl) {
@@ -724,12 +768,12 @@ router.get("/tenant-bots", requireAuth, requireSuperAdmin, async (req, res) => {
             tenant_id: tb.tenant_id,
             flow_id: tb.flow_id,
             is_active: tb.is_active,
-            config: tb.config,
+            config: sanitizeTenantBotConfig(tb.config),
             created_at: tb.created_at,
             updated_at: tb.updated_at,
             flow_name: flow?.name || tb.flow_id,
             flow_description: flow?.description || "",
-            flow_icon: flow?.icon || "🤖",
+            flow_icon: flow?.icon || "ðŸ¤–",
         };
     });
 
@@ -741,7 +785,7 @@ router.get("/tenant-bots", requireAuth, requireSuperAdmin, async (req, res) => {
 router.post("/tenant-bots", requireAuth, requireSuperAdmin, async (req, res) => {
     const tenantId = req.body?.tenant_id;
     const flowId = req.body?.flow_id;
-    const config = req.body?.config || null;
+    const config = normalizeTenantBotConfig(req.body?.config || null);
 
     if (!tenantId || !flowId) {
         return res.status(400).json({ error: "missing_fields" });
@@ -771,7 +815,7 @@ router.post("/tenant-bots", requireAuth, requireSuperAdmin, async (req, res) => 
                 tenant_id: tenantBot.tenant_id,
                 flow_id: tenantBot.flow_id,
                 is_active: tenantBot.is_active,
-                config: tenantBot.config,
+                config: sanitizeTenantBotConfig(tenantBot.config),
                 created_at: tenantBot.created_at,
                 flow_name: flow.name,
                 flow_icon: flow.icon,
@@ -794,7 +838,13 @@ router.patch("/tenant-bots/:id", requireAuth, requireSuperAdmin, async (req, res
         updates.is_active = Boolean(req.body.is_active);
     }
     if (req.body?.config !== undefined) {
-        updates.config = req.body.config;
+        const control = getControlClient();
+        const existing = await control.tenantBot.findUnique({
+            where: { id: req.params.id },
+            select: { config: true },
+        });
+        const merged = mergeTenantBotConfig(existing?.config, req.body.config);
+        updates.config = normalizeTenantBotConfig(merged);
     }
 
     const control = getControlClient();
@@ -812,10 +862,10 @@ router.patch("/tenant-bots/:id", requireAuth, requireSuperAdmin, async (req, res
             tenant_id: tenantBot.tenant_id,
             flow_id: tenantBot.flow_id,
             is_active: tenantBot.is_active,
-            config: tenantBot.config,
+            config: sanitizeTenantBotConfig(tenantBot.config),
             updated_at: tenantBot.updated_at,
             flow_name: flow?.name || tenantBot.flow_id,
-            flow_icon: flow?.icon || "🤖",
+            flow_icon: flow?.icon || "ðŸ¤–",
         },
     });
 });
@@ -832,3 +882,6 @@ router.delete("/tenant-bots/:id", requireAuth, requireSuperAdmin, async (req, re
 
 module.exports = router;
 module.exports.requireSuperAdmin = requireSuperAdmin;
+
+
+

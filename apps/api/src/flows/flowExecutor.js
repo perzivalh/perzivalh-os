@@ -10,6 +10,7 @@ const prisma = require("../db");
 const { getTenantContext } = require("../tenancy/tenantContext");
 const { setConversationStatus, addTagToConversation } = require("../services/conversations");
 const { BOT_FLOW_ID, FIRST_NOTICE_MS } = require("../config/flowInactivity");
+const { routeWithAI } = require("../services/aiRouter");
 
 const MAX_LIST_TITLE = 24;
 const BUTTON_TITLE_LIMIT = 20;
@@ -265,6 +266,48 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
     if (match && match.next && nodeMap.has(match.next)) {
       await sendNode(waId, flow, nodeMap.get(match.next), new Set([match.next]));
       return;
+    }
+
+    const aiDecision = await routeWithAI({
+      text,
+      flow,
+      config: flowData.config,
+      session,
+    });
+    if (aiDecision?.action) {
+      const menuId = getStartNodeId(flow);
+      const servicesId = flow.ai?.services_node_id || "SERVICIOS_MENU";
+      const handoffId = flow.ai?.handoff_node_id || "AI_HANDOFF_OFFER";
+
+      if (aiDecision.ai_used) {
+        const aiTurns = Number(session.data?.ai_turns || 0);
+        await sessionStore.updateSession(waId, lineId, {
+          data: { ai_turns: aiTurns + 1 },
+        });
+      }
+
+      if (aiDecision.action === "route" && aiDecision.route_id) {
+        const target = nodeMap.get(aiDecision.route_id);
+        if (target) {
+          await sendNode(waId, flow, target, new Set([aiDecision.route_id]));
+          return;
+        }
+      }
+
+      if (aiDecision.action === "services" && nodeMap.has(servicesId)) {
+        await sendNode(waId, flow, nodeMap.get(servicesId), new Set([servicesId]));
+        return;
+      }
+
+      if (aiDecision.action === "handoff" && nodeMap.has(handoffId)) {
+        await sendNode(waId, flow, nodeMap.get(handoffId), new Set([handoffId]));
+        return;
+      }
+
+      if (aiDecision.action === "menu" && menuId && nodeMap.has(menuId)) {
+        await sendNode(waId, flow, nodeMap.get(menuId), new Set([menuId]));
+        return;
+      }
     }
 
     await sendNode(waId, flow, currentNode, new Set([currentNodeId]));

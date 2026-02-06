@@ -26,6 +26,17 @@ function extractOpenAIText(data) {
   return "";
 }
 
+function extractGeminiText(data) {
+  const parts = data?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) {
+    return "";
+  }
+  return parts
+    .map((part) => (typeof part?.text === "string" ? part.text : ""))
+    .filter(Boolean)
+    .join("\n");
+}
+
 async function callOpenAI({
   apiKey,
   model,
@@ -116,7 +127,7 @@ async function callGemini({
         headers: { "Content-Type": "application/json" },
         timeout: 20000,
       });
-      return response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      return extractGeminiText(response.data);
     } catch (error) {
       const status = error?.response?.status;
       if (schema && status === 400) {
@@ -132,9 +143,7 @@ async function callGemini({
             headers: { "Content-Type": "application/json" },
             timeout: 20000,
           });
-          return (
-            response.data?.candidates?.[0]?.content?.parts?.[0]?.text || ""
-          );
+          return extractGeminiText(response.data);
         } catch (schemaError) {
           lastError = schemaError;
           continue;

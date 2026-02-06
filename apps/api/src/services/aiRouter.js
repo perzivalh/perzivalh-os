@@ -112,14 +112,14 @@ function buildRouteCandidates(flow) {
 
 function buildSystemPrompt() {
   return [
-    "Eres un enrutador de intenciones para un bot de una clínica podológica.",
+    "Eres un enrutador de intenciones para un bot de una clinica podologica.",
     "Tu objetivo es llevar al usuario al flujo correcto con la menor cantidad de mensajes.",
-    "Responde SOLO con JSON válido según el esquema.",
+    "Responde SOLO con JSON valido segun el esquema. No agregues texto extra ni explicaciones.",
     "Reglas:",
-    "- Si el mensaje describe síntomas, dolor o dudas médicas complejas: action=handoff.",
-    "- Si el mensaje está fuera de tema: action=menu.",
+    "- Si el mensaje describe sintomas, dolor o dudas medicas complejas: action=handoff.",
+    "- Si el mensaje esta fuera de tema: action=menu.",
     "- Si no se identifica el servicio: action=services.",
-    "- Si se identifica un servicio o tema del flujo: action=route con route_id válido.",
+    "- Si se identifica un servicio o tema del flujo: action=route con route_id valido.",
   ].join("\n");
 }
 
@@ -141,13 +141,48 @@ function safeJsonParse(raw) {
   if (!raw || typeof raw !== "string") {
     return null;
   }
+  const trimmed = raw.trim();
+  const direct = tryParseJson(trimmed);
+  if (direct) {
+    return direct;
+  }
+  const withoutFence = stripCodeFence(trimmed);
+  if (withoutFence !== trimmed) {
+    const fenced = tryParseJson(withoutFence);
+    if (fenced) {
+      return fenced;
+    }
+  }
+  const extracted = extractFirstJsonObject(trimmed);
+  if (extracted) {
+    return tryParseJson(extracted);
+  }
+  return null;
+}
+
+function tryParseJson(text) {
   try {
-    return JSON.parse(raw);
+    return JSON.parse(text);
   } catch (error) {
     return null;
   }
 }
 
+function stripCodeFence(text) {
+  if (!text.startsWith("```")) {
+    return text;
+  }
+  return text.replace(/^```[a-zA-Z0-9]*\n?/, "").replace(/```$/, "").trim();
+}
+
+function extractFirstJsonObject(text) {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) {
+    return null;
+  }
+  return text.slice(start, end + 1);
+}
 function containsSymptom(normalizedMessage) {
   if (!normalizedMessage) {
     return false;
@@ -271,7 +306,7 @@ async function routeWithAI({ text, flow, config, session }) {
       system,
       user,
       schema: ROUTER_SCHEMA,
-      temperature: 0.1,
+      temperature: 0,
       maxTokens: 200,
     });
     logger.info("ai.router_raw", {

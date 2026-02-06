@@ -195,6 +195,10 @@ async function routeWithAI({ text, flow, config, session }) {
   const aiFlow = flow.ai || {};
 
   if (!aiFlow.enabled) {
+    logger.info("ai.router_skipped", {
+      reason: "disabled",
+      flowId: flow?.id,
+    });
     return null;
   }
 
@@ -225,6 +229,11 @@ async function routeWithAI({ text, flow, config, session }) {
   }
 
   if (!apiKey) {
+    logger.warn("ai.router_skipped", {
+      reason: "missing_key",
+      provider,
+      flowId: flow?.id,
+    });
     if (allowFallback) {
       const fallbackRoute = fallbackRouteByKeywords(normalizedMessage, routes);
       if (fallbackRoute) {
@@ -249,6 +258,11 @@ async function routeWithAI({ text, flow, config, session }) {
   });
 
   const model = aiConfig.model || DEFAULT_MODELS[provider] || "gpt-4o-mini";
+  logger.info("ai.router_request", {
+    provider,
+    model,
+    flowId: flow?.id,
+  });
 
   try {
     const raw = await callAiProvider(provider, {

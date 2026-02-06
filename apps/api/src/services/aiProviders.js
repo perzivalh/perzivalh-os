@@ -81,11 +81,14 @@ async function callGemini({
   temperature = 0,
   maxTokens = 220,
 }) {
-  const normalizedModel = String(model || "")
-    .replace(/^models\//, "")
-    .trim() || "gemini-1.5-flash";
-  const url = `${GEMINI_ENDPOINT}/${normalizedModel}:generateContent?key=${apiKey}`;
-  const payload = {
+  const normalizedModel = String(model || "").replace(/^models\//, "").trim();
+  const modelCandidates = [
+    normalizedModel || "gemini-1.5-flash",
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-latest",
+  ].filter(Boolean);
+
+  const basePayload = {
     system_instruction: {
       parts: [{ text: system }],
     },
@@ -103,37 +106,52 @@ async function callGemini({
     },
   };
 
-  try {
-    const response = await axios.post(url, payload, {
-      headers: { "Content-Type": "application/json" },
-      timeout: 20000,
-    });
-    return response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  } catch (error) {
-    const status = error?.response?.status;
-    if (schema && status === 400) {
-      const retryPayload = {
-        ...payload,
-        generationConfig: {
-          ...payload.generationConfig,
-          responseSchema: undefined,
-        },
-      };
-      const response = await axios.post(url, retryPayload, {
+  let lastError = null;
+  for (const candidate of modelCandidates) {
+    const url = `${GEMINI_ENDPOINT}/${candidate}:generateContent?key=${apiKey}`;
+    const payload = basePayload;
+    try {
+      const response = await axios.post(url, payload, {
         headers: { "Content-Type": "application/json" },
         timeout: 20000,
       });
       return response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    } catch (error) {
+      const status = error?.response?.status;
+      if (schema && status === 400) {
+        const retryPayload = {
+          ...payload,
+          generationConfig: {
+            ...payload.generationConfig,
+            responseSchema: undefined,
+          },
+        };
+        try {
+          const response = await axios.post(url, retryPayload, {
+            headers: { "Content-Type": "application/json" },
+            timeout: 20000,
+          });
+          return (
+            response.data?.candidates?.[0]?.content?.parts?.[0]?.text || ""
+          );
+        } catch (schemaError) {
+          lastError = schemaError;
+          continue;
+        }
+      }
+      lastError = error;
     }
-    const detail = error?.response?.data
-      ? JSON.stringify(error.response.data).slice(0, 500)
-      : "";
-    throw new Error(
-      `Gemini request failed${status ? ` (${status})` : ""}${
-        detail ? `: ${detail}` : ""
-      }`
-    );
   }
+
+  const status = lastError?.response?.status;
+  const detail = lastError?.response?.data
+    ? JSON.stringify(lastError.response.data).slice(0, 500)
+    : "";
+  throw new Error(
+    `Gemini request failed${status ? ` (${status})` : ""}${
+      detail ? `: ${detail}` : ""
+    }`
+  );
 }
 
 async function callAiProvider(provider, options) {

@@ -273,6 +273,7 @@ async function routeWithAI({ text, flow, config, session }) {
     logger.error("ai.router_failed", {
       message: error.message,
       provider,
+      model,
     });
     if (allowFallback) {
       const fallbackRoute = fallbackRouteByKeywords(normalizedMessage, routes);

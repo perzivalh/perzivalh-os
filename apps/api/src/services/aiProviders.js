@@ -100,14 +100,37 @@ async function callGemini({
     },
   };
 
-  const response = await axios.post(url, payload, {
-    headers: { "Content-Type": "application/json" },
-    timeout: 20000,
-  });
-
-  const text =
-    response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  return text;
+  try {
+    const response = await axios.post(url, payload, {
+      headers: { "Content-Type": "application/json" },
+      timeout: 20000,
+    });
+    return response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  } catch (error) {
+    const status = error?.response?.status;
+    if (schema && status === 400) {
+      const retryPayload = {
+        ...payload,
+        generationConfig: {
+          ...payload.generationConfig,
+          responseSchema: undefined,
+        },
+      };
+      const response = await axios.post(url, retryPayload, {
+        headers: { "Content-Type": "application/json" },
+        timeout: 20000,
+      });
+      return response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    }
+    const detail = error?.response?.data
+      ? JSON.stringify(error.response.data).slice(0, 500)
+      : "";
+    throw new Error(
+      `Gemini request failed${status ? ` (${status})` : ""}${
+        detail ? `: ${detail}` : ""
+      }`
+    );
+  }
 }
 
 async function callAiProvider(provider, options) {

@@ -1894,6 +1894,8 @@ function CampaignsView({
                         const reads = campaign.read_count || "--";
                         const replies = campaign.reply_count || "--";
                         const statusLabel = STATUS_LABELS[campaign.status] || campaign.status;
+                        const isSending = campaign.status === "sending";
+                        const canResend = ["sent", "failed"].includes(campaign.status);
                         return (
                           <div className="campaigns-table-row" key={campaign.id}>
                             <div className="campaigns-table-title">
@@ -1917,18 +1919,30 @@ function CampaignsView({
                               {statusLabel}
                             </div>
                             <div className="campaigns-row-actions">
-                              {(["draft", "scheduled"].includes(campaign.status)) && (
-                                <button className="campaigns-row-btn" type="button" onClick={() => handleEditCampaign(campaign)}>
+                              {!isSending && (
+                                <button
+                                  className="campaigns-row-btn"
+                                  type="button"
+                                  onClick={() => handleEditCampaign(campaign)}
+                                >
                                   Editar
                                 </button>
                               )}
-                              {(campaign.status === "sent" || campaign.status === "failed") && (
-                                <button className="campaigns-row-btn" type="button" onClick={() => handleResendCampaignClick(campaign)}>
+                              {canResend && (
+                                <button
+                                  className="campaigns-row-btn"
+                                  type="button"
+                                  onClick={() => handleResendCampaignClick(campaign)}
+                                >
                                   Reenviar
                                 </button>
                               )}
-                              {(["draft", "failed", "scheduled"].includes(campaign.status)) && (
-                                <button className="campaigns-row-btn danger" type="button" onClick={() => handleDeleteCampaignClick(campaign)}>
+                              {!isSending && (
+                                <button
+                                  className="campaigns-row-btn danger"
+                                  type="button"
+                                  onClick={() => handleDeleteCampaignClick(campaign)}
+                                >
                                   Eliminar
                                 </button>
                               )}

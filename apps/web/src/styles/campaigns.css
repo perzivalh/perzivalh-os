@@ -8,12 +8,12 @@
 
 .campaigns-shell {
   width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 1rem;
+  max-width: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1rem;
   min-width: 0;
 }
 
@@ -191,10 +191,10 @@
 }
 
 .campaigns-panel {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 1.25rem;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
   min-width: 0;
 }
 
@@ -829,16 +829,16 @@
 .campaigns-dashboard {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1.5rem;
-  padding: 1.5rem;
+  gap: 1rem;
+  padding: 0;
 }
 
 .campaigns-sidebar {
-  border-right: 1px solid var(--border);
-  padding-right: 1rem;
+  border-right: none;
+  padding-right: 0;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1rem;
   min-width: 0;
 }
 
@@ -848,8 +848,8 @@
   gap: 0.5rem;
   border: 1px solid var(--border);
   background: var(--panel);
-  border-radius: 999px;
-  padding: 0.55rem 0.9rem;
+  border-radius: 8px;
+  padding: 0.45rem 0.75rem;
   min-width: 0;
 }
 
@@ -864,14 +864,14 @@
 .campaigns-filters-list {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.45rem;
 }
 
 .campaigns-filter-item {
   border: 1px solid var(--border);
   background: var(--panel);
-  border-radius: 14px;
-  padding: 0.7rem 0.9rem;
+  border-radius: 8px;
+  padding: 0.55rem 0.75rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -889,15 +889,15 @@
   background: var(--accent-soft);
   color: var(--accent);
   font-size: 0.7rem;
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  border-radius: 6px;
   font-weight: 700;
 }
 
 .campaigns-quota {
   border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 0.9rem;
+  border-radius: 8px;
+  padding: 0.7rem;
   background: var(--panel-muted);
 }
 
@@ -961,7 +961,7 @@
 
 .campaigns-table {
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 0;
   overflow-x: auto;
   min-width: 0;
 }
@@ -982,7 +982,7 @@
   font-size: 0.7rem;
   color: var(--muted);
   font-weight: 700;
-  background: var(--panel-muted);
+  background: transparent;
 }
 
 .campaigns-table-row {
@@ -991,7 +991,7 @@
 }
 
 .campaigns-table-row:hover {
-  background: var(--panel-muted);
+  background: rgba(15, 23, 42, 0.04);
 }
 
 .campaigns-table-title {
@@ -1092,15 +1092,16 @@
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  padding-bottom: 0.75rem;
 }
 
 .campaigns-launch {
   display: grid;
   grid-template-columns: 1fr;
   gap: 2rem;
-  padding: 1.5rem;
-  background: #fff;
-  border-radius: 18px;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
 }
 
 .campaigns-launch-form {
@@ -1135,10 +1136,11 @@
 }
 
 .launch-card {
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 1rem;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding: 0.75rem 0 1rem;
   display: grid;
   gap: 0.75rem;
 }
@@ -1284,14 +1286,14 @@
 }
 
 .campaigns-launch-preview {
-  border-left: 1px solid var(--border);
-  padding-left: 1.5rem;
+  border-left: none;
+  padding-left: 0;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  background: #f7f8fb;
-  border-radius: 16px;
-  padding: 1.5rem;
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
 }
 
 .preview-title {
@@ -1434,9 +1436,9 @@
 
 .preview-summary {
   border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 1rem;
-  background: var(--panel);
+  border-radius: 8px;
+  padding: 0.85rem;
+  background: transparent;
 }
 
 .preview-summary-title {
@@ -2077,7 +2079,6 @@
   margin-top: 1rem;
 }
 
-body[data-theme="dark"] .campaigns-panel,
 body[data-theme="dark"] .template-card,
 body[data-theme="dark"] .audience-card {
   background: #141414;
@@ -2124,14 +2125,14 @@ body[data-theme="dark"] .launch-template,
 body[data-theme="dark"] .launch-template-search,
 body[data-theme="dark"] .launch-schedule-option,
 body[data-theme="dark"] .preview-summary {
-  background: #141414;
+  background: transparent;
   border-color: #2a2a2a;
 }
 
 body[data-theme="dark"] .campaigns-launch,
 body[data-theme="dark"] .campaigns-launch-preview,
 body[data-theme="dark"] .launch-card {
-  background: #141414;
+  background: transparent;
   border-color: #2a2a2a;
 }
 

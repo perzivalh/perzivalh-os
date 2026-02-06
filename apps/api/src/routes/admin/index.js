@@ -846,8 +846,8 @@ router.put("/campaigns/:id", requireAuth, requireRole(["admin", "marketing"]), a
     if (!campaign) {
         return res.status(404).json({ error: "not_found" });
     }
-    if (!["draft", "scheduled"].includes(campaign.status)) {
-        return res.status(400).json({ error: "Only draft or scheduled campaigns can be edited" });
+    if (campaign.status === "sending") {
+        return res.status(400).json({ error: "Sending campaigns cannot be edited" });
     }
     let resolvedTemplateId = templateId || campaign.template_id;
     if (templateId) {
@@ -890,7 +890,7 @@ router.put("/campaigns/:id", requireAuth, requireRole(["admin", "marketing"]), a
     if (audienceFilter !== null) {
         updates.audience_filter = audienceFilter;
     }
-    if (scheduledForRaw !== undefined) {
+    if (scheduledForRaw !== undefined && ["draft", "scheduled"].includes(campaign.status)) {
         updates.scheduled_for = scheduledFor;
         updates.status = scheduledFor ? "scheduled" : "draft";
     }
@@ -912,8 +912,8 @@ router.delete("/campaigns/:id", requireAuth, requireRole(["admin", "marketing"])
     if (!campaign) {
         return res.status(404).json({ error: "not_found" });
     }
-    if (!["draft", "failed", "scheduled"].includes(campaign.status)) {
-        return res.status(400).json({ error: "Only draft, failed or scheduled campaigns can be deleted" });
+    if (campaign.status === "sending") {
+        return res.status(400).json({ error: "Sending campaigns cannot be deleted" });
     }
     await prisma.campaign.delete({ where: { id: campaign.id } });
     await logAudit({

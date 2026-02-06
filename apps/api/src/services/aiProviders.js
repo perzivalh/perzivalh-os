@@ -81,7 +81,10 @@ async function callGemini({
   temperature = 0,
   maxTokens = 220,
 }) {
-  const url = `${GEMINI_ENDPOINT}/${model}:generateContent?key=${apiKey}`;
+  const normalizedModel = String(model || "")
+    .replace(/^models\//, "")
+    .trim() || "gemini-1.5-flash";
+  const url = `${GEMINI_ENDPOINT}/${normalizedModel}:generateContent?key=${apiKey}`;
   const payload = {
     system_instruction: {
       parts: [{ text: system }],

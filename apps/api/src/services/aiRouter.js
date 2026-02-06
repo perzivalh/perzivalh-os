@@ -20,6 +20,25 @@ const ROUTER_SCHEMA = {
   required: ["action"],
 };
 
+const SYMPTOM_KEYWORDS = [
+  "dolor",
+  "duele",
+  "inflamacion",
+  "inflamación",
+  "hinchado",
+  "hinchazon",
+  "hinchazón",
+  "rojo",
+  "rojizo",
+  "sangra",
+  "sangrado",
+  "supura",
+  "pus",
+  "fiebre",
+  "ulcera",
+  "úlcera",
+];
+
 function normalizeLabel(value) {
   return normalizeText(value || "").replace(/\s+/g, " ").trim();
 }
@@ -129,6 +148,48 @@ function safeJsonParse(raw) {
   }
 }
 
+function containsSymptom(normalizedMessage) {
+  if (!normalizedMessage) {
+    return false;
+  }
+  return SYMPTOM_KEYWORDS.some((keyword) =>
+    normalizedMessage.includes(normalizeLabel(keyword))
+  );
+}
+
+function fallbackRouteByKeywords(normalizedMessage, routes) {
+  if (!normalizedMessage || !routes?.length) {
+    return null;
+  }
+  const messageTokens = new Set(normalizedMessage.split(" ").filter(Boolean));
+  let best = null;
+  for (const route of routes) {
+    const tokens = new Set();
+    route.labels?.forEach((label) => {
+      normalizeLabel(label)
+        .split(" ")
+        .filter((t) => t.length > 2)
+        .forEach((t) => tokens.add(t));
+    });
+    route.keywords?.forEach((kw) => {
+      normalizeLabel(kw)
+        .split(" ")
+        .filter((t) => t.length > 2)
+        .forEach((t) => tokens.add(t));
+    });
+    let score = 0;
+    tokens.forEach((token) => {
+      if (messageTokens.has(token)) {
+        score += 1;
+      }
+    });
+    if (score > 0 && (!best || score > best.score)) {
+      best = { id: route.id, score };
+    }
+  }
+  return best?.id || null;
+}
+
 async function routeWithAI({ text, flow, config, session }) {
   const aiConfig = config?.ai || {};
   const aiFlow = flow.ai || {};
@@ -138,15 +199,14 @@ async function routeWithAI({ text, flow, config, session }) {
   }
 
   const provider = aiConfig.provider || aiFlow.provider || "openai";
-  const apiKey =
+  const rawKey =
     aiConfig.key ||
     aiConfig.api_key ||
     (provider === "gemini"
       ? process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
       : process.env.OPENAI_API_KEY);
-  if (!apiKey) {
-    return null;
-  }
+  const apiKey = rawKey ? String(rawKey).trim() : "";
+  const allowFallback = aiFlow.allow_fallback !== false;
 
   const maxTurns = Number(aiFlow.max_turns || 2);
   const usedTurns = Number(session?.data?.ai_turns || 0);
@@ -157,6 +217,22 @@ async function routeWithAI({ text, flow, config, session }) {
   const routes = buildRouteCandidates(flow);
   if (!routes.length) {
     return { action: "menu" };
+  }
+
+  const normalizedMessage = normalizeLabel(text);
+  if (containsSymptom(normalizedMessage)) {
+    return { action: "handoff", ai_used: false };
+  }
+
+  if (!apiKey) {
+    if (allowFallback) {
+      const fallbackRoute = fallbackRouteByKeywords(normalizedMessage, routes);
+      if (fallbackRoute) {
+        return { action: "route", route_id: fallbackRoute, ai_used: false };
+      }
+      return { action: "menu", ai_used: false };
+    }
+    return null;
   }
 
   const menuId = flow.start_node_id || flow.start || "MAIN_MENU";
@@ -186,6 +262,10 @@ async function routeWithAI({ text, flow, config, session }) {
     });
     const parsed = safeJsonParse(raw);
     if (!parsed?.action) {
+      const fallbackRoute = fallbackRouteByKeywords(normalizedMessage, routes);
+      if (allowFallback && fallbackRoute) {
+        return { action: "route", route_id: fallbackRoute, ai_used: false };
+      }
       return null;
     }
     return { ...parsed, ai_used: true };
@@ -194,6 +274,12 @@ async function routeWithAI({ text, flow, config, session }) {
       message: error.message,
       provider,
     });
+    if (allowFallback) {
+      const fallbackRoute = fallbackRouteByKeywords(normalizedMessage, routes);
+      if (fallbackRoute) {
+        return { action: "route", route_id: fallbackRoute, ai_used: false };
+      }
+    }
     return null;
   }
 }

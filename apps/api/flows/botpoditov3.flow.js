@@ -14,6 +14,7 @@ module.exports = {
     enabled: true,
     mode: "router",
     max_turns: 2,
+    allow_fallback: false,
     handoff_node_id: "AI_HANDOFF_OFFER",
     services_node_id: "SERVICIOS_MENU",
   },
@@ -1060,7 +1061,6 @@ module.exports = {
 
   useLegacyHandler: false,
 };
-
 
 
 

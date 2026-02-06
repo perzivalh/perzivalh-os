@@ -54,7 +54,7 @@ function normalizeTenantBotConfig(config) {
     if (next.ai) {
         const ai = { ...next.ai };
         if (ai.key) {
-            ai.key_encrypted = encryptString(String(ai.key));
+            ai.key_encrypted = encryptString(String(ai.key).trim());
             delete ai.key;
         } else {
             delete ai.key;

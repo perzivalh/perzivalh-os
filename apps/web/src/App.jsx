@@ -2427,6 +2427,7 @@ function App() {
               campaignMessages={campaignMessages}
               users={users}
               tags={tags}
+              channels={tenantChannels}
               selectedTemplate={selectedTemplate}
               statusOptions={STATUS_OPTIONS}
               onCreateCampaign={handleCreateCampaign}

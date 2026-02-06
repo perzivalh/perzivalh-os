@@ -106,6 +106,7 @@ function CampaignsView({
   campaignMessages,
   users,
   tags,
+  channels,
   selectedTemplate,
   statusOptions,
   onCreateCampaign,
@@ -185,6 +186,7 @@ function CampaignsView({
   const [odooStatus, setOdooStatus] = useState({ connected: false });
   const [checkingOdoo, setCheckingOdoo] = useState(false);
   const [refreshingOdoo, setRefreshingOdoo] = useState(false);
+  const [odooSyncResult, setOdooSyncResult] = useState(null);
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window === "undefined") {
       return "templates";
@@ -203,6 +205,9 @@ function CampaignsView({
   const [audienceContactsTotal, setAudienceContactsTotal] = useState(0);
   const [audienceContactsLoading, setAudienceContactsLoading] = useState(false);
   const [audienceContactSearch, setAudienceContactSearch] = useState("");
+  const [selectedContactKeys, setSelectedContactKeys] = useState(new Set());
+  const [bulkTargetAudienceId, setBulkTargetAudienceId] = useState("");
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [audiencePage, setAudiencePage] = useState(1);
   const [audiencePageSize] = useState(10);
   const [audienceFilters, setAudienceFilters] = useState({
@@ -211,6 +216,21 @@ function CampaignsView({
     status: "Activos",
   });
   const [openAudienceMenuId, setOpenAudienceMenuId] = useState(null);
+  const selectAllRef = useRef(null);
+  const availableLines = useMemo(
+    () => (channels || []).filter((channel) => channel?.phone_number_id),
+    [channels]
+  );
+  const [selectedLineId, setSelectedLineId] = useState("");
+  const selectedLine = useMemo(
+    () =>
+      availableLines.find((line) => line.phone_number_id === selectedLineId) ||
+      availableLines[0] ||
+      null,
+    [availableLines, selectedLineId]
+  );
+  const selectedLineLabel =
+    selectedLine?.display_name || selectedLine?.phone_number_id || "";
 
   useEffect(() => {
     const nextMode =
@@ -228,11 +248,17 @@ function CampaignsView({
   }, []);
 
   useEffect(() => {
+    if (!selectedLineId && availableLines.length) {
+      setSelectedLineId(availableLines[0].phone_number_id);
+    }
+  }, [availableLines, selectedLineId]);
+
+  useEffect(() => {
     if (!audienceFlowOpen) return;
     loadAutomationSettings();
     loadDynamicAudiences();
     loadOdooStatus();
-  }, [audienceFlowOpen]);
+  }, [audienceFlowOpen, selectedLineId]);
 
   useEffect(() => {
     if (activeTab !== "new" || campaignLaunchOpen) {
@@ -290,7 +316,10 @@ function CampaignsView({
   async function loadAutomationSettings() {
     setLoadingAutomation(true);
     try {
-      const res = await apiGet("/api/audiences/automation-settings");
+      const query = selectedLine?.phone_number_id
+        ? `?phone_number_id=${encodeURIComponent(selectedLine.phone_number_id)}`
+        : "";
+      const res = await apiGet(`/api/audiences/automation-settings${query}`);
       setAutomationSettings(res?.settings || { enabled: false, phone_number_id: null });
     } catch (err) {
       console.error("Failed to load automation settings", err);
@@ -302,7 +331,15 @@ function CampaignsView({
   async function loadDynamicAudiences() {
     setDynamicLoading(true);
     try {
-      const res = await apiGet("/api/audiences/dynamic-tags");
+      const params = new URLSearchParams();
+      if (selectedLine?.phone_number_id) {
+        params.set("phone_number_id", selectedLine.phone_number_id);
+      }
+      if (selectedLineLabel) {
+        params.set("line_name", selectedLineLabel);
+      }
+      const query = params.toString();
+      const res = await apiGet(`/api/audiences/dynamic-tags${query ? `?${query}` : ""}`);
       setDynamicAudiences(res?.items || []);
     } catch (err) {
       console.error("Failed to load dynamic audiences", err);
@@ -315,6 +352,8 @@ function CampaignsView({
     try {
       const res = await apiPost("/api/audiences/automation-settings", {
         enabled: nextEnabled,
+        phone_number_id: selectedLine?.phone_number_id || null,
+        line_name: selectedLineLabel || null,
       });
       setAutomationSettings(res?.settings || { ...automationSettings, enabled: nextEnabled });
       pushToast({ message: "Configuración guardada" });
@@ -331,7 +370,10 @@ function CampaignsView({
   async function handleSyncHistorical() {
     setSyncingDynamic(true);
     try {
-      await apiPost("/api/audiences/sync-historical", {});
+      await apiPost("/api/audiences/sync-historical", {
+        phone_number_id: selectedLine?.phone_number_id || null,
+        line_name: selectedLineLabel || null,
+      });
       await loadDynamicAudiences();
       await loadSegments();
       pushToast({ message: "Sincronización completa" });
@@ -346,7 +388,11 @@ function CampaignsView({
     const name = newTagName.trim();
     if (!name) return;
     try {
-      await apiPost("/api/audiences/dynamic-tags", { name });
+      await apiPost("/api/audiences/dynamic-tags", {
+        name,
+        phone_number_id: selectedLine?.phone_number_id || null,
+        line_name: selectedLineLabel || null,
+      });
       setNewTagName("");
       await loadDynamicAudiences();
       await loadSegments();
@@ -371,8 +417,10 @@ function CampaignsView({
 
   async function handleRefreshOdoo() {
     setRefreshingOdoo(true);
+    setOdooSyncResult(null);
     try {
-      await apiPost("/api/contacts/refresh-odoo", {});
+      const res = await apiPost("/api/contacts/refresh-odoo", {});
+      setOdooSyncResult(res || null);
       await loadOdooStats();
       pushToast({ message: "Lista Odoo actualizada" });
     } catch (err) {
@@ -416,6 +464,14 @@ function CampaignsView({
     }
   }
 
+  function handleClearImportFile() {
+    setImportFile(null);
+    setImportFileBase64("");
+    setImportPreview(null);
+    setImportMapping([]);
+    setImportSummary(null);
+  }
+
   async function handleImportExcel() {
     if (!importFile || !importFileBase64) {
       pushToast({ type: "error", message: "Selecciona un archivo válido" });
@@ -433,6 +489,7 @@ function CampaignsView({
             importOptions.targetMode === "existing" ? importOptions.targetSegmentId : "",
           prefix: importOptions.prefix,
           ignoreDuplicates: importOptions.ignoreDuplicates,
+          phoneNumberId: selectedLine?.phone_number_id || null,
         },
       };
       const res = await apiPost("/api/audiences/import-excel", payload);
@@ -488,8 +545,9 @@ function CampaignsView({
         return;
       }
 
+      const limit = search ? 1000 : 200;
       const preview = await apiGet(
-        `/api/audiences/${segment.id}/preview?limit=200`
+        `/api/audiences/${segment.id}/preview?limit=${limit}`
       );
       const recipients = preview?.recipients || [];
       const query = search.trim().toLowerCase();
@@ -503,7 +561,7 @@ function CampaignsView({
       if (audienceFilters.tag === "Sin etiquetas") {
         filtered = filtered.filter((recipient) => !recipient.tags || recipient.tags.length === 0);
       }
-      const total = preview?.total || filtered.length;
+      const total = query ? filtered.length : preview?.total || filtered.length;
       const start = (page - 1) * audiencePageSize;
       const paged = filtered.slice(start, start + audiencePageSize);
       setAudienceContacts(paged);
@@ -520,6 +578,8 @@ function CampaignsView({
   function handleSelectAudience(segment) {
     setSelectedAudienceId(segment?.id || null);
     setAudiencePage(1);
+    setSelectedContactKeys(new Set());
+    setBulkTargetAudienceId("");
   }
 
   async function handleRefreshAudienceCounts() {
@@ -610,6 +670,12 @@ function CampaignsView({
       count: seg.estimated_count || 0,
       type: "segment",
       isDefault: (seg.name || "").toUpperCase().startsWith("DEFAULT"),
+      rules: seg.rules_json,
+      tagName: Array.isArray(seg.rules_json)
+        ? seg.rules_json.find(
+            (rule) => (rule.type || rule.field) === "tag" && rule.value
+          )?.value || ""
+        : "",
     }));
 
     return [odooSegment, ...apiSegments];
@@ -736,11 +802,14 @@ function CampaignsView({
   }, [activeTab, campaignLaunchOpen]);
 
   useEffect(() => {
-    if (activeTab !== "audiences") return;
-    loadAudienceContacts(selectedAudience, {
-      page: audiencePage,
-      search: audienceContactSearch,
-    });
+    if (activeTab !== "audiences") return undefined;
+    const handler = setTimeout(() => {
+      loadAudienceContacts(selectedAudience, {
+        page: audiencePage,
+        search: audienceContactSearch,
+      });
+    }, 300);
+    return () => clearTimeout(handler);
   }, [
     selectedAudienceId,
     audiencePage,
@@ -749,6 +818,153 @@ function CampaignsView({
     selectedAudience,
     audienceFilters,
   ]);
+
+  useEffect(() => {
+    setSelectedContactKeys(new Set());
+    setBulkTargetAudienceId("");
+  }, [selectedAudienceId]);
+
+  const selectableContacts = useMemo(
+    () =>
+      audienceContacts.filter(
+        (contact) => contact.conversation_id || contact.conversationId
+      ),
+    [audienceContacts]
+  );
+
+  const selectedContacts = useMemo(() => {
+    const map = new Map(
+      audienceContacts.map((contact) => [
+        contact.conversation_id || contact.conversationId || "",
+        contact,
+      ])
+    );
+    return Array.from(selectedContactKeys)
+      .map((key) => map.get(key))
+      .filter(Boolean);
+  }, [audienceContacts, selectedContactKeys]);
+
+  const currentAudienceTagName = selectedAudience?.tagName || "";
+  const tagSegments = useMemo(
+    () => segments.filter((segment) => segment.tagName),
+    [segments]
+  );
+  const targetSegment = tagSegments.find((segment) => segment.id === bulkTargetAudienceId);
+  const targetTagName = targetSegment?.tagName || "";
+
+  useEffect(() => {
+    if (!selectAllRef.current) {
+      return;
+    }
+    const totalSelectable = selectableContacts.length;
+    const selectedCount = selectedContactKeys.size;
+    selectAllRef.current.indeterminate =
+      selectedCount > 0 && selectedCount < totalSelectable;
+  }, [selectableContacts.length, selectedContactKeys]);
+
+  function toggleSelectAllContacts(checked) {
+    if (!checked) {
+      setSelectedContactKeys(new Set());
+      return;
+    }
+    const next = new Set(
+      selectableContacts.map(
+        (contact) => contact.conversation_id || contact.conversationId || ""
+      )
+    );
+    setSelectedContactKeys(next);
+  }
+
+  function toggleSelectContact(contact) {
+    const key = contact.conversation_id || contact.conversationId || "";
+    if (!key) {
+      return;
+    }
+    setSelectedContactKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
+
+  async function handleBulkAction(action) {
+    if (!selectedContacts.length || bulkActionLoading) return;
+    const targetNeeded = action === "add" || action === "move";
+    if (targetNeeded && !targetTagName) {
+      pushToast({ type: "error", message: "Selecciona una audiencia destino válida." });
+      return;
+    }
+    if ((action === "remove" || action === "move") && !currentAudienceTagName) {
+      pushToast({
+        type: "error",
+        message: "La audiencia actual no permite quitar contactos.",
+      });
+      return;
+    }
+    if (targetTagName && targetTagName === currentAudienceTagName && action !== "remove") {
+      pushToast({
+        type: "error",
+        message: "La audiencia destino debe ser diferente a la actual.",
+      });
+      return;
+    }
+
+    const toProcess = selectedContacts
+      .map((contact) => ({
+        contact,
+        conversationId: contact.conversation_id || contact.conversationId || "",
+      }))
+      .filter((item) => item.conversationId);
+    const skipped = selectedContacts.length - toProcess.length;
+
+    if (!toProcess.length) {
+      pushToast({
+        type: "error",
+        message: "No hay contactos compatibles para esta acción.",
+      });
+      return;
+    }
+
+    setBulkActionLoading(true);
+    try {
+      await Promise.all(
+        toProcess.map(({ conversationId }) =>
+          apiPost(`/api/conversations/${conversationId}/tags`, {
+            add:
+              action === "add" || action === "move"
+                ? [targetTagName]
+                : [],
+            remove:
+              action === "remove" || action === "move"
+                ? [currentAudienceTagName]
+                : [],
+          })
+        )
+      );
+      if (skipped) {
+        pushToast({
+          type: "error",
+          message: `${skipped} contacto(s) no se pudieron actualizar.`,
+        });
+      }
+      setSelectedContactKeys(new Set());
+      setBulkTargetAudienceId("");
+      await loadSegments();
+      await loadAudienceContacts(selectedAudience, {
+        page: audiencePage,
+        search: audienceContactSearch,
+      });
+      pushToast({ message: "Cambios aplicados correctamente." });
+    } catch (error) {
+      pushToast({ type: "error", message: error.message || "No se pudo actualizar." });
+    } finally {
+      setBulkActionLoading(false);
+    }
+  }
 
   const templateCategories = useMemo(() => {
     const unique = new Set();
@@ -1218,6 +1434,23 @@ function CampaignsView({
                           Vincula tus etiquetas directamente con Audiencias Dinámicas.
                           La lógica del sistema es 1 Tag = 1 Audiencia.
                         </div>
+                        <div className="audience-line-picker">
+                          <span>Línea activa</span>
+                          <select
+                            value={selectedLine?.phone_number_id || ""}
+                            onChange={(event) => setSelectedLineId(event.target.value)}
+                            disabled={!availableLines.length}
+                          >
+                            {!availableLines.length && (
+                              <option value="">Sin líneas registradas</option>
+                            )}
+                            {availableLines.map((line) => (
+                              <option key={line.id} value={line.phone_number_id}>
+                                {line.display_name || line.phone_number_id}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                       <label className="audience-switch">
                         <span>Estado</span>
@@ -1225,7 +1458,7 @@ function CampaignsView({
                           type="checkbox"
                           checked={automationSettings.enabled}
                           onChange={(event) => handleToggleAutomation(event.target.checked)}
-                          disabled={loadingAutomation}
+                          disabled={loadingAutomation || !availableLines.length}
                         />
                         <span>{automationSettings.enabled ? "ACTIVO" : "INACTIVO"}</span>
                       </label>
@@ -1294,7 +1527,7 @@ function CampaignsView({
                             <div className="audience-tag-head">
                               <div className="audience-tag-name">
                                 {item.is_default
-                                  ? "DEFAULT"
+                                  ? item.segment?.name || "DEFAULT"
                                   : item.tag?.name || item.segment?.name}
                               </div>
                               <div className="audience-tag-count">
@@ -1340,168 +1573,202 @@ function CampaignsView({
 
                 {audienceFlowTab === "excel" && (
                   <div className="audience-flow-content">
-                    <div className="excel-dropzone">
-                      <div className="excel-dropzone-inner">
-                        <div className="excel-dropzone-icon">?</div>
-                        <div className="excel-dropzone-title">
-                          Sube tu archivo de Excel
+                    {!importFile ? (
+                      <div className="excel-dropzone">
+                        <div className="excel-dropzone-inner">
+                          <div className="excel-dropzone-icon">?</div>
+                          <div className="excel-dropzone-title">
+                            Sube tu archivo de Excel
+                          </div>
+                          <div className="excel-dropzone-subtitle">
+                            Arrastra y suelta tu archivo .xlsx o .csv aquí o{" "}
+                            <label className="excel-link">
+                              explora tus archivos
+                              <input
+                                type="file"
+                                accept=".csv,.xlsx"
+                                onChange={handleFileSelect}
+                              />
+                            </label>
+                          </div>
+                          <div className="excel-dropzone-tags">
+                            <span>Máximo 50MB</span>
+                            <span>Hasta 50,000 filas</span>
+                          </div>
                         </div>
-                        <div className="excel-dropzone-subtitle">
-                          Arrastra y suelta tu archivo .xlsx o .csv aquí o{" "}
+                      </div>
+                    ) : (
+                      <div className="excel-file-panel">
+                        <div>
+                          <div className="excel-file-title">Archivo cargado</div>
+                          <div className="excel-file-name">{importFile.name}</div>
+                        </div>
+                        <div className="excel-file-actions">
                           <label className="excel-link">
-                            explora tus archivos
+                            Cambiar archivo
                             <input
                               type="file"
                               accept=".csv,.xlsx"
                               onChange={handleFileSelect}
                             />
                           </label>
-                        </div>
-                        <div className="excel-dropzone-tags">
-                          <span>Máximo 50MB</span>
-                          <span>Hasta 50,000 filas</span>
-                        </div>
-                        {importFile && (
-                          <div className="excel-file-name">{importFile.name}</div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="excel-grid">
-                      <div className="excel-card">
-                        <div className="excel-card-title">Configuración de Importación</div>
-                        <label className="excel-field">
-                          <span>Lista de destino</span>
-                          <select
-                            value={importOptions.targetMode}
-                            onChange={(event) =>
-                              setImportOptions((prev) => ({
-                                ...prev,
-                                targetMode: event.target.value,
-                              }))
-                            }
+                          <button
+                            className="campaigns-danger"
+                            type="button"
+                            onClick={handleClearImportFile}
                           >
-                            <option value="new">Crear Nueva Lista</option>
-                            <option value="existing">Elegir Lista Existente</option>
-                          </select>
-                        </label>
-                        {importOptions.targetMode === "new" ? (
+                            Eliminar archivo
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {importFile ? (
+                      <div className="excel-grid">
+                        <div className="excel-card">
+                          <div className="excel-card-title">Configuración de Importación</div>
                           <label className="excel-field">
-                            <span>Nombre de la nueva lista</span>
-                            <input
-                              type="text"
-                              placeholder="Ej: IMPORT_JULIO"
-                              value={importOptions.listName}
+                            <span>Lista de destino</span>
+                            <select
+                              value={importOptions.targetMode}
                               onChange={(event) =>
                                 setImportOptions((prev) => ({
                                   ...prev,
-                                  listName: event.target.value,
+                                  targetMode: event.target.value,
+                                }))
+                              }
+                            >
+                              <option value="new">Crear Nueva Lista</option>
+                              <option value="existing">Elegir Lista Existente</option>
+                            </select>
+                          </label>
+                          {importOptions.targetMode === "new" ? (
+                            <label className="excel-field">
+                              <span>Nombre de la nueva lista</span>
+                              <input
+                                type="text"
+                                placeholder="Ej: IMPORT_JULIO"
+                                value={importOptions.listName}
+                                onChange={(event) =>
+                                  setImportOptions((prev) => ({
+                                    ...prev,
+                                    listName: event.target.value,
+                                  }))
+                                }
+                              />
+                            </label>
+                          ) : (
+                            <label className="excel-field">
+                              <span>Lista existente</span>
+                              <select
+                                value={importOptions.targetSegmentId}
+                                onChange={(event) =>
+                                  setImportOptions((prev) => ({
+                                    ...prev,
+                                    targetSegmentId: event.target.value,
+                                  }))
+                                }
+                              >
+                                <option value="">Selecciona una lista</option>
+                                {customSegments.map((segment) => (
+                                  <option key={segment.id} value={segment.id}>
+                                    {segment.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          )}
+                          <label className="excel-field">
+                            <span>Prefijo de etiqueta (opcional)</span>
+                            <input
+                              type="text"
+                              placeholder="Ej: IMPORT_JULIO_"
+                              value={importOptions.prefix}
+                              onChange={(event) =>
+                                setImportOptions((prev) => ({
+                                  ...prev,
+                                  prefix: event.target.value,
                                 }))
                               }
                             />
                           </label>
-                        ) : (
-                          <label className="excel-field">
-                            <span>Lista existente</span>
-                            <select
-                              value={importOptions.targetSegmentId}
+                          <label className="excel-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={importOptions.ignoreDuplicates}
                               onChange={(event) =>
                                 setImportOptions((prev) => ({
                                   ...prev,
-                                  targetSegmentId: event.target.value,
+                                  ignoreDuplicates: event.target.checked,
                                 }))
                               }
-                            >
-                              <option value="">Selecciona una lista</option>
-                              {customSegments.map((segment) => (
-                                <option key={segment.id} value={segment.id}>
-                                  {segment.name}
-                                </option>
-                              ))}
-                            </select>
+                            />
+                            Ignorar contactos duplicados
                           </label>
-                        )}
-                        <label className="excel-field">
-                          <span>Prefijo de etiqueta (opcional)</span>
-                          <input
-                            type="text"
-                            placeholder="Ej: IMPORT_JULIO_"
-                            value={importOptions.prefix}
-                            onChange={(event) =>
-                              setImportOptions((prev) => ({
-                                ...prev,
-                                prefix: event.target.value,
-                              }))
-                            }
-                          />
-                        </label>
-                        <label className="excel-checkbox">
-                          <input
-                            type="checkbox"
-                            checked={importOptions.ignoreDuplicates}
-                            onChange={(event) =>
-                              setImportOptions((prev) => ({
-                                ...prev,
-                                ignoreDuplicates: event.target.checked,
-                              }))
-                            }
-                          />
-                          Ignorar contactos duplicados
-                        </label>
-                        {importSummary && (
-                          <div className="excel-summary">
-                            Procesadas: {importSummary.processed} · Nuevos:{" "}
-                            {importSummary.created} · Duplicados:{" "}
-                            {importSummary.skipped} · Errores: {importSummary.errors}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="excel-card">
-                        <div className="excel-card-title">
-                          Vista previa de mapeo
-                          <span className="excel-pill">
-                            Columnas detectadas: {importPreview?.columns?.length || 0}
-                          </span>
-                        </div>
-                        <div className="excel-map-table">
-                          <div className="excel-map-head">
-                            <span>Columna Excel</span>
-                            <span>Mapeo CRM</span>
-                            <span>Ejemplo</span>
-                          </div>
-                          {(importPreview?.columns || []).map((col, index) => (
-                            <div className="excel-map-row" key={`${col}-${index}`}>
-                              <span>{col}</span>
-                              <select
-                                value={importMapping[index] || "ignore"}
-                                onChange={(event) =>
-                                  setImportMapping((prev) => {
-                                    const next = [...prev];
-                                    next[index] = event.target.value;
-                                    return next;
-                                  })
-                                }
-                              >
-                                {IMPORT_FIELDS.map((field) => (
-                                  <option value={field.value} key={field.value}>
-                                    {field.label}
-                                  </option>
-                                ))}
-                              </select>
-                              <span>
-                                {importPreview?.previewRows?.[0]?.[index] || "--"}
-                              </span>
-                            </div>
-                          ))}
-                          {!importPreview && (
-                            <div className="empty-state">
-                              Sube un archivo para ver el mapeo.
+                          {importSummary && (
+                            <div className="excel-summary">
+                              Procesadas: {importSummary.processed} · Nuevos:{" "}
+                              {importSummary.created} · Duplicados:{" "}
+                              {importSummary.skipped} · Errores: {importSummary.errors}
                             </div>
                           )}
                         </div>
+
+                        <div className="excel-card">
+                          <div className="excel-card-title">
+                            Vista previa de mapeo
+                            <span className="excel-pill">
+                              Columnas detectadas: {importPreview?.columns?.length || 0}
+                            </span>
+                          </div>
+                          <div className="excel-map-table">
+                            <div className="excel-map-head">
+                              <span>Columna Excel</span>
+                              <span>Mapeo CRM</span>
+                              <span>Ejemplo</span>
+                            </div>
+                            {(importPreview?.columns || []).map((col, index) => (
+                              <div className="excel-map-row" key={`${col}-${index}`}>
+                                <span>{col}</span>
+                                <select
+                                  value={importMapping[index] || "ignore"}
+                                  onChange={(event) =>
+                                    setImportMapping((prev) => {
+                                      const next = [...prev];
+                                      next[index] = event.target.value;
+                                      return next;
+                                    })
+                                  }
+                                >
+                                  {IMPORT_FIELDS.map((field) => (
+                                    <option value={field.value} key={field.value}>
+                                      {field.label}
+                                    </option>
+                                  ))}
+                                </select>
+                                <span>
+                                  {importPreview?.previewRows?.[0]?.[index] || "--"}
+                                </span>
+                              </div>
+                            ))}
+                            {!importPreview && (
+                              <div className="empty-state">
+                                Sube un archivo para ver el mapeo.
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="excel-placeholder">
+                        <div className="excel-placeholder-title">
+                          Agrega un archivo para continuar
+                        </div>
+                        <div className="excel-placeholder-subtitle">
+                          Luego podrás mapear todas las columnas a los campos del CRM.
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1532,6 +1799,29 @@ function CampaignsView({
                     <div className="odoo-note">
                       Se importarán contactos y se crearán audiencias por etiqueta Automáticamente.
                     </div>
+                    {odooSyncResult && (
+                      <div className="odoo-summary">
+                        <div className="odoo-summary-title">Resultado de sincronización</div>
+                        <div className="odoo-summary-metrics">
+                          <span>Añadidos: {odooSyncResult.created || 0}</span>
+                          <span>Actualizados: {odooSyncResult.updated || 0}</span>
+                          <span>Omitidos: {odooSyncResult.skipped || 0}</span>
+                        </div>
+                        {odooSyncResult.preview?.created?.length ? (
+                          <div className="odoo-preview">
+                            <div className="odoo-preview-title">Contactos añadidos</div>
+                            <ul>
+                              {odooSyncResult.preview.created.map((contact) => (
+                                <li key={`${contact.phone_e164 || contact.name}-${contact.id || ""}`}>
+                                  <strong>{contact.name || "Sin nombre"}</strong>{" "}
+                                  <span>{contact.phone_e164 || ""}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1783,9 +2073,76 @@ function CampaignsView({
                       {audienceContactsTotal.toLocaleString("es-PE")} contactos en total
                     </div>
                   </div>
+                  <div className="audiences-bulk">
+                    <div className="audiences-bulk-info">
+                      {selectedContacts.length} seleccionados
+                    </div>
+                    <select
+                      className="audiences-bulk-select"
+                      value={bulkTargetAudienceId}
+                      onChange={(event) => setBulkTargetAudienceId(event.target.value)}
+                    >
+                      <option value="">Selecciona audiencia destino...</option>
+                      {tagSegments.map((segment) => (
+                        <option key={`bulk-${segment.id}`} value={segment.id}>
+                          {segment.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="audiences-bulk-btn"
+                      type="button"
+                      disabled={
+                        bulkActionLoading ||
+                        !selectedContacts.length ||
+                        !targetTagName ||
+                        targetTagName === currentAudienceTagName
+                      }
+                      onClick={() => handleBulkAction("add")}
+                    >
+                      Añadir
+                    </button>
+                    <button
+                      className="audiences-bulk-btn"
+                      type="button"
+                      disabled={
+                        bulkActionLoading ||
+                        !selectedContacts.length ||
+                        !targetTagName ||
+                        targetTagName === currentAudienceTagName
+                      }
+                      onClick={() => handleBulkAction("move")}
+                    >
+                      Mover
+                    </button>
+                    <button
+                      className="audiences-bulk-btn danger"
+                      type="button"
+                      disabled={bulkActionLoading || !selectedContacts.length || !currentAudienceTagName}
+                      onClick={() => handleBulkAction("remove")}
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                  {selectedAudience?.type === "odoo" && (
+                    <div className="audiences-bulk-note">
+                      Las acciones masivas solo aplican a contactos con conversación de WhatsApp.
+                    </div>
+                  )}
                   <div className="audiences-table">
                     <div className="audiences-table-head">
-                      <span />
+                      <span>
+                        <input
+                          ref={selectAllRef}
+                          type="checkbox"
+                          aria-label="Seleccionar todos"
+                          checked={
+                            selectableContacts.length > 0 &&
+                            selectedContactKeys.size === selectableContacts.length
+                          }
+                          onChange={(event) => toggleSelectAllContacts(event.target.checked)}
+                        />
+                      </span>
                       <span>CONTACTO</span>
                       <span>WHATSAPP</span>
                       <span>ETIQUETAS</span>
@@ -1810,9 +2167,17 @@ function CampaignsView({
                             ? [contact.tags]
                             : [];
                         const initials = (contactName || "?").trim().slice(0, 1).toUpperCase();
+                        const contactKey =
+                          contact.conversation_id || contact.conversationId || "";
                         return (
                           <div className="audiences-table-row" key={contact.id || contactPhone}>
-                            <input type="checkbox" aria-label="Seleccionar contacto" />
+                            <input
+                              type="checkbox"
+                              aria-label="Seleccionar contacto"
+                              checked={selectedContactKeys.has(contactKey)}
+                              onChange={() => toggleSelectContact(contact)}
+                              disabled={!contactKey}
+                            />
                             <div className="audiences-contact">
                               <div className="audiences-avatar">{initials}</div>
                               <div className="audiences-contact-info">

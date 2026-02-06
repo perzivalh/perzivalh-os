@@ -10,7 +10,7 @@ async function getAutomationSettings({ phoneNumberId } = {}) {
   return setting || { enabled: false, phone_number_id: phoneNumberId || null };
 }
 
-async function setAutomationSettings({ phoneNumberId, enabled, userId }) {
+async function setAutomationSettings({ phoneNumberId, enabled, userId, lineName }) {
   const data = {
     phone_number_id: phoneNumberId || null,
     enabled: Boolean(enabled),
@@ -24,6 +24,10 @@ async function setAutomationSettings({ phoneNumberId, enabled, userId }) {
         data,
       })
     : await prisma.audienceAutomationSetting.create({ data });
+
+  if (enabled) {
+    await ensureDefaultAudience({ phoneNumberId, userId, lineName });
+  }
 
   if (userId) {
     await prisma.auditLogTenant.create({
@@ -41,7 +45,7 @@ async function setAutomationSettings({ phoneNumberId, enabled, userId }) {
   return setting;
 }
 
-async function ensureDefaultAudience({ phoneNumberId, userId } = {}) {
+async function ensureDefaultAudience({ phoneNumberId, userId, lineName } = {}) {
   const existing = await prisma.audienceTag.findFirst({
     where: { is_default: true, phone_number_id: phoneNumberId || null },
     include: { segment: true },
@@ -49,6 +53,13 @@ async function ensureDefaultAudience({ phoneNumberId, userId } = {}) {
   if (existing) {
     return existing.segment;
   }
+
+  const normalizedLineName = typeof lineName === "string" ? lineName.trim() : "";
+  const suffix = normalizedLineName
+    ? ` - ${normalizedLineName}`
+    : phoneNumberId
+      ? ` (${phoneNumberId})`
+      : "";
 
   const rules = [
     { type: "source", operator: "is", value: "conversation" },
@@ -60,7 +71,7 @@ async function ensureDefaultAudience({ phoneNumberId, userId } = {}) {
 
   const segment = await prisma.audienceSegment.create({
     data: {
-      name: phoneNumberId ? `DEFAULT (${phoneNumberId})` : "DEFAULT",
+      name: `DEFAULT${suffix}`,
       description: "Contactos sin etiqueta específica",
       rules_json: rules,
       estimated_count: 0,
@@ -106,9 +117,6 @@ async function ensureAudienceForTag({ tagId, tagName, phoneNumberId, userId }) {
   if (phoneNumberId) {
     rules.push({ type: "phone_number_id", operator: "is", value: phoneNumberId });
   }
-  if (phoneNumberId) {
-    rules.push({ type: "phone_number_id", operator: "is", value: phoneNumberId });
-  }
 
   const segment = await prisma.audienceSegment.create({
     data: {
@@ -139,14 +147,18 @@ async function ensureAudienceForTag({ tagId, tagName, phoneNumberId, userId }) {
   return segment;
 }
 
-async function listDynamicAudiences({ phoneNumberId } = {}) {
-  await ensureDefaultAudience({ phoneNumberId });
+async function listDynamicAudiences({ phoneNumberId, lineName } = {}) {
+  await ensureDefaultAudience({ phoneNumberId, lineName });
   const mappings = await prisma.audienceTag.findMany({
     where: { phone_number_id: phoneNumberId || null },
     include: { tag: true, segment: true },
     orderBy: [{ is_default: "desc" }, { created_at: "desc" }],
   });
-  return mappings.map((mapping) => ({
+  const hasPendingAttention = mappings.some((mapping) => mapping.tag?.name === "pendiente_atencion");
+  const filteredMappings = hasPendingAttention
+    ? mappings.filter((mapping) => mapping.tag?.name !== "pendiente")
+    : mappings;
+  return filteredMappings.map((mapping) => ({
     id: mapping.id,
     is_default: mapping.is_default,
     phone_number_id: mapping.phone_number_id,
@@ -156,7 +168,7 @@ async function listDynamicAudiences({ phoneNumberId } = {}) {
   }));
 }
 
-async function syncHistorical({ phoneNumberId, userId } = {}) {
+async function syncHistorical({ phoneNumberId, userId, lineName } = {}) {
   const where = phoneNumberId ? { phone_number_id: phoneNumberId } : {};
   const conversations = await prisma.conversation.findMany({
     where,
@@ -180,7 +192,15 @@ async function syncHistorical({ phoneNumberId, userId } = {}) {
   const tags = await prisma.tag.findMany({
     select: { id: true, name: true },
   });
+  const tagNames = new Set(tags.map((tag) => tag.name));
+  const skipNames = new Set();
+  if (tagNames.has("pendiente_atencion")) {
+    skipNames.add("pendiente");
+  }
   for (const tag of tags) {
+    if (skipNames.has(tag.name)) {
+      continue;
+    }
     await ensureAudienceForTag({
       tagId: tag.id,
       tagName: tag.name,
@@ -189,7 +209,7 @@ async function syncHistorical({ phoneNumberId, userId } = {}) {
     });
   }
 
-  await ensureDefaultAudience({ phoneNumberId, userId });
+  await ensureDefaultAudience({ phoneNumberId, userId, lineName });
 
   const mappings = await prisma.audienceTag.findMany({
     where: { phone_number_id: phoneNumberId || null },

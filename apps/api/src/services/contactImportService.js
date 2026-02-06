@@ -146,7 +146,16 @@ async function importSinglePartner(partner) {
                     last_synced_at: new Date(),
                 },
             });
-            return { imported: true, updated: true, created: false };
+            return {
+                imported: true,
+                updated: true,
+                created: false,
+                contact: {
+                    name: partner.name || "Sin nombre",
+                    phone_e164: phoneE164,
+                    email: partner.email || null,
+                },
+            };
         }
         await prisma.odooContact.create({
             data: {
@@ -160,7 +169,16 @@ async function importSinglePartner(partner) {
                 last_synced_at: new Date(),
             },
         });
-        return { imported: true, created: true, updated: false };
+        return {
+            imported: true,
+            created: true,
+            updated: false,
+            contact: {
+                name: partner.name || "Sin nombre",
+                phone_e164: phoneE164,
+                email: partner.email || null,
+            },
+        };
     } catch (error) {
         logger.error("Failed to import partner", {
             partnerId: partner.id,
@@ -205,11 +223,27 @@ async function refreshFromOdoo(options = {}) {
 
         let imported = 0;
         let skipped = 0;
+        let created = 0;
+        let updated = 0;
+        const createdPreview = [];
+        const updatedPreview = [];
 
         for (const partner of partners || []) {
             const result = await importSinglePartner(partner);
             if (result.imported) {
                 imported++;
+                if (result.created) {
+                    created++;
+                    if (createdPreview.length < 6 && result.contact) {
+                        createdPreview.push(result.contact);
+                    }
+                }
+                if (result.updated) {
+                    updated++;
+                    if (updatedPreview.length < 6 && result.contact) {
+                        updatedPreview.push(result.contact);
+                    }
+                }
             } else {
                 skipped++;
             }
@@ -220,12 +254,17 @@ async function refreshFromOdoo(options = {}) {
             await enrichContactsWithPatientInfo();
         }
 
-        logger.info("Incremental Odoo sync completed", { imported, skipped });
+        logger.info("Incremental Odoo sync completed", { imported, created, updated, skipped });
 
         return {
-            newContacts: partners?.length || 0,
             imported,
+            created,
+            updated,
             skipped,
+            preview: {
+                created: createdPreview,
+                updated: updatedPreview,
+            },
         };
     } catch (error) {
         logger.error("Incremental Odoo sync failed", { error: error.message });

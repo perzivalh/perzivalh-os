@@ -64,6 +64,7 @@ router.post(
             const settings = await audienceAutomationService.setAutomationSettings({
                 phoneNumberId: req.body.phone_number_id || null,
                 enabled: req.body.enabled,
+                lineName: req.body.line_name || null,
                 userId,
             });
             res.json({ settings });
@@ -81,8 +82,10 @@ router.post(
 router.get("/audiences/dynamic-tags", async (req, res) => {
     try {
         const phoneNumberId = req.query.phone_number_id || null;
+        const lineName = req.query.line_name || null;
         const items = await audienceAutomationService.listDynamicAudiences({
             phoneNumberId,
+            lineName,
         });
         res.json({ items });
     } catch (error) {
@@ -127,8 +130,10 @@ router.post(
         try {
             const userId = req.user?.id || null;
             const phoneNumberId = req.body.phone_number_id || null;
+            const lineName = req.body.line_name || null;
             const result = await audienceAutomationService.syncHistorical({
                 phoneNumberId,
+                lineName,
                 userId,
             });
             res.json(result);

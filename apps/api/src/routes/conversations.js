@@ -22,6 +22,7 @@ const {
     createMessage,
     logAudit,
 } = require("../services/conversations");
+const audienceAutomationService = require("../services/audienceAutomationService");
 
 // Aplicar rate limiter a todas las rutas /api
 router.use(panelLimiter);
@@ -508,6 +509,28 @@ router.post("/conversations/:id/tags", requireAuth, async (req, res) => {
                 tagName: name,
                 userId: req.user.id,
             });
+        }
+        if (normalizedAdds.length && conversation?.phone_number_id) {
+            try {
+                const settings = await audienceAutomationService.getAutomationSettings({
+                    phoneNumberId: conversation.phone_number_id,
+                });
+                if (settings?.enabled) {
+                    await audienceAutomationService.ensureDefaultAudience({
+                        phoneNumberId: conversation.phone_number_id,
+                        userId: req.user.id,
+                    });
+                    for (const name of normalizedAdds) {
+                        await audienceAutomationService.createTagWithAudience({
+                            name,
+                            phoneNumberId: conversation.phone_number_id,
+                            userId: req.user.id,
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error("audience.automation.tag_failed", error.message || error);
+            }
         }
     } catch (error) {
         return res.status(400).json({ error: "tag_update_failed" });

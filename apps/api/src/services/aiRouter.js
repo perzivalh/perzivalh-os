@@ -274,14 +274,30 @@ async function routeWithAI({ text, flow, config, session }) {
       temperature: 0.1,
       maxTokens: 200,
     });
+    logger.info("ai.router_raw", {
+      provider,
+      model,
+      length: typeof raw === "string" ? raw.length : 0,
+    });
     const parsed = safeJsonParse(raw);
     if (!parsed?.action) {
+      logger.warn("ai.router_invalid", {
+        provider,
+        model,
+        preview: typeof raw === "string" ? raw.slice(0, 160) : "",
+      });
       const fallbackRoute = fallbackRouteByKeywords(normalizedMessage, routes);
       if (allowFallback && fallbackRoute) {
         return { action: "route", route_id: fallbackRoute, ai_used: false };
       }
       return null;
     }
+    logger.info("ai.router_decision", {
+      provider,
+      model,
+      action: parsed.action,
+      route_id: parsed.route_id || null,
+    });
     return { ...parsed, ai_used: true };
   } catch (error) {
     logger.error("ai.router_failed", {

@@ -109,6 +109,10 @@ function CampaignsView({
   onLoadCampaigns,
   onLoadCampaignMessages,
   onSendCampaign,
+  onUpdateCampaign,
+  onDeleteCampaign,
+  onResendCampaign,
+  campaignsTotal,
   formatDate,
   brandName,
 }) {
@@ -122,6 +126,8 @@ function CampaignsView({
   const [campaignSearch, setCampaignSearch] = useState("");
   const [campaignStatusFilter, setCampaignStatusFilter] = useState("all");
   const [campaignLaunchOpen, setCampaignLaunchOpen] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState(null);
+  const [launchTemplateSearch, setLaunchTemplateSearch] = useState("");
   const [campaignScheduleMode, setCampaignScheduleMode] = useState(
     campaignForm.send_now === false || campaignForm.scheduled_for ? "schedule" : "now"
   );
@@ -212,6 +218,17 @@ function CampaignsView({
     loadDynamicAudiences();
     loadOdooStatus();
   }, [audienceFlowOpen]);
+
+  useEffect(() => {
+    if (activeTab !== "new" || campaignLaunchOpen) {
+      return undefined;
+    }
+    const handler = setTimeout(() => {
+      setCampaignPage(1);
+      onLoadCampaigns(1, campaignPageSize, campaignSearch.trim());
+    }, 350);
+    return () => clearTimeout(handler);
+  }, [campaignSearch, campaignPageSize, campaignLaunchOpen, activeTab, onLoadCampaigns]);
 
   useEffect(() => {
     if (!audienceFlowOpen || audienceFlowTab !== "odoo") return;
@@ -599,8 +616,8 @@ function CampaignsView({
     return segments.find((segment) => segment.id === selectedAudienceId);
   }, [segments, selectedAudienceId]);
 
-  const previewButtons = useMemo(() => {
-    const raw = selectedTemplate?.buttons_json ?? selectedTemplate?.buttons ?? [];
+  const parseTemplateButtons = (template) => {
+    const raw = template?.buttons_json ?? template?.buttons ?? [];
     if (Array.isArray(raw)) {
       return raw;
     }
@@ -613,7 +630,17 @@ function CampaignsView({
       }
     }
     return [];
-  }, [selectedTemplate]);
+  };
+
+  const previewButtons = useMemo(
+    () => parseTemplateButtons(selectedTemplate),
+    [selectedTemplate]
+  );
+
+  const templatePreviewButtons = useMemo(
+    () => parseTemplateButtons(templatePreviewTemplate),
+    [templatePreviewTemplate]
+  );
 
   const audienceTotalPages = useMemo(() => {
     return Math.max(1, Math.ceil(audienceContactsTotal / audiencePageSize));
@@ -658,14 +685,15 @@ function CampaignsView({
 
   const campaignPages = useMemo(() => {
     const pages = [];
-    const totalPages = Math.max(1, Math.ceil(campaigns.length / campaignPageSize));
+    const totalCount = campaignsTotal || campaigns.length;
+    const totalPages = Math.max(1, Math.ceil(totalCount / campaignPageSize));
     const start = Math.max(1, campaignPage - 1);
     const end = Math.min(totalPages, start + 2);
     for (let i = start; i <= end; i += 1) {
       pages.push(i);
     }
     return { pages, totalPages };
-  }, [campaigns.length, campaignPage, campaignPageSize]);
+  }, [campaignsTotal, campaigns.length, campaignPage, campaignPageSize]);
 
   useEffect(() => {
     if (activeTab !== "audiences") return;
@@ -677,6 +705,8 @@ function CampaignsView({
   useEffect(() => {
     if (activeTab !== "new" && campaignLaunchOpen) {
       setCampaignLaunchOpen(false);
+      setEditingCampaign(null);
+      resetCampaignDraft();
     }
   }, [activeTab, campaignLaunchOpen]);
 
@@ -716,6 +746,14 @@ function CampaignsView({
       return matchesQuery && matchesCategory;
     });
   }, [templateSearch, templateCategory, templates]);
+
+  const filteredLaunchTemplates = useMemo(() => {
+    const query = launchTemplateSearch.trim().toLowerCase();
+    return (templates || []).filter((template) => {
+      const name = template.name?.toLowerCase() || "";
+      return !query || name.includes(query);
+    });
+  }, [launchTemplateSearch, templates]);
 
   const selectedSegment = useMemo(() => {
     if (campaignFilter.segment_id) {
@@ -781,11 +819,113 @@ function CampaignsView({
     });
   }
 
+  function formatDateTimeLocal(value) {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    const pad = (num) => String(num).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
   function handleTemplateSelect(templateId) {
     setCampaignForm((prev) => ({
       ...prev,
       template_id: templateId,
     }));
+  }
+
+  function resetCampaignDraft() {
+    setCampaignForm({
+      name: "",
+      template_id: "",
+      scheduled_for: "",
+      send_now: true,
+    });
+    setCampaignFilter({
+      status: "",
+      tag: "",
+      assigned_user_id: "",
+      verified_only: false,
+      segment_id: "",
+      segment_name: "",
+    });
+    setLaunchTemplateSearch("");
+  }
+
+  function handleEditCampaign(campaign) {
+    if (!campaign) return;
+    setEditingCampaign(campaign);
+    setCampaignLaunchOpen(true);
+    setCampaignForm((prev) => ({
+      ...prev,
+      name: campaign.name || "",
+      template_id: campaign.template_id || campaign.template?.id || "",
+      scheduled_for: formatDateTimeLocal(campaign.scheduled_for),
+      send_now: !campaign.scheduled_for,
+    }));
+    const filter = campaign.audience_filter || {};
+    setCampaignFilter((prev) => ({
+      ...prev,
+      status: filter.status || "",
+      tag: filter.tag || "",
+      assigned_user_id: filter.assigned_user_id || "",
+      verified_only: Boolean(filter.verified_only),
+      segment_id: filter.segment_id || "",
+      segment_name: filter.segment_name || "",
+    }));
+  }
+
+  function handleDeleteCampaignClick(campaign) {
+    if (!campaign?.id || !onDeleteCampaign) return;
+    const confirmed = window.confirm(`¿Eliminar la campaña "${campaign.name}"?`);
+    if (!confirmed) return;
+    onDeleteCampaign(campaign.id);
+  }
+
+  function handleResendCampaignClick(campaign) {
+    if (!campaign?.id || !onResendCampaign) return;
+    const confirmed = window.confirm(`¿Reenviar la campaña "${campaign.name}"?`);
+    if (!confirmed) return;
+    onResendCampaign(campaign.id);
+  }
+
+  function handleSubmitCampaign(event) {
+    event.preventDefault();
+    if (!campaignForm.name.trim() || !campaignForm.template_id) {
+      return;
+    }
+    const filter = {};
+    if (campaignFilter.status) {
+      filter.status = campaignFilter.status;
+    }
+    if (campaignFilter.tag) {
+      filter.tag = campaignFilter.tag.trim();
+    }
+    if (campaignFilter.assigned_user_id) {
+      filter.assigned_user_id = campaignFilter.assigned_user_id;
+    }
+    if (campaignFilter.verified_only) {
+      filter.verified_only = true;
+    }
+    if (campaignFilter.segment_id) {
+      filter.segment_id = campaignFilter.segment_id;
+      if (campaignFilter.segment_name) {
+        filter.segment_name = campaignFilter.segment_name;
+      }
+    }
+    if (editingCampaign && onUpdateCampaign) {
+      onUpdateCampaign(editingCampaign.id, {
+        name: campaignForm.name.trim(),
+        template_id: campaignForm.template_id,
+        audience_filter: filter,
+        scheduled_for: campaignForm.scheduled_for || null,
+      });
+      setCampaignLaunchOpen(false);
+      setEditingCampaign(null);
+      resetCampaignDraft();
+      return;
+    }
+    onCreateCampaign(event);
   }
 
   function handleTemplatePreview(template) {
@@ -883,7 +1023,11 @@ function CampaignsView({
                     <button
                       className="campaigns-ghost"
                       type="button"
-                      onClick={() => setCampaignLaunchOpen(false)}
+                      onClick={() => {
+                        setCampaignLaunchOpen(false);
+                        setEditingCampaign(null);
+                        resetCampaignDraft();
+                      }}
                     >
                       Cancelar
                     </button>
@@ -1363,13 +1507,6 @@ function CampaignsView({
                         >
                           {actionLabel}
                         </button>
-                        <button
-                          className="template-menu"
-                          type="button"
-                          aria-label="Mas opciones"
-                        >
-                          ...
-                        </button>
                       </div>
                     </div>
                   );
@@ -1730,7 +1867,13 @@ function CampaignsView({
                         <button className="audiences-icon-btn" type="button">
                           {"\u2193"}
                         </button>
-                        <button className="audiences-icon-btn" type="button" onClick={() => onLoadCampaigns(1, campaignPageSize)}>
+                        <button
+                          className="audiences-icon-btn"
+                          type="button"
+                          onClick={() =>
+                            onLoadCampaigns(campaignPage, campaignPageSize, campaignSearch.trim())
+                          }
+                        >
                           {"\u21bb"}
                         </button>
                       </div>
@@ -1773,9 +1916,23 @@ function CampaignsView({
                             <div className={`campaigns-status ${campaign.status}`}>
                               {statusLabel}
                             </div>
-                            <button className="campaigns-row-action" type="button">
-                              ...
-                            </button>
+                            <div className="campaigns-row-actions">
+                              {(["draft", "scheduled"].includes(campaign.status)) && (
+                                <button className="campaigns-row-btn" type="button" onClick={() => handleEditCampaign(campaign)}>
+                                  Editar
+                                </button>
+                              )}
+                              {(campaign.status === "sent" || campaign.status === "failed") && (
+                                <button className="campaigns-row-btn" type="button" onClick={() => handleResendCampaignClick(campaign)}>
+                                  Reenviar
+                                </button>
+                              )}
+                              {(["draft", "failed", "scheduled"].includes(campaign.status)) && (
+                                <button className="campaigns-row-btn danger" type="button" onClick={() => handleDeleteCampaignClick(campaign)}>
+                                  Eliminar
+                                </button>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -1785,7 +1942,8 @@ function CampaignsView({
                     </div>
                     <div className="campaigns-table-footer">
                       <span>
-                        Mostrando {filteredCampaigns.length} de {campaigns.length} campañas
+                        Mostrando {filteredCampaigns.length} de{" "}
+                        {campaignsTotal || campaigns.length} campañas
                       </span>
                       <div className="audiences-page-actions">
                         <button
@@ -1795,7 +1953,7 @@ function CampaignsView({
                           onClick={() => {
                             const next = Math.max(1, campaignPage - 1);
                             setCampaignPage(next);
-                            onLoadCampaigns(next, campaignPageSize);
+                            onLoadCampaigns(next, campaignPageSize, campaignSearch.trim());
                           }}
                         >
                           {"<"}
@@ -1809,7 +1967,7 @@ function CampaignsView({
                             type="button"
                             onClick={() => {
                               setCampaignPage(page);
-                              onLoadCampaigns(page, campaignPageSize);
+                              onLoadCampaigns(page, campaignPageSize, campaignSearch.trim());
                             }}
                           >
                             {page}
@@ -1822,7 +1980,7 @@ function CampaignsView({
                           onClick={() => {
                             const next = Math.min(campaignPages.totalPages, campaignPage + 1);
                             setCampaignPage(next);
-                            onLoadCampaigns(next, campaignPageSize);
+                            onLoadCampaigns(next, campaignPageSize, campaignSearch.trim());
                           }}
                         >
                           {">"}
@@ -1836,7 +1994,7 @@ function CampaignsView({
                   <form
                     className="campaigns-launch-form"
                     ref={formRef}
-                    onSubmit={onCreateCampaign}
+                    onSubmit={handleSubmitCampaign}
                   >
                     <div className="launch-step">
                       <span className="launch-step-number">1</span>
@@ -1880,30 +2038,44 @@ function CampaignsView({
                       <span className="launch-step-number">3</span>
                       <div className="launch-card">
                         <div className="launch-step-title">Elegir Plantilla de Meta</div>
-                        <div className="launch-templates">
-                          {templates.map((template) => {
-                            const statusKey = template.status || "APPROVED";
-                            const statusMeta =
-                              TEMPLATE_STATUS[statusKey] || TEMPLATE_STATUS.APPROVED;
-                            const selected = campaignForm.template_id === template.id;
-                            return (
-                              <button
-                                className={`launch-template ${selected ? "selected" : ""}`}
-                                type="button"
-                                key={template.id}
-                                onClick={() => handleTemplateSelect(template.id)}
-                              >
-                                <div className="launch-template-icon" />
-                                <div className="launch-template-title">{template.name}</div>
-                                <div className="launch-template-preview">
-                                  {template.body_preview || template.body_text || "Sin preview"}
-                                </div>
-                                <span className={`launch-template-status ${statusMeta.className}`}>
-                                  {statusMeta.label}
-                                </span>
-                              </button>
-                            );
-                          })}
+                        <div className="launch-template-search">
+                          <input
+                            type="text"
+                            placeholder="Buscar plantilla..."
+                            value={launchTemplateSearch}
+                            onChange={(event) => setLaunchTemplateSearch(event.target.value)}
+                          />
+                          <button type="button" onClick={() => setLaunchTemplateSearch("")}>Limpiar</button>
+                        </div>
+                        <div className="launch-templates-scroll">
+                          <div className="launch-templates">
+                            {filteredLaunchTemplates.map((template) => {
+                              const statusKey = template.status || "APPROVED";
+                              const statusMeta =
+                                TEMPLATE_STATUS[statusKey] || TEMPLATE_STATUS.APPROVED;
+                              const selected = campaignForm.template_id === template.id;
+                              return (
+                                <button
+                                  className={`launch-template ${selected ? "selected" : ""}`}
+                                  type="button"
+                                  key={template.id}
+                                  onClick={() => handleTemplateSelect(template.id)}
+                                >
+                                  <div className="launch-template-icon" />
+                                  <div className="launch-template-title">{template.name}</div>
+                                  <div className="launch-template-preview">
+                                    {template.body_preview || template.body_text || "Sin preview"}
+                                  </div>
+                                  <span className={`launch-template-status ${statusMeta.className}`}>
+                                    {statusMeta.label}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                            {filteredLaunchTemplates.length === 0 && (
+                              <div className="launch-empty">Sin plantillas</div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1981,7 +2153,7 @@ function CampaignsView({
                           <div className="preview-actions">
                             {previewButtons.map((btn, index) => (
                               <button type="button" key={`preview-btn-${index}`}>
-                                {btn.text || btn.label || `Boton ${index + 1}`}
+                                {btn.text || btn.label || btn.title || `Botón ${index + 1}`}
                               </button>
                             ))}
                           </div>
@@ -2130,12 +2302,37 @@ function CampaignsView({
             </div>
             <div className="modal-body">
               <div className="preview-phone">
+                <div className="preview-phone-header">
+                  <div className="preview-phone-notch" />
+                  <div className="preview-phone-title">
+                    <div className="preview-phone-avatar" />
+                    <div>
+                      <div className="preview-phone-name">{brandLabel}</div>
+                      <div className="preview-phone-status">en línea</div>
+                    </div>
+                  </div>
+                </div>
                 <div className="preview-phone-body">
+                  <div className="preview-day-pill">HOY</div>
                   <div className="preview-bubble">
                     {templatePreviewTemplate?.body_preview ||
                       templatePreviewTemplate?.body_text ||
                       "Sin previsualización disponible."}
                   </div>
+                  {templatePreviewButtons.length > 0 && (
+                    <div className="preview-actions">
+                      {templatePreviewButtons.map((btn, index) => (
+                        <button type="button" key={`preview-modal-btn-${index}`}>
+                          {btn.text || btn.label || btn.title || `Botón ${index + 1}`}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="preview-time">10:45 AM</div>
+                </div>
+                <div className="preview-phone-input">
+                  <span>Escribir mensaje...</span>
+                  <div className="preview-mic" />
                 </div>
               </div>
             </div>

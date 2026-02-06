@@ -43,7 +43,8 @@ function TemplatesSection({
     const [syncing, setSyncing] = useState(false);
     const [filterStatus, setFilterStatus] = useState("");
     const [submitting, setSubmitting] = useState(false);
-    const [openMenuId, setOpenMenuId] = useState(null);
+    const [previewOpen, setPreviewOpen] = useState(false);
+    const [previewTemplate, setPreviewTemplate] = useState(null);
 
     // New form state for editor
     const [editorForm, setEditorForm] = useState({
@@ -66,19 +67,6 @@ function TemplatesSection({
         }
     }, []);
 
-    useEffect(() => {
-        if (!openMenuId) {
-            return undefined;
-        }
-        const handleClickOutside = (event) => {
-            if (event.target.closest(".template-card-menu")) {
-                return;
-            }
-            setOpenMenuId(null);
-        };
-        document.addEventListener("click", handleClickOutside);
-        return () => document.removeEventListener("click", handleClickOutside);
-    }, [openMenuId]);
 
     const handleSync = async () => {
         setSyncing(true);
@@ -132,7 +120,6 @@ function TemplatesSection({
             return;
         }
         await handleTemplateDelete(template.id);
-        setOpenMenuId(null);
     };
 
     const handleSaveTemplate = async (e) => {
@@ -187,6 +174,20 @@ function TemplatesSection({
         setEditingTemplate(null);
     };
 
+    const getPreviewButtons = (template) => {
+        const raw = template?.buttons_json ?? template?.buttons ?? [];
+        if (Array.isArray(raw)) return raw;
+        if (typeof raw === "string") {
+            try {
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (error) {
+                return [];
+            }
+        }
+        return [];
+    };
+
     // Extract variables from body_text ({{1}}, {{2}}, etc.)
     const extractVariables = (text) => {
         const matches = text.match(/\{\{(\d+)\}\}/g) || [];
@@ -208,6 +209,7 @@ function TemplatesSection({
     // Render list view
     if (view === "list") {
         return (
+            <>
             <div className="templates-section">
                 <div className="templates-header">
                     <div className="templates-title-row">
@@ -285,42 +287,17 @@ function TemplatesSection({
                                 <div className="template-card-actions">
                                     <button className="btn-preview" onClick={(e) => {
                                         e.stopPropagation();
-                                        handleSelectTemplate(template);
+                                        setPreviewTemplate(template);
+                                        setPreviewOpen(true);
                                     }}>
-                                        👁 Previsualizar
+                                        Vista previa
                                     </button>
-                                    <div
-                                        className="template-card-menu"
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <button
-                                            className="btn-more"
-                                            type="button"
-                                            onClick={() =>
-                                                setOpenMenuId((prev) => (prev === template.id ? null : template.id))
-                                            }
-                                        >
-                                            ⋯
-                                        </button>
-                                        {openMenuId === template.id && (
-                                            <div className="template-menu-dropdown">
-                                                <button
-                                                    type="button"
-                                                    className="menu-item"
-                                                    onClick={() => handleSelectTemplate(template)}
-                                                >
-                                                    Editar
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="menu-item danger"
-                                                    onClick={() => handleDeleteTemplate(template)}
-                                                >
-                                                    Eliminar
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
+                                    <button className="btn-preview danger" onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteTemplate(template);
+                                    }}>
+                                        Eliminar
+                                    </button>
                                 </div>
                             </div>
                         );
@@ -340,6 +317,55 @@ function TemplatesSection({
                     </div>
                 )}
             </div>
+            {previewOpen && (
+                <div className="modal-overlay" onClick={() => setPreviewOpen(false)}>
+                    <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>Vista previa</h2>
+                            <button className="modal-close" onClick={() => setPreviewOpen(false)}>
+                                x
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <div className="preview-phone">
+                                <div className="preview-phone-header">
+                                    <div className="preview-phone-notch" />
+                                    <div className="preview-phone-title">
+                                        <div className="preview-phone-avatar" />
+                                        <div>
+                                            <div className="preview-phone-name">{brandLabel}</div>
+                                            <div className="preview-phone-status">en línea</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="preview-phone-body">
+                                    <div className="preview-day-pill">HOY</div>
+                                    <div className="preview-bubble">
+                                        {previewTemplate?.body_preview ||
+                                            previewTemplate?.body_text ||
+                                            "Sin previsualización disponible."}
+                                    </div>
+                                    {getPreviewButtons(previewTemplate).length > 0 && (
+                                        <div className="preview-actions">
+                                            {getPreviewButtons(previewTemplate).map((btn, index) => (
+                                                <button type="button" key={`prev-${index}`}>
+                                                    {btn.text || btn.label || btn.title || `Botón ${index + 1}`}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                    <div className="preview-time">10:45 AM</div>
+                                </div>
+                                <div className="preview-phone-input">
+                                    <span>Escribir mensaje...</span>
+                                    <div className="preview-mic" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            </>
         );
     }
 
@@ -443,38 +469,52 @@ function TemplatesSection({
 
                 {/* Center panel - Phone Preview */}
                 <div className="editor-preview-panel">
-                    <div className="phone-frame">
-                        <div className="phone-header">
-                            <span className="phone-back">←</span>
-                            <div className="phone-contact">
-                                <div className="phone-avatar">🏥</div>
-                                <div className="phone-name">{brandLabel}</div>
-                            </div>
-                            <div className="phone-icons">📹 📞</div>
-                        </div>
-                        <div className="phone-body">
-                            <div className="phone-date-label">TODAY</div>
-                            <div className="phone-message">
-                                <div className="message-bubble">
-                                    {editorForm.body_text || "Tu mensaje aparecerá aquí..."}
+                    <div className="preview-title">Vista previa en tiempo real</div>
+                    <div className="preview-phone">
+                        <div className="preview-phone-header">
+                            <div className="preview-phone-notch" />
+                            <div className="preview-phone-title">
+                                <div className="preview-phone-avatar" />
+                                <div>
+                                    <div className="preview-phone-name">{brandLabel}</div>
+                                    <div className="preview-phone-status">en línea</div>
                                 </div>
-                                <div className="message-time">10:42 AM</div>
+                            </div>
+                        </div>
+                        <div className="preview-phone-body">
+                            <div className="preview-day-pill">HOY</div>
+                            <div className="preview-bubble">
+                                {editorForm.body_text || "Tu mensaje aparecerá aquí..."}
                             </div>
                             {editorForm.buttons && editorForm.buttons.length > 0 && (
-                                <div className="phone-buttons">
-                                    {editorForm.buttons.map((btn, i) => (
-                                        <button key={i} className="phone-action-btn">
-                                            {btn.text || `Button ${i + 1}`}
+                                <div className="preview-actions">
+                                    {editorForm.buttons.map((btn, index) => (
+                                        <button type="button" key={`btn-${index}`}>
+                                            {btn.text || btn.title || `Botón ${index + 1}`}
                                         </button>
                                     ))}
                                 </div>
                             )}
+                            <div className="preview-time">10:42 AM</div>
+                        </div>
+                        <div className="preview-phone-input">
+                            <span>Escribir mensaje...</span>
+                            <div className="preview-mic" />
                         </div>
                     </div>
-                    <div className="preview-label">🔍 High-fidelity dynamic preview</div>
+                    <div className="preview-summary">
+                        <div className="preview-summary-title">Resumen</div>
+                        <div className="preview-summary-row">
+                            <span>Plantilla</span>
+                            <strong>{editorForm.name || "Sin nombre"}</strong>
+                        </div>
+                        <div className="preview-summary-row">
+                            <span>Idioma</span>
+                            <strong>{editorForm.language?.toUpperCase() || "ES"}</strong>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Right panel - Variable Mappings */}
                 <div className="editor-mapping-panel">
                     <div className="mapping-tabs">
                         <button className="tab active">VARIABLES</button>

@@ -364,7 +364,7 @@
 .template-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.75rem;
   margin-top: auto;
 }
@@ -378,17 +378,6 @@
   color: var(--accent);
 }
 
-.template-menu {
-  border: 1px solid var(--border);
-  background: var(--panel);
-  border-radius: 10px;
-  width: 36px;
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--muted);
-}
 
 .audiences-layout {
   display: grid;
@@ -980,10 +969,10 @@
 .campaigns-table-head,
 .campaigns-table-row {
   display: grid;
-  grid-template-columns: 2.2fr 1.1fr 1.1fr 0.9fr 0.9fr 0.9fr 0.9fr 32px;
+  grid-template-columns: 2.2fr 1.1fr 1.1fr 0.9fr 0.9fr 0.9fr 0.9fr minmax(180px, 1fr);
   gap: 0.75rem;
   align-items: center;
-  min-width: 860px;
+  min-width: 980px;
   padding: 0.8rem 1rem;
 }
 
@@ -1026,12 +1015,12 @@
 }
 
 .campaigns-pill {
-  background: #eef2ff;
-  color: #4f46e5;
-  padding: 0.2rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 700;
+  background: transparent;
+  color: var(--muted);
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .campaigns-metric {
@@ -1063,11 +1052,34 @@
   color: #64748b;
 }
 
-.campaigns-row-action {
-  border: none;
-  background: transparent;
-  color: var(--muted);
+.campaigns-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.campaigns-row-btn {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--ink);
+  border-radius: 10px;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.72rem;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.campaigns-row-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.campaigns-row-btn.danger {
+  border-color: rgba(220, 38, 38, 0.45);
+  background: rgba(220, 38, 38, 0.08);
+  color: #dc2626;
 }
 
 .campaigns-table-footer {
@@ -1139,9 +1151,43 @@
   padding: 0.75rem 0.9rem;
 }
 
+.launch-template-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--panel-muted);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.4rem 0.5rem;
+}
+
+.launch-template-search input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0.45rem 0.6rem;
+  color: var(--ink);
+}
+
+.launch-template-search button {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.launch-templates-scroll {
+  max-height: clamp(240px, 42vh, 360px);
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
 .launch-templates {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1rem;
 }
 
@@ -1176,6 +1222,14 @@
 .launch-template-preview {
   font-size: 0.8rem;
   color: var(--muted);
+}
+
+.launch-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding: 0.8rem 0;
 }
 
 .launch-template-status {
@@ -1249,17 +1303,18 @@
 }
 
 .preview-phone {
-  width: 100%;
-  max-width: 320px;
+  width: min(100%, 340px);
+  max-width: 100%;
   margin: 0 auto;
   border-radius: 32px;
-  border: 10px solid #1f2937;
-  background: linear-gradient(135deg, #f7b480, #f0c4a5);
-  padding: 1.5rem;
-  min-height: 420px;
+  border: clamp(6px, 1.2vw, 10px) solid #1f2937;
+  background: linear-gradient(160deg, #f9d6b4, #f7b480);
+  padding: clamp(1rem, 2vw, 1.4rem);
+  height: clamp(320px, 60vh, 560px);
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.15);
 }
 
 .preview-phone-header {
@@ -1305,10 +1360,12 @@
   background: #fff;
   border-radius: 14px;
   padding: 0.8rem;
-  min-height: 260px;
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .preview-day-pill {
@@ -1327,6 +1384,8 @@
   padding: 0.8rem;
   font-size: 0.85rem;
   color: #334155;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .preview-actions {
@@ -1342,6 +1401,10 @@
   font-size: 0.75rem;
   color: #2563eb;
   font-weight: 600;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .preview-time {
@@ -1359,6 +1422,7 @@
   justify-content: space-between;
   font-size: 0.7rem;
   color: #94a3b8;
+  flex: 0 0 auto;
 }
 
 .preview-mic {
@@ -2023,7 +2087,6 @@ body[data-theme="dark"] .audience-card {
 body[data-theme="dark"] .campaigns-ghost,
 body[data-theme="dark"] .templates-search,
 body[data-theme="dark"] .templates-select,
-body[data-theme="dark"] .template-menu,
 body[data-theme="dark"] .audiences-search,
 body[data-theme="dark"] .audiences-search-field,
 body[data-theme="dark"] .audiences-filter-chip,
@@ -2058,6 +2121,7 @@ body[data-theme="dark"] .campaigns-search,
 body[data-theme="dark"] .campaigns-filter-chip,
 body[data-theme="dark"] .campaigns-table,
 body[data-theme="dark"] .launch-template,
+body[data-theme="dark"] .launch-template-search,
 body[data-theme="dark"] .launch-schedule-option,
 body[data-theme="dark"] .preview-summary {
   background: #141414;
@@ -2069,6 +2133,23 @@ body[data-theme="dark"] .campaigns-launch-preview,
 body[data-theme="dark"] .launch-card {
   background: #141414;
   border-color: #2a2a2a;
+}
+
+body[data-theme="dark"] .launch-template-search button,
+body[data-theme="dark"] .campaigns-row-btn {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #fecaca;
+}
+
+body[data-theme="dark"] .launch-template-search input {
+  color: #fee2e2;
+}
+
+body[data-theme="dark"] .campaigns-row-btn.danger {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.55);
+  color: #fee2e2;
 }
 
 body[data-theme="dark"] .audience-rule-card {
@@ -2114,11 +2195,11 @@ body[data-theme="dark"] .audience-rule-card {
     max-width: 100%;
     border-width: 8px;
     padding: 1rem;
-    min-height: 360px;
+    height: clamp(300px, 60vh, 520px);
   }
 
   .preview-phone-body {
-    min-height: 220px;
+    min-height: 0;
   }
 
   .preview-actions button {

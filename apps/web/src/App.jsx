@@ -147,6 +147,7 @@ function App() {
   const [metrics, setMetrics] = useState(null);
   const [templates, setTemplates] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
+  const [campaignsTotal, setCampaignsTotal] = useState(0);
   const [campaignMessages, setCampaignMessages] = useState([]);
   const [selectedCampaignId, setSelectedCampaignId] = useState("");
   const [selectedTemplateForEdit, setSelectedTemplateForEdit] = useState(null);
@@ -1453,12 +1454,18 @@ function App() {
     }
   }
 
-  async function loadCampaigns(page = 1, pageSize = 6) {
+  async function loadCampaigns(page = 1, pageSize = 6, query = "") {
     try {
-      const data = await apiGet(
-        `/api/admin/campaigns?page=${page}&page_size=${pageSize}`
-      );
+      const qs = new URLSearchParams({
+        page: String(page),
+        page_size: String(pageSize),
+      });
+      if (query) {
+        qs.set("q", query);
+      }
+      const data = await apiGet(`/api/admin/campaigns?${qs.toString()}`);
       setCampaigns(data.campaigns || []);
+      setCampaignsTotal(Number.isFinite(data.total) ? data.total : (data.campaigns || []).length);
     } catch (error) {
       setPageError(normalizeError(error));
     }
@@ -1540,6 +1547,45 @@ function App() {
       await loadCampaigns(1, 6);
     } catch (error) {
       setPageError(normalizeError(error));
+    }
+  }
+
+  async function handleUpdateCampaign(campaignId, payload) {
+    try {
+      const data = await apiPut(`/api/admin/campaigns/${campaignId}`, payload);
+      setCampaigns((prev) =>
+        prev.map((item) => (item.id === campaignId ? data.campaign || item : item))
+      );
+      await loadCampaigns(1, 6);
+      pushToast({ message: "Campaña actualizada" });
+    } catch (error) {
+      const message = normalizeError(error) || "No se pudo actualizar";
+      setPageError(message);
+      pushToast({ type: "error", message });
+    }
+  }
+
+  async function handleDeleteCampaign(campaignId) {
+    try {
+      await apiDelete(`/api/admin/campaigns/${campaignId}`);
+      await loadCampaigns(1, 6);
+      pushToast({ message: "Campaña eliminada" });
+    } catch (error) {
+      const message = normalizeError(error) || "No se pudo eliminar";
+      setPageError(message);
+      pushToast({ type: "error", message });
+    }
+  }
+
+  async function handleResendCampaign(campaignId) {
+    try {
+      await apiPost(`/api/admin/campaigns/${campaignId}/send`, {});
+      await loadCampaigns(1, 6);
+      pushToast({ message: "Campaña reenviada" });
+    } catch (error) {
+      const message = normalizeError(error) || "No se pudo reenviar";
+      setPageError(message);
+      pushToast({ type: "error", message });
     }
   }
 
@@ -2158,7 +2204,7 @@ function App() {
     },
     {
       id: "campaigns",
-      label: "Campanas",
+      label: "Campañas",
       icon: BellIcon,
       enabled: canViewCampaigns,
     },

@@ -511,23 +511,34 @@
 
 .template-card-actions {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
+    gap: 0.5rem;
     border-top: 1px solid #f1f5f9;
     padding-top: 12px;
 }
 
 .btn-preview {
-    background: none;
-    border: none;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
     color: #64748b;
-    font-size: 13px;
+    font-size: 12px;
+    font-weight: 600;
     cursor: pointer;
-    padding: 4px 8px;
+    padding: 6px 10px;
+    border-radius: 999px;
 }
 
 .btn-preview:hover {
     color: #2563eb;
+    border-color: #cbd5f5;
+    background: #eff6ff;
+}
+
+.btn-preview.danger {
+    color: #dc2626;
+    border-color: #fecaca;
+    background: #fef2f2;
 }
 
 .btn-more {

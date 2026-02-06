@@ -733,14 +733,23 @@ router.get("/campaigns", requireAuth, requireRole(["admin", "marketing"]), async
     const pageSize = Math.min(Math.max(Number(req.query.page_size) || 10, 5), 100);
     const page = Math.max(Number(req.query.page) || 1, 1);
     const offset = (page - 1) * pageSize;
+    const query = (req.query.q || "").trim();
+    const where = {};
+    if (query) {
+        where.OR = [
+            { name: { contains: query, mode: "insensitive" } },
+            { template: { name: { contains: query, mode: "insensitive" } } },
+        ];
+    }
     const [campaigns, total] = await Promise.all([
         prisma.campaign.findMany({
+            where,
             include: { template: true },
             orderBy: { created_at: "desc" },
             skip: offset,
             take: pageSize,
         }),
-        prisma.campaign.count(),
+        prisma.campaign.count({ where }),
     ]);
     return res.json({ campaigns, total, page, page_size: pageSize });
 });
@@ -823,6 +832,96 @@ router.post("/campaigns/:id/send", requireAuth, requireRole(["admin", "marketing
         data: { campaign_id: campaign.id, queued },
     });
     return res.json({ campaign: updated, queued });
+});
+
+
+// PUT /api/admin/campaigns/:id
+router.put("/campaigns/:id", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+    const name = (req.body?.name || "").trim();
+    const templateId = req.body?.template_id || null;
+    const audienceFilter = req.body?.audience_filter || null;
+    const scheduledForRaw = req.body?.scheduled_for;
+    const scheduledFor = scheduledForRaw ? new Date(scheduledForRaw) : null;
+    const campaign = await prisma.campaign.findUnique({ where: { id: req.params.id } });
+    if (!campaign) {
+        return res.status(404).json({ error: "not_found" });
+    }
+    if (!["draft", "scheduled"].includes(campaign.status)) {
+        return res.status(400).json({ error: "Only draft or scheduled campaigns can be edited" });
+    }
+    let resolvedTemplateId = templateId || campaign.template_id;
+    if (templateId) {
+        const existingTemplate = await prisma.template.findUnique({
+            where: { id: templateId },
+        });
+        if (!existingTemplate) {
+            const metaTemplate = await prisma.metaTemplate.findUnique({
+                where: { id: templateId },
+            });
+            if (!metaTemplate) {
+                return res.status(400).json({ error: "template_not_found" });
+            }
+            const templateByName = await prisma.template.findUnique({
+                where: { name: metaTemplate.name },
+            });
+            if (templateByName) {
+                resolvedTemplateId = templateByName.id;
+            } else {
+                const createdTemplate = await prisma.template.create({
+                    data: {
+                        name: metaTemplate.name,
+                        language: metaTemplate.language || "es",
+                        category: metaTemplate.category || null,
+                        body_preview: metaTemplate.body_text || metaTemplate.footer_text || "",
+                        is_active: metaTemplate.status === "APPROVED",
+                    },
+                });
+                resolvedTemplateId = createdTemplate.id;
+            }
+        }
+    }
+    const updates = {};
+    if (name) {
+        updates.name = name;
+    }
+    if (resolvedTemplateId) {
+        updates.template_id = resolvedTemplateId;
+    }
+    if (audienceFilter !== null) {
+        updates.audience_filter = audienceFilter;
+    }
+    if (scheduledForRaw !== undefined) {
+        updates.scheduled_for = scheduledFor;
+        updates.status = scheduledFor ? "scheduled" : "draft";
+    }
+    const updated = await prisma.campaign.update({
+        where: { id: campaign.id },
+        data: updates,
+    });
+    await logAudit({
+        userId: req.user.id,
+        action: "campaign.updated",
+        data: { campaign_id: updated.id },
+    });
+    return res.json({ campaign: updated });
+});
+
+// DELETE /api/admin/campaigns/:id
+router.delete("/campaigns/:id", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+    const campaign = await prisma.campaign.findUnique({ where: { id: req.params.id } });
+    if (!campaign) {
+        return res.status(404).json({ error: "not_found" });
+    }
+    if (!["draft", "failed", "scheduled"].includes(campaign.status)) {
+        return res.status(400).json({ error: "Only draft, failed or scheduled campaigns can be deleted" });
+    }
+    await prisma.campaign.delete({ where: { id: campaign.id } });
+    await logAudit({
+        userId: req.user.id,
+        action: "campaign.deleted",
+        data: { campaign_id: campaign.id },
+    });
+    return res.json({ success: true });
 });
 
 // GET /api/admin/campaigns/:id/messages

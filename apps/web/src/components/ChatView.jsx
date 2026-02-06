@@ -517,7 +517,7 @@ function ChatView({
               <div className="section-title">Acciones</div>
               <div className="action-stack">
                 <button
-                  className="ghost"
+                  className="ghost action-btn"
                   type="button"
                   onClick={handleAssignSelf}
                   disabled={isAssignedToOther}
@@ -525,7 +525,7 @@ function ChatView({
                   Tomar conversacion
                 </button>
                 {canManageStatus && (
-                  <div className="reassign-row">
+                  <div className="reassign-card">
                     <select
                       value={reassignUserId}
                       onChange={(event) => setReassignUserId(event.target.value)}
@@ -538,7 +538,7 @@ function ChatView({
                       ))}
                     </select>
                     <button
-                      className="ghost"
+                      className="ghost action-btn"
                       type="button"
                       onClick={handleReassignConversation}
                       disabled={!reassignUserId}
@@ -548,22 +548,22 @@ function ChatView({
                   </div>
                 )}
                 {canManageStatus && (
-                  <>
+                  <div className="action-row">
                     <button
-                      className="ghost"
+                      className="ghost action-btn"
                       type="button"
                       onClick={() => handleStatusChange("open")}
                     >
                       Reactivar bot
                     </button>
                     <button
-                      className="ghost"
+                      className="ghost action-btn"
                       type="button"
                       onClick={() => handleStatusChange("pending")}
                     >
                       Liberar para otro operador
                     </button>
-                  </>
+                  </div>
                 )}
               </div>
             </div>

@@ -1457,13 +1457,13 @@ function App() {
   async function loadCampaigns(page = 1, pageSize = 6, query = "") {
     try {
       const qs = new URLSearchParams({
-        page: String(page),
-        page_size: String(pageSize),
+        offset: String((page - 1) * pageSize),
+        limit: String(pageSize),
       });
       if (query) {
         qs.set("q", query);
       }
-      const data = await apiGet(`/api/admin/campaigns?${qs.toString()}`);
+      const data = await apiGet(`/api/campaigns?${qs.toString()}`);
       setCampaigns(data.campaigns || []);
       setCampaignsTotal(Number.isFinite(data.total) ? data.total : (data.campaigns || []).length);
     } catch (error) {
@@ -1507,16 +1507,16 @@ function App() {
       }
     }
     try {
-      const result = await apiPost("/api/admin/campaigns", {
+      const result = await apiPost("/api/campaigns", {
         name: campaignForm.name.trim(),
         template_id: campaignForm.template_id,
-        audience_filter: filter,
-        scheduled_for: campaignForm.scheduled_for || null,
+        segment_id: campaignFilter.segment_id || null,
+        scheduled_at: campaignForm.scheduled_for || null,
       });
       if (campaignForm.send_now && !campaignForm.scheduled_for) {
         const campaignId = result?.campaign?.id;
         if (campaignId) {
-          await apiPost(`/api/admin/campaigns/${campaignId}/send`, {});
+          await apiPost(`/api/campaigns/${campaignId}/launch`, {});
         }
       }
       setCampaignForm({
@@ -1543,7 +1543,7 @@ function App() {
 
   async function handleSendCampaign(campaignId) {
     try {
-      await apiPost(`/api/admin/campaigns/${campaignId}/send`, {});
+      await apiPost(`/api/campaigns/${campaignId}/launch`, {});
       await loadCampaigns(1, 6);
     } catch (error) {
       setPageError(normalizeError(error));
@@ -1552,7 +1552,12 @@ function App() {
 
   async function handleUpdateCampaign(campaignId, payload) {
     try {
-      const data = await apiPut(`/api/admin/campaigns/${campaignId}`, payload);
+      const data = await apiPut(`/api/campaigns/${campaignId}`, {
+        name: payload.name,
+        template_id: payload.template_id,
+        segment_id: payload.segment_id || payload.audience_filter?.segment_id || null,
+        scheduled_at: payload.scheduled_for || null,
+      });
       setCampaigns((prev) =>
         prev.map((item) => (item.id === campaignId ? data.campaign || item : item))
       );
@@ -1567,7 +1572,7 @@ function App() {
 
   async function handleDeleteCampaign(campaignId) {
     try {
-      await apiDelete(`/api/admin/campaigns/${campaignId}`);
+      await apiDelete(`/api/campaigns/${campaignId}`);
       await loadCampaigns(1, 6);
       pushToast({ message: "Campaña eliminada" });
     } catch (error) {
@@ -1579,7 +1584,7 @@ function App() {
 
   async function handleResendCampaign(campaignId) {
     try {
-      await apiPost(`/api/admin/campaigns/${campaignId}/send`, {});
+      await apiPost(`/api/campaigns/${campaignId}/resend`, {});
       await loadCampaigns(1, 6);
       pushToast({ message: "Campaña reenviada" });
     } catch (error) {

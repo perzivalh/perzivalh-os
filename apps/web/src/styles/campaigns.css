@@ -998,17 +998,26 @@
 .campaigns-table {
   border: 1px solid var(--border);
   border-radius: 0;
-  overflow-x: auto;
+  overflow: visible;
+  width: 100%;
   min-width: 0;
 }
 
 .campaigns-table-head,
 .campaigns-table-row {
   display: grid;
-  grid-template-columns: 2.2fr 1.1fr 1.1fr 0.9fr 0.9fr 0.9fr 0.9fr 64px;
-  gap: 0.75rem;
+  grid-template-columns:
+    minmax(0, 2.2fr)
+    minmax(0, 1.1fr)
+    minmax(0, 1.1fr)
+    minmax(0, 0.9fr)
+    minmax(0, 0.9fr)
+    minmax(0, 0.9fr)
+    minmax(0, 0.9fr)
+    48px;
+  gap: 0.65rem;
   align-items: center;
-  min-width: 940px;
+  min-width: 0;
   padding: 0.8rem 1rem;
 }
 
@@ -1033,21 +1042,47 @@
 .campaigns-table-title {
   display: grid;
   gap: 0.2rem;
+  min-width: 0;
 }
 
 .campaigns-table-name {
   font-weight: 600;
   color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .campaigns-table-ref {
   font-size: 0.75rem;
   color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .campaigns-table-date {
   color: var(--muted);
   font-size: 0.8rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.campaigns-table-tags {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.campaigns-table-tags .campaigns-pill {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .campaigns-pill {
@@ -1062,6 +1097,10 @@
 .campaigns-metric {
   font-weight: 600;
   color: var(--ink);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .campaigns-status {
@@ -1070,10 +1109,22 @@
   font-size: 0.7rem;
   font-weight: 700;
   color: var(--muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .campaigns-status.sent {
   color: #16a34a;
+}
+
+.campaigns-status.completed {
+  color: #16a34a;
+}
+
+.campaigns-status.running {
+  color: #2563eb;
 }
 
 .campaigns-status.scheduled {
@@ -1096,6 +1147,7 @@
 .campaigns-row-menu {
   position: relative;
   display: inline-flex;
+  z-index: 2;
 }
 
 .campaigns-row-menu-btn {
@@ -1122,6 +1174,11 @@
   display: grid;
   min-width: 150px;
   z-index: 10;
+}
+
+.campaigns-row-dropdown.drop-up {
+  top: auto;
+  bottom: 38px;
 }
 
 .campaigns-row-dropdown button {
@@ -2455,7 +2512,7 @@ body[data-theme="dark"] .audience-rule-card {
   }
 
   .campaigns-dashboard {
-    grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
   }
 
   .campaigns-launch {

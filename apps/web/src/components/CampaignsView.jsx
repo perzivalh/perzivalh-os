@@ -5,8 +5,11 @@ import { useToast } from "./ToastProvider.jsx";
 const STATUS_LABELS = {
   draft: "BORRADOR",
   scheduled: "PROGRAMADA",
+  running: "ENVIANDO",
   sending: "ENVIANDO",
+  completed: "FINALIZADA",
   sent: "FINALIZADA",
+  paused: "PAUSADA",
   failed: "ERROR",
 };
 
@@ -129,6 +132,7 @@ function CampaignsView({
   const [editingCampaign, setEditingCampaign] = useState(null);
   const [launchTemplateSearch, setLaunchTemplateSearch] = useState("");
   const [openCampaignMenuId, setOpenCampaignMenuId] = useState(null);
+  const [campaignMenuPlacement, setCampaignMenuPlacement] = useState("down");
   const [openContactMenuId, setOpenContactMenuId] = useState(null);
   const [contactEditOpen, setContactEditOpen] = useState(false);
   const [contactSaving, setContactSaving] = useState(false);
@@ -667,19 +671,28 @@ function CampaignsView({
     return pages;
   }, [audiencePage, audienceTotalPages]);
 
+  const normalizeCampaignStatus = (status) => {
+    if (status === "sent") return "completed";
+    if (status === "sending") return "running";
+    return status || "";
+  };
+
   const campaignStatusBuckets = useMemo(() => {
     const buckets = {
       all: campaigns.length,
-      sent: 0,
+      completed: 0,
       scheduled: 0,
       draft: 0,
       failed: 0,
+      running: 0,
     };
     campaigns.forEach((item) => {
-      if (item.status === "sent") buckets.sent += 1;
-      if (item.status === "scheduled") buckets.scheduled += 1;
-      if (item.status === "draft") buckets.draft += 1;
-      if (item.status === "failed") buckets.failed += 1;
+      const status = normalizeCampaignStatus(item.status);
+      if (status === "completed") buckets.completed += 1;
+      if (status === "scheduled") buckets.scheduled += 1;
+      if (status === "draft") buckets.draft += 1;
+      if (status === "failed") buckets.failed += 1;
+      if (status === "running") buckets.running += 1;
     });
     return buckets;
   }, [campaigns]);
@@ -688,8 +701,9 @@ function CampaignsView({
     const query = campaignSearch.trim().toLowerCase();
     return campaigns.filter((campaign) => {
       const matchesSearch = !query || (campaign.name || "").toLowerCase().includes(query);
+      const normalizedStatus = normalizeCampaignStatus(campaign.status);
       const matchesStatus =
-        campaignStatusFilter === "all" || campaign.status === campaignStatusFilter;
+        campaignStatusFilter === "all" || normalizedStatus === campaignStatusFilter;
       return matchesSearch && matchesStatus;
     });
   }, [campaigns, campaignSearch, campaignStatusFilter]);
@@ -867,22 +881,25 @@ function CampaignsView({
     if (!campaign) return;
     setEditingCampaign(campaign);
     setCampaignLaunchOpen(true);
+    setLaunchTemplateSearch("");
     setCampaignForm((prev) => ({
       ...prev,
       name: campaign.name || "",
       template_id: campaign.template_id || campaign.template?.id || "",
-      scheduled_for: formatDateTimeLocal(campaign.scheduled_for),
-      send_now: !campaign.scheduled_for,
+      scheduled_for: formatDateTimeLocal(campaign.scheduled_for || campaign.scheduled_at),
+      send_now: !(campaign.scheduled_for || campaign.scheduled_at),
     }));
     const filter = campaign.audience_filter || {};
+    const segmentId = filter.segment_id || campaign.segment_id || "";
+    const segmentName = filter.segment_name || campaign.segment?.name || "";
     setCampaignFilter((prev) => ({
       ...prev,
       status: filter.status || "",
       tag: filter.tag || "",
       assigned_user_id: filter.assigned_user_id || "",
       verified_only: Boolean(filter.verified_only),
-      segment_id: filter.segment_id || "",
-      segment_name: filter.segment_name || "",
+      segment_id: segmentId,
+      segment_name: segmentName,
     }));
   }
 
@@ -900,8 +917,15 @@ function CampaignsView({
     onResendCampaign(campaign.id);
   }
 
-  function toggleCampaignMenu(id) {
+  function toggleCampaignMenu(id, event) {
     setOpenCampaignMenuId((prev) => (prev === id ? null : id));
+    if (event?.currentTarget && typeof window !== "undefined") {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const prefersUp = spaceBelow < 180 && spaceAbove > spaceBelow;
+      setCampaignMenuPlacement(prefersUp ? "up" : "down");
+    }
   }
 
   function toggleContactMenu(id) {
@@ -1004,6 +1028,7 @@ function CampaignsView({
       onUpdateCampaign(editingCampaign.id, {
         name: campaignForm.name.trim(),
         template_id: campaignForm.template_id,
+        segment_id: campaignFilter.segment_id || null,
         audience_filter: filter,
         scheduled_for: campaignForm.scheduled_for || null,
       });
@@ -1123,7 +1148,7 @@ function CampaignsView({
                       type="button"
                       onClick={() => formRef.current?.requestSubmit?.()}
                     >
-                      Lanzar Campaña
+                      {editingCampaign ? "Guardar cambios" : "Lanzar Campaña"}
                     </button>
                   </>
                 ) : (
@@ -1916,14 +1941,14 @@ function CampaignsView({
                       </button>
                       <button
                         className={`campaigns-filter-item ${
-                          campaignStatusFilter === "sent" ? "active" : ""
+                          campaignStatusFilter === "completed" ? "active" : ""
                         }`}
                         type="button"
-                        onClick={() => setCampaignStatusFilter("sent")}
+                        onClick={() => setCampaignStatusFilter("completed")}
                       >
                         <span>Enviadas</span>
                         <span className="campaigns-filter-count">
-                          {campaignStatusBuckets.sent}
+                          {campaignStatusBuckets.completed}
                         </span>
                       </button>
                       <button
@@ -2005,9 +2030,10 @@ function CampaignsView({
                         const sent = campaign.messages_count || campaign.audience_count || "--";
                         const reads = campaign.read_count || "--";
                         const replies = campaign.reply_count || "--";
-                        const statusLabel = STATUS_LABELS[campaign.status] || campaign.status;
-                        const isSending = campaign.status === "sending";
-                        const canResend = ["sent", "failed"].includes(campaign.status);
+                        const normalizedStatus = normalizeCampaignStatus(campaign.status);
+                        const statusLabel = STATUS_LABELS[normalizedStatus] || normalizedStatus;
+                        const isSending = ["running", "sending"].includes(normalizedStatus);
+                        const canResend = ["completed", "failed"].includes(normalizedStatus);
                         const canEdit = !isSending;
                         const canDelete = !isSending;
                         return (
@@ -2029,7 +2055,7 @@ function CampaignsView({
                             <div className="campaigns-metric">{sent}</div>
                             <div className="campaigns-metric">{reads}</div>
                             <div className="campaigns-metric">{replies}</div>
-                            <div className={`campaigns-status ${campaign.status}`}>
+                            <div className={`campaigns-status ${normalizedStatus}`}>
                               {statusLabel}
                             </div>
                             <div className="campaigns-row-actions">
@@ -2038,12 +2064,16 @@ function CampaignsView({
                                   className="campaigns-row-menu-btn"
                                   type="button"
                                   aria-label="Opciones"
-                                  onClick={() => toggleCampaignMenu(campaign.id)}
+                                  onClick={(event) => toggleCampaignMenu(campaign.id, event)}
                                 >
                                   ...
                                 </button>
                                 {openCampaignMenuId === campaign.id && (
-                                  <div className="campaigns-row-dropdown">
+                                  <div
+                                    className={`campaigns-row-dropdown ${
+                                      campaignMenuPlacement === "up" ? "drop-up" : ""
+                                    }`}
+                                  >
                                     {canEdit && (
                                       <button
                                         type="button"

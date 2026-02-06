@@ -24,11 +24,20 @@ router.use(requireAuth);
  */
 router.get("/campaigns", async (req, res) => {
     try {
-        const { status, limit, offset } = req.query;
+        const { status, limit, offset, q } = req.query;
 
         const where = {};
         if (status) {
             where.status = status;
+        }
+        if (q) {
+            const query = String(q).trim();
+            if (query) {
+                where.OR = [
+                    { name: { contains: query, mode: "insensitive" } },
+                    { template: { name: { contains: query, mode: "insensitive" } } },
+                ];
+            }
         }
 
         const campaigns = await prisma.campaign.findMany({
@@ -221,8 +230,8 @@ router.put("/campaigns/:id", requireRole(["admin", "marketing"]), async (req, re
             return res.status(404).json({ error: "Campaign not found" });
         }
 
-        if (existing.status !== "draft") {
-            return res.status(400).json({ error: "Only draft campaigns can be edited" });
+        if (existing.status === "running") {
+            return res.status(400).json({ error: "Running campaigns cannot be edited" });
         }
 
         const campaign = await prisma.campaign.update({
@@ -334,7 +343,7 @@ router.post("/campaigns/:id/resume", requireRole(["admin", "marketing"]), async 
  * DELETE /api/campaigns/:id
  * Delete a draft campaign
  */
-router.delete("/campaigns/:id", requireRole(["admin"]), async (req, res) => {
+router.delete("/campaigns/:id", requireRole(["admin", "marketing"]), async (req, res) => {
     try {
         const campaign = await prisma.campaign.findUnique({
             where: { id: req.params.id },
@@ -344,8 +353,8 @@ router.delete("/campaigns/:id", requireRole(["admin"]), async (req, res) => {
             return res.status(404).json({ error: "Campaign not found" });
         }
 
-        if (campaign.status !== "draft") {
-            return res.status(400).json({ error: "Only draft campaigns can be deleted" });
+        if (campaign.status === "running") {
+            return res.status(400).json({ error: "Running campaigns cannot be deleted" });
         }
 
         await prisma.campaign.delete({
@@ -355,6 +364,52 @@ router.delete("/campaigns/:id", requireRole(["admin"]), async (req, res) => {
         res.json({ deleted: true });
     } catch (error) {
         logger.error("Failed to delete campaign", { error: error.message });
+        res.status(400).json({ error: error.message });
+    }
+});
+
+/**
+ * POST /api/campaigns/:id/resend
+ * Clone and relaunch a completed/failed campaign
+ */
+router.post("/campaigns/:id/resend", requireRole(["admin", "marketing"]), async (req, res) => {
+    try {
+        const userId = req.user?.id || null;
+        const campaign = await prisma.campaign.findUnique({
+            where: { id: req.params.id },
+        });
+
+        if (!campaign) {
+            return res.status(404).json({ error: "Campaign not found" });
+        }
+
+        if (!campaign.segment_id) {
+            return res.status(400).json({ error: "Campaign must have an audience segment" });
+        }
+
+        const cloned = await prisma.campaign.create({
+            data: {
+                name: `${campaign.name} (Reenvío)`,
+                template_id: campaign.template_id,
+                segment_id: campaign.segment_id,
+                status: "draft",
+                created_by_user_id: userId,
+            },
+            include: {
+                template: {
+                    select: { id: true, name: true, status: true },
+                },
+                segment: {
+                    select: { id: true, name: true, estimated_count: true },
+                },
+            },
+        });
+
+        await enqueueCampaign(cloned.id);
+
+        res.json({ campaign: cloned, launched: true });
+    } catch (error) {
+        logger.error("Failed to resend campaign", { error: error.message });
         res.status(400).json({ error: error.message });
     }
 });

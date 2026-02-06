@@ -633,12 +633,13 @@
 }
 
 .audiences-table {
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  border: none;
+  border-radius: 0;
   overflow-x: auto;
   overflow-y: auto;
   max-height: 520px;
   min-width: 0;
+  background: transparent;
 }
 
 .audiences-table-head,
@@ -657,7 +658,7 @@
   font-size: 0.7rem;
   color: var(--muted);
   font-weight: 700;
-  background: var(--panel-muted);
+  background: transparent;
 }
 
 .audiences-table-row {
@@ -666,7 +667,7 @@
 }
 
 .audiences-table-row:hover {
-  background: var(--panel-muted);
+  background: rgba(15, 23, 42, 0.04);
 }
 
 .audiences-contact {
@@ -1017,10 +1018,10 @@
 }
 
 .campaigns-table {
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  border: none;
+  border-radius: 0;
   overflow: visible;
-  background: var(--panel);
+  background: transparent;
   width: 100%;
   min-width: 0;
 }
@@ -1049,7 +1050,7 @@
   font-size: 0.7rem;
   color: var(--muted);
   font-weight: 700;
-  background: var(--panel-muted);
+  background: transparent;
 }
 
 .campaigns-table-row {
@@ -1058,7 +1059,7 @@
 }
 
 .campaigns-table-row:hover {
-  background: var(--panel-muted);
+  background: rgba(15, 23, 42, 0.04);
 }
 
 .campaigns-table-title {
@@ -2426,8 +2427,7 @@ body[data-theme="dark"] .excel-card,
 body[data-theme="dark"] .excel-dropzone,
 body[data-theme="dark"] .excel-file-panel,
 body[data-theme="dark"] .excel-placeholder,
-body[data-theme="dark"] .odoo-summary,
-body[data-theme="dark"] .audiences-table {
+body[data-theme="dark"] .odoo-summary {
   background: #141414;
   border-color: #2a2a2a;
 }
@@ -2442,10 +2442,15 @@ body[data-theme="dark"] .preview-summary {
 }
 
 body[data-theme="dark"] .campaigns-search,
-body[data-theme="dark"] .campaigns-table,
 body[data-theme="dark"] .launch-template-search {
   background: #141414;
   border-color: #2a2a2a;
+}
+
+body[data-theme="dark"] .campaigns-table,
+body[data-theme="dark"] .audiences-table {
+  background: transparent;
+  border-color: transparent;
 }
 
 body[data-theme="dark"] .launch-template {

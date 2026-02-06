@@ -4,7 +4,7 @@ const { callAiProvider } = require("./aiProviders");
 
 const DEFAULT_MODELS = {
   openai: "gpt-4o-mini",
-  gemini: "gemini-1.5-flash",
+  gemini: "gemini-flash-latest",
 };
 
 const ROUTER_SCHEMA = {

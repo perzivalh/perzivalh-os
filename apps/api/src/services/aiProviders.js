@@ -83,9 +83,10 @@ async function callGemini({
 }) {
   const normalizedModel = String(model || "").replace(/^models\//, "").trim();
   const modelCandidates = [
-    normalizedModel || "gemini-1.5-flash",
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-latest",
+    normalizedModel || "gemini-flash-latest",
+    "gemini-flash-latest",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-001",
   ].filter(Boolean);
 
   const basePayload = {

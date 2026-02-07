@@ -530,6 +530,9 @@ async function resumeCampaign(campaignId) {
  * Handle message status update from webhook
  */
 async function handleMessageStatusUpdate(wamid, status, timestamp = null) {
+    if (!prisma?.campaignRecipient?.findFirst) {
+        return;
+    }
     // Find recipient by wamid
     const recipient = await prisma.campaignRecipient.findFirst({
         where: { wamid },

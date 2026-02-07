@@ -58,7 +58,7 @@ async function getActiveTenantFlow(tenantId) {
             is_active: true,
         },
         orderBy: {
-            created_at: "asc", // El más antiguo primero (flow principal)
+            updated_at: "desc", // El mas recientemente activado primero
         },
     });
 
@@ -122,9 +122,34 @@ async function getTenantBots(tenantId) {
 async function updateTenantBotStatus(tenantBotId, isActive) {
     const control = getControlClient();
 
+    if (!isActive) {
+        return control.tenantBot.update({
+            where: { id: tenantBotId },
+            data: { is_active: false },
+        });
+    }
+
+    const current = await control.tenantBot.findUnique({
+        where: { id: tenantBotId },
+        select: { id: true, tenant_id: true },
+    });
+
+    if (!current) {
+        return null;
+    }
+
+    await control.tenantBot.updateMany({
+        where: {
+            tenant_id: current.tenant_id,
+            is_active: true,
+            id: { not: current.id },
+        },
+        data: { is_active: false },
+    });
+
     return control.tenantBot.update({
         where: { id: tenantBotId },
-        data: { is_active: isActive },
+        data: { is_active: true },
     });
 }
 

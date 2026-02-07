@@ -114,7 +114,6 @@ async function callGemini({
       temperature,
       maxOutputTokens: maxTokens,
       responseMimeType: "application/json",
-      ...(schema ? { responseSchema: schema } : {}),
     },
   };
 
@@ -129,26 +128,6 @@ async function callGemini({
       });
       return extractGeminiText(response.data);
     } catch (error) {
-      const status = error?.response?.status;
-      if (schema && status === 400) {
-        const retryPayload = {
-          ...payload,
-          generationConfig: {
-            ...payload.generationConfig,
-            responseSchema: undefined,
-          },
-        };
-        try {
-          const response = await axios.post(url, retryPayload, {
-            headers: { "Content-Type": "application/json" },
-            timeout: 20000,
-          });
-          return extractGeminiText(response.data);
-        } catch (schemaError) {
-          lastError = schemaError;
-          continue;
-        }
-      }
       lastError = error;
     }
   }

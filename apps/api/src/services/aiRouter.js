@@ -411,16 +411,57 @@ async function routeWithAI({ text, flow, config, session }) {
       model,
       length: typeof raw === "string" ? raw.length : 0,
     });
-    const parsed = safeJsonParse(raw);
+    let parsed = safeJsonParse(raw);
     if (!parsed?.action) {
       logger.warn("ai.router_invalid", {
         provider,
         model,
         preview: typeof raw === "string" ? raw.slice(0, 160) : "",
       });
-      const fallbackRoute = fallbackRouteByKeywords(normalizedMessage, routes);
-      if (allowFallback && fallbackRoute) {
-        return { action: "route", route_id: fallbackRoute, ai_used: false };
+
+      // One retry with stricter instruction to return pure JSON.
+      const retrySystem = `${system}\n\nDevuelve SOLO un objeto JSON válido. No escribas texto adicional.`;
+      try {
+        const retryRaw = await callAiProvider(provider, {
+          apiKey,
+          model,
+          system: retrySystem,
+          user,
+          schema: ROUTER_SCHEMA,
+          temperature: 0,
+          maxTokens: 200,
+        });
+        logger.info("ai.router_retry_raw", {
+          provider,
+          model,
+          length: typeof retryRaw === "string" ? retryRaw.length : 0,
+        });
+        parsed = safeJsonParse(retryRaw);
+      } catch (retryError) {
+        logger.warn("ai.router_retry_failed", {
+          provider,
+          model,
+          message: retryError.message,
+        });
+      }
+    }
+
+    if (!parsed?.action) {
+      if (allowFallback) {
+        const fallbackRoute = fallbackRouteByKeywords(normalizedMessage, routes);
+        if (fallbackRoute) {
+          return { action: "route", route_id: fallbackRoute, ai_used: false };
+        }
+        return { action: "menu", ai_used: false };
+      }
+      // As a last resort, ask a short clarification once.
+      if (allowClarify) {
+        return {
+          action: "clarify",
+          question:
+            "¿Qué servicio te interesa? Puedo ayudarte con uñeros, hongos, pedicure, horarios o precios.",
+          ai_used: false,
+        };
       }
       return null;
     }

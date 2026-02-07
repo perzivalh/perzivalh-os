@@ -2,7 +2,7 @@ const axios = require("axios");
 
 const OPENAI_ENDPOINT = "https://api.openai.com/v1/responses";
 const GEMINI_ENDPOINT =
-  "https://generativelanguage.googleapis.com/v1/models";
+  "https://generativelanguage.googleapis.com/v1beta/models";
 
 function extractOpenAIText(data) {
   if (!data) {
@@ -92,13 +92,24 @@ async function callGemini({
   temperature = 0,
   maxTokens = 220,
 }) {
-  const normalizedModel = String(model || "").replace(/^models\//, "").trim();
+  // EXTENSIVE LOGGING FOR DEBUGGING
+  console.log("=".repeat(60));
+  console.log("[GEMINI DEBUG] Starting Gemini call");
+  console.log("[GEMINI DEBUG] API Key prefix:", apiKey ? apiKey.substring(0, 10) + "..." : "MISSING");
+  console.log("[GEMINI DEBUG] API Key length:", apiKey ? apiKey.length : 0);
+  console.log("[GEMINI DEBUG] Requested model from config:", model);
+  console.log("[GEMINI DEBUG] System prompt length:", system?.length || 0);
+  console.log("[GEMINI DEBUG] User prompt length:", user?.length || 0);
+  console.log("[GEMINI DEBUG] Endpoint:", GEMINI_ENDPOINT);
+
+  // Models to try - these should work with v1beta
   const modelCandidates = [
-    normalizedModel || "gemini-1.5-flash-latest",
-    "gemini-1.5-flash-latest",
-    "gemini-1.5-pro-latest",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
     "gemini-pro",
-  ].filter(Boolean);
+  ];
+
+  console.log("[GEMINI DEBUG] Model candidates:", modelCandidates);
 
   const basePayload = {
     system_instruction: {
@@ -117,25 +128,54 @@ async function callGemini({
     },
   };
 
+  console.log("[GEMINI DEBUG] Payload structure:", JSON.stringify({
+    system_instruction: { parts: [{ text: "..." }] },
+    contents: [{ role: "user", parts: [{ text: "..." }] }],
+    generationConfig: basePayload.generationConfig,
+  }, null, 2));
+
   let lastError = null;
   for (const candidate of modelCandidates) {
     const url = `${GEMINI_ENDPOINT}/${candidate}:generateContent?key=${apiKey}`;
-    const payload = basePayload;
+    const urlForLog = `${GEMINI_ENDPOINT}/${candidate}:generateContent?key=***`;
+
+    console.log("[GEMINI DEBUG] Trying model:", candidate);
+    console.log("[GEMINI DEBUG] Full URL (masked):", urlForLog);
+
     try {
-      console.log(`[AI] Gemini request: model=${candidate}`);
-      const response = await axios.post(url, payload, {
+      const response = await axios.post(url, basePayload, {
         headers: { "Content-Type": "application/json" },
         timeout: 20000,
       });
+
+      console.log("[GEMINI DEBUG] SUCCESS! Status:", response.status);
+      console.log("[GEMINI DEBUG] Response headers:", JSON.stringify(response.headers, null, 2));
+      console.log("[GEMINI DEBUG] Response data keys:", Object.keys(response.data || {}));
+      console.log("[GEMINI DEBUG] Candidates count:", response.data?.candidates?.length || 0);
+
       const resultText = extractGeminiText(response.data);
-      console.log(`[AI] Gemini response: status=${response.status}, length=${resultText.length}`);
+      console.log("[GEMINI DEBUG] Extracted text length:", resultText.length);
+      console.log("[GEMINI DEBUG] Extracted text preview:", resultText.substring(0, 200));
+      console.log("=".repeat(60));
+
       return resultText;
     } catch (error) {
       const status = error?.response?.status;
-      console.warn(`[AI] Gemini model ${candidate} failed: status=${status || "N/A"}`);
+      const errorData = error?.response?.data;
+      const errorMessage = error?.message;
+
+      console.error("[GEMINI DEBUG] FAILED for model:", candidate);
+      console.error("[GEMINI DEBUG] Error status:", status || "N/A");
+      console.error("[GEMINI DEBUG] Error message:", errorMessage);
+      console.error("[GEMINI DEBUG] Error response data:", JSON.stringify(errorData, null, 2));
+      console.error("[GEMINI DEBUG] Error code:", error?.code);
+
       lastError = error;
     }
   }
+
+  console.error("[GEMINI DEBUG] ALL MODELS FAILED!");
+  console.error("=".repeat(60));
 
   const status = lastError?.response?.status;
   const detail = lastError?.response?.data
@@ -148,6 +188,10 @@ async function callGemini({
 }
 
 async function callAiProvider(provider, options) {
+  console.log("[AI PROVIDER] Called with provider:", provider);
+  console.log("[AI PROVIDER] Options model:", options.model);
+  console.log("[AI PROVIDER] Has API key:", !!options.apiKey);
+
   if (provider === "gemini") {
     return callGemini(options);
   }

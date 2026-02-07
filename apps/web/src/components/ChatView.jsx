@@ -77,6 +77,7 @@ function ChatView({
           : ""),
     ])
   );
+  const userMap = new Map((users || []).map((item) => [item.id, item]));
   const isAssignedToOther =
     activeConversation?.assigned_user_id &&
     activeConversation.assigned_user_id !== currentUser?.id;
@@ -241,9 +242,11 @@ function ChatView({
                 0
             );
             const topTag = conversation.tags?.[0]?.name || "";
-            const assignedLabel = conversation.assigned_user?.name
-              ? `Tomada por ${conversation.assigned_user.name}`
-              : "";
+            const assignedName =
+              conversation.assigned_user?.name ||
+              userMap.get(conversation.assigned_user_id || "")?.name ||
+              "";
+            const assignedLabel = assignedName ? `Tomada por ${assignedName}` : "";
             const lineLabel = conversation.phone_number_id
               ? channelMap.get(conversation.phone_number_id) ||
                 `Linea ${String(conversation.phone_number_id).slice(-4)}`

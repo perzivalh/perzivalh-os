@@ -449,31 +449,25 @@ router.patch("/conversations/:id/assign", requireAuth, async (req, res) => {
             return res.status(409).json({ error: "already_assigned" });
         }
 
-        const conversation = await prisma.conversation.update({
-            where: { id: req.params.id },
-            data: {
-                assigned_user_id: userId || req.user.id,
-                status: "assigned",
-            },
-            select: CONVERSATION_SELECT,
+        const conversation = await assignConversation({
+            conversationId: req.params.id,
+            userId: userId || req.user.id,
         });
 
-        await removeTagFromConversation({
+        let nextConversation = conversation;
+        nextConversation = await removeTagFromConversation({
             conversationId: req.params.id,
             tagName: "pendiente_atencion",
             userId: req.user.id,
         });
-
-        await logAudit({
+        // Backward compatibility: some tenants still use "pendiente".
+        nextConversation = await removeTagFromConversation({
+            conversationId: req.params.id,
+            tagName: "pendiente",
             userId: req.user.id,
-            action: "conversation.assigned",
-            data: {
-                conversation_id: req.params.id,
-                to: userId || req.user.id,
-            },
         });
 
-        return res.json({ conversation: formatConversation(conversation) });
+        return res.json({ conversation: formatConversation(nextConversation) });
     } catch (error) {
         return res.status(404).json({ error: "not_found" });
     }

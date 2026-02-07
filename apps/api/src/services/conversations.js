@@ -206,7 +206,7 @@ async function setConversationStatus({ conversationId, status, userId }) {
 async function assignConversation({ conversationId, userId }) {
   const current = await prisma.conversation.findUnique({
     where: { id: conversationId },
-    select: { assigned_user_id: true },
+    select: { assigned_user_id: true, status: true },
   });
   if (!current) {
     throw new Error("conversation_not_found");
@@ -214,11 +214,14 @@ async function assignConversation({ conversationId, userId }) {
 
   const updated = await prisma.conversation.update({
     where: { id: conversationId },
-    data: { assigned_user_id: userId },
+    data: {
+      assigned_user_id: userId,
+      status: "assigned",
+    },
     select: CONVERSATION_SELECT,
   });
 
-  if (current.assigned_user_id !== userId) {
+  if (current.assigned_user_id !== userId || current.status !== "assigned") {
     await logAudit({
       userId,
       action: "conversation.assigned",

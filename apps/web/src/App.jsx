@@ -873,6 +873,13 @@ function App() {
         try {
           const assigned = await apiPatch(`/api/conversations/${conversationId}/assign`, {});
           conversation = assigned.conversation;
+          setConversations((prev) =>
+            sortConversations(
+              prev.map((item) =>
+                item.id === conversationId ? { ...item, ...conversation } : item
+              )
+            )
+          );
         } catch (error) {
           if (String(normalizeError(error)).includes("already_assigned")) {
             pushToast({ type: "error", message: "Conversación tomada por otro operador" });
@@ -1183,6 +1190,15 @@ function App() {
     try {
       const data = await apiPatch(`/api/conversations/${activeConversation.id}/assign`);
       setActiveConversation(data.conversation);
+      setConversations((prev) =>
+        sortConversations(
+          prev.map((item) =>
+            item.id === data.conversation.id
+              ? { ...item, ...data.conversation }
+              : item
+          )
+        )
+      );
     } catch (error) {
       const message = normalizeError(error) || "No se pudo tomar la conversacion";
       pushToast({ type: "error", message });
@@ -1198,6 +1214,15 @@ function App() {
         user_id: reassignUserId,
       });
       setActiveConversation(data.conversation);
+      setConversations((prev) =>
+        sortConversations(
+          prev.map((item) =>
+            item.id === data.conversation.id
+              ? { ...item, ...data.conversation }
+              : item
+          )
+        )
+      );
       setReassignUserId("");
       pushToast({ message: "Conversación reasignada" });
     } catch (error) {

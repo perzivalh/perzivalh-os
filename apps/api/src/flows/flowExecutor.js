@@ -238,7 +238,11 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
 
   const lineId = getCurrentLineId();
   await sessionStore.updateSession(waId, lineId, {
-    data: { flow_id: flow.id, last_user_at: new Date().toISOString() },
+    data: {
+      flow_id: flow.id,
+      last_user_at: new Date().toISOString(),
+      ai_pending: null,
+    },
     flow_id: flow.id,
   });
 
@@ -251,6 +255,9 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
     }
 
     if (isMenuTrigger(normalized)) {
+      await sessionStore.updateSession(waId, lineId, {
+        data: { ai_pending: null },
+      });
       await sendNode(waId, flow, nodeMap.get(startNodeId), new Set([startNodeId]));
       return;
     }
@@ -283,6 +290,25 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
         const aiTurns = Number(session.data?.ai_turns || 0);
         await sessionStore.updateSession(waId, lineId, {
           data: { ai_turns: aiTurns + 1 },
+        });
+      }
+
+      if (aiDecision.action === "clarify" && aiDecision.question) {
+        await sendText(waId, aiDecision.question);
+        await sessionStore.updateSession(waId, lineId, {
+          data: {
+            ai_pending: {
+              question: aiDecision.question,
+              asked_at: new Date().toISOString(),
+            },
+          },
+        });
+        return;
+      }
+
+      if (session.data?.ai_pending) {
+        await sessionStore.updateSession(waId, lineId, {
+          data: { ai_pending: null },
         });
       }
 
@@ -333,7 +359,11 @@ async function executeDynamicInteractive(waId, selectionId, flowData, context = 
 
   const lineId = getCurrentLineId();
   await sessionStore.updateSession(waId, lineId, {
-    data: { flow_id: flow.id, last_user_at: new Date().toISOString() },
+    data: {
+      flow_id: flow.id,
+      last_user_at: new Date().toISOString(),
+      ai_pending: null,
+    },
     flow_id: flow.id,
   });
 

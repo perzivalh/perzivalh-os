@@ -13,9 +13,10 @@ const ROUTER_SCHEMA = {
   properties: {
     action: {
       type: "string",
-      enum: ["route", "menu", "services", "handoff"],
+      enum: ["route", "menu", "services", "handoff", "clarify"],
     },
     route_id: { type: "string" },
+    question: { type: "string" },
   },
   required: ["action"],
 };
@@ -39,8 +40,90 @@ const SYMPTOM_KEYWORDS = [
   "úlcera",
 ];
 
+const ROUTE_STOP_WORDS = new Set([
+  "info",
+  "informacion",
+  "servicio",
+  "servicios",
+  "tratamiento",
+  "tratamientos",
+  "tipo",
+  "menu",
+  "volver",
+  "necesito",
+  "quiero",
+  "saber",
+  "mas",
+  "porfa",
+  "porfavor",
+  "hola",
+  "ayuda",
+  "ayudame",
+  "puedo",
+  "podria",
+  "podrias",
+  "donde",
+  "cuando",
+  "costo",
+  "precio",
+  "precios",
+  "horario",
+  "horarios",
+  "ubicacion",
+  "ubicaciones",
+  "central",
+  "sucursal",
+]);
+
+
 function normalizeLabel(value) {
   return normalizeText(value || "").replace(/\s+/g, " ").trim();
+}
+
+function routeByRules(normalizedMessage, routes) {
+  if (!normalizedMessage || !routes?.length) {
+    return null;
+  }
+  let best = null;
+
+  for (const route of routes) {
+    const labels = Array.isArray(route.labels) ? route.labels : [];
+    for (const label of labels) {
+      const normalizedLabel = normalizeLabel(label);
+      if (normalizedLabel && normalizedMessage.includes(normalizedLabel)) {
+        return route.id;
+      }
+    }
+
+    const tokens = new Set();
+    labels.forEach((label) => {
+      normalizeLabel(label)
+        .split(" ")
+        .filter(Boolean)
+        .forEach((token) => tokens.add(token));
+    });
+    (route.keywords || []).forEach((keyword) => {
+      normalizeLabel(keyword)
+        .split(" ")
+        .filter(Boolean)
+        .forEach((token) => tokens.add(token));
+    });
+
+    let score = 0;
+    tokens.forEach((token) => {
+      if (token.length < 4) return;
+      if (ROUTE_STOP_WORDS.has(token)) return;
+      if (normalizedMessage.includes(token)) {
+        score += 1;
+      }
+    });
+
+    if (score > 0 && (!best || score > best.score)) {
+      best = { id: route.id, score };
+    }
+  }
+
+  return best?.id || null;
 }
 
 function buildNodeMap(flow) {
@@ -118,18 +201,20 @@ function buildSystemPrompt() {
     "Reglas:",
     "- Si el mensaje describe sintomas, dolor o dudas medicas complejas: action=handoff.",
     "- Si el mensaje esta fuera de tema: action=menu.",
+    "- Si hay ambiguedad y necesitas una sola aclaracion corta: action=clarify con question.",
     "- Si no se identifica el servicio: action=services.",
     "- Si se identifica un servicio o tema del flujo: action=route con route_id valido.",
   ].join("\n");
 }
 
-function buildUserPrompt({ message, routes, menuId, servicesId, handoffId }) {
+function buildUserPrompt({ message, routes, menuId, servicesId, handoffId, previousQuestion }) {
   return JSON.stringify(
     {
       message,
       menu_id: menuId,
       services_id: servicesId,
       handoff_id: handoffId,
+      previous_question: previousQuestion || null,
       routes,
     },
     null,
@@ -259,8 +344,19 @@ async function routeWithAI({ text, flow, config, session }) {
   }
 
   const normalizedMessage = normalizeLabel(text);
+  const pendingQuestion = session?.data?.ai_pending?.question || null;
+  const allowClarify = !pendingQuestion;
   if (containsSymptom(normalizedMessage)) {
     return { action: "handoff", ai_used: false };
+  }
+
+  const ruleRoute = routeByRules(normalizedMessage, routes);
+  if (ruleRoute) {
+    logger.info("ai.router_rule_match", {
+      route_id: ruleRoute,
+      flowId: flow?.id,
+    });
+    return { action: "route", route_id: ruleRoute, ai_used: false, clear_pending: Boolean(pendingQuestion) };
   }
 
   if (!apiKey) {
@@ -290,6 +386,7 @@ async function routeWithAI({ text, flow, config, session }) {
     menuId,
     servicesId,
     handoffId,
+    previousQuestion: pendingQuestion,
   });
 
   const model = aiConfig.model || DEFAULT_MODELS[provider] || "gpt-4o-mini";
@@ -327,13 +424,30 @@ async function routeWithAI({ text, flow, config, session }) {
       }
       return null;
     }
+
+    if (parsed.action === "clarify") {
+      if (!allowClarify) {
+        return null;
+      }
+      const question = String(parsed.question || "").trim();
+      if (!question) {
+        return null;
+      }
+      logger.info("ai.router_decision", {
+        provider,
+        model,
+        action: parsed.action,
+      });
+      return { action: "clarify", question: question.slice(0, 280), ai_used: true };
+    }
+
     logger.info("ai.router_decision", {
       provider,
       model,
       action: parsed.action,
       route_id: parsed.route_id || null,
     });
-    return { ...parsed, ai_used: true };
+    return { ...parsed, ai_used: true, clear_pending: Boolean(pendingQuestion) };
   } catch (error) {
     logger.error("ai.router_failed", {
       message: error.message,

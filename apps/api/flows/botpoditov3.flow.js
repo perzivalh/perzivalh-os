@@ -13,10 +13,11 @@ module.exports = {
   ai: {
     enabled: true,
     mode: "router",
-    max_turns: 2,
+    max_turns: 3,
     allow_fallback: false,
     handoff_node_id: "AI_HANDOFF_OFFER",
     services_node_id: "SERVICIOS_MENU",
+    out_of_scope_node_id: "OUT_OF_SCOPE",
   },
 
   flow_name: "flujogramaV3",
@@ -41,6 +42,13 @@ module.exports = {
         { label: "🧼 Servicios", next: "SERVICIOS_MENU" },
         { label: "👨‍💻 Atención personal", next: "CONTACT_METHOD" },
       ],
+    },
+    {
+      id: "OUT_OF_SCOPE",
+      type: "text",
+      text: "En PODOPIE nos especializamos en salud podológica 🦶 (solo pies). Te muestro los servicios que SÍ tenemos:",
+      delayMs: 1000,
+      next: "SERVICIOS_MENU",
     },
     {
       id: "AI_HANDOFF_OFFER",

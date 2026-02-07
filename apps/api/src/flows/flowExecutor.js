@@ -285,6 +285,7 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
       const menuId = getStartNodeId(flow);
       const servicesId = flow.ai?.services_node_id || "SERVICIOS_MENU";
       const handoffId = flow.ai?.handoff_node_id || "AI_HANDOFF_OFFER";
+      const outOfScopeId = flow.ai?.out_of_scope_node_id || "OUT_OF_SCOPE";
 
       if (aiDecision.ai_used) {
         const aiTurns = Number(session.data?.ai_turns || 0);
@@ -293,14 +294,39 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
         });
       }
 
+      // Anti-repetition: Check if we'd be sending the same message
+      const lastSentText = session.data?.last_sent_text || "";
+      const replyText = aiDecision.reply_text?.trim() || "";
+
+      // Helper to send reply text if not repeated
+      async function sendReplyIfNotRepeated(text) {
+        if (text && text !== lastSentText) {
+          await sendText(waId, text);
+          await sessionStore.updateSession(waId, lineId, {
+            data: { last_sent_text: text },
+          });
+          return true;
+        }
+        return false;
+      }
+
       if (aiDecision.action === "clarify" && aiDecision.question) {
-        await sendText(waId, aiDecision.question);
+        // Anti-repetition: Don't send same clarification twice
+        if (aiDecision.question === lastSentText) {
+          // Already asked this, go to services instead
+          if (nodeMap.has(servicesId)) {
+            await sendNode(waId, flow, nodeMap.get(servicesId), new Set([servicesId]));
+            return;
+          }
+        }
+        await sendReplyIfNotRepeated(aiDecision.question);
         await sessionStore.updateSession(waId, lineId, {
           data: {
             ai_pending: {
               question: aiDecision.question,
               asked_at: new Date().toISOString(),
             },
+            last_sent_text: aiDecision.question,
           },
         });
         return;
@@ -312,12 +338,27 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
         });
       }
 
+      // Send the conversational reply_text first (if exists and not repeated)
+      if (replyText && replyText !== lastSentText) {
+        await sendText(waId, replyText);
+        await sessionStore.updateSession(waId, lineId, {
+          data: { last_sent_text: replyText },
+        });
+        // Small delay to make it feel conversational
+        await sleep(800);
+      }
+
       if (aiDecision.action === "route" && aiDecision.route_id) {
         const target = nodeMap.get(aiDecision.route_id);
         if (target) {
           await sendNode(waId, flow, target, new Set([aiDecision.route_id]));
           return;
         }
+      }
+
+      if (aiDecision.action === "out_of_scope" && nodeMap.has(outOfScopeId)) {
+        await sendNode(waId, flow, nodeMap.get(outOfScopeId), new Set([outOfScopeId]));
+        return;
       }
 
       if (aiDecision.action === "services" && nodeMap.has(servicesId)) {

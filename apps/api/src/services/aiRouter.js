@@ -75,6 +75,116 @@ const ROUTE_STOP_WORDS = new Set([
   "sucursal",
 ]);
 
+/**
+ * Direct keyword to node mapping for fast rule-based routing
+ * Keys are normalized (lowercase, no accents). Values are node IDs.
+ */
+const SERVICE_KEYWORDS = {
+  // Uñero keywords
+  unero: "UNERO_TIPO_TRAT",
+  uñero: "UNERO_TIPO_TRAT",
+  una: "UNERO_TIPO_TRAT",
+  unas: "UNERO_TIPO_TRAT",
+  uña: "UNERO_TIPO_TRAT",
+  uñas: "UNERO_TIPO_TRAT",
+  encarnada: "UNERO_TIPO_TRAT",
+  encarnado: "UNERO_TIPO_TRAT",
+  matricectomia: "TRAT_MATRICECTOMIA_INFO",
+  ortesis: "TRAT_ORTESIS_INFO",
+
+  // Hongos keywords
+  hongo: "HONGOS_TIPO_TRAT",
+  hongos: "HONGOS_TIPO_TRAT",
+  onicomicosis: "HONGOS_TIPO_TRAT",
+  laser: "TRAT_Láser_INFO",
+  topico: "TRAT_Tópico_INFO",
+  sistemico: "TRAT_Sistémico_INFO",
+
+  // Pedicure keywords
+  pedicure: "SVC_PEDICURE_INFO",
+  pedicura: "SVC_PEDICURE_INFO",
+  "pedicure clinico": "SVC_PEDICURE_INFO",
+  "pedicura clinica": "SVC_PEDICURE_INFO",
+
+  // Podopediatría
+  podopediatria: "SVC_PODOPEDIATRIA_INFO",
+  pediatria: "SVC_PODOPEDIATRIA_INFO",
+  nino: "SVC_PODOPEDIATRIA_INFO",
+  ninos: "SVC_PODOPEDIATRIA_INFO",
+  niño: "SVC_PODOPEDIATRIA_INFO",
+  niños: "SVC_PODOPEDIATRIA_INFO",
+  bebe: "SVC_PODOPEDIATRIA_INFO",
+
+  // Podogeriatría
+  podogeriatria: "SVC_PODOGERIATRIA_INFO",
+  geriatria: "SVC_PODOGERIATRIA_INFO",
+  adulto: "SVC_PODOGERIATRIA_INFO",
+  "adulto mayor": "SVC_PODOGERIATRIA_INFO",
+  abuelo: "SVC_PODOGERIATRIA_INFO",
+  abuela: "SVC_PODOGERIATRIA_INFO",
+  tercera: "SVC_PODOGERIATRIA_INFO",
+
+  // Otros servicios
+  callosidad: "OTR_CALLOSIDAD_INFO",
+  callo: "OTR_CALLOSIDAD_INFO",
+  callos: "OTR_CALLOSIDAD_INFO",
+  verruga: "OTR_VERRUGA_PLANTAR_INFO",
+  verrugas: "OTR_VERRUGA_PLANTAR_INFO",
+  plantar: "OTR_VERRUGA_PLANTAR_INFO",
+  heloma: "OTR_HELOMA_INFO",
+  helomas: "OTR_HELOMA_INFO",
+  extraccion: "OTR_EXTRACCION_UNA_INFO",
+  "pie de atleta": "OTR_PIE_ATLETA_INFO",
+  "pie atleta": "OTR_PIE_ATLETA_INFO",
+  atleta: "OTR_PIE_ATLETA_INFO",
+  diabetico: "OTR_PIE_DIABETICO_INFO",
+  diabética: "OTR_PIE_DIABETICO_INFO",
+  diabetes: "OTR_PIE_DIABETICO_INFO",
+  "pie diabetico": "OTR_PIE_DIABETICO_INFO",
+
+  // Info general
+  horario: "HORARIOS_INFO",
+  horarios: "HORARIOS_INFO",
+  ubicacion: "HORARIOS_INFO",
+  direccion: "HORARIOS_INFO",
+  donde: "HORARIOS_INFO",
+  precio: "PRECIOS_INFO",
+  precios: "PRECIOS_INFO",
+  costo: "PRECIOS_INFO",
+  costos: "PRECIOS_INFO",
+  cuanto: "PRECIOS_INFO",
+  tarifa: "PRECIOS_INFO",
+};
+
+/**
+ * Route by direct service keyword match
+ * Returns node ID if a keyword matches, null otherwise
+ */
+function routeByServiceKeywords(normalizedMessage) {
+  if (!normalizedMessage) {
+    return null;
+  }
+
+  // Check multi-word phrases first (longer matches take priority)
+  const phrases = Object.keys(SERVICE_KEYWORDS).filter(k => k.includes(" "));
+  for (const phrase of phrases) {
+    if (normalizedMessage.includes(phrase)) {
+      return SERVICE_KEYWORDS[phrase];
+    }
+  }
+
+  // Check single words
+  const words = normalizedMessage.split(/\s+/).filter(Boolean);
+  for (const word of words) {
+    if (SERVICE_KEYWORDS[word]) {
+      return SERVICE_KEYWORDS[word];
+    }
+  }
+
+  return null;
+}
+
+
 
 function normalizeLabel(value) {
   return normalizeText(value || "").replace(/\s+/g, " ").trim();
@@ -350,6 +460,16 @@ async function routeWithAI({ text, flow, config, session }) {
     return { action: "handoff", ai_used: false };
   }
 
+  // First try direct service keyword match (fastest path)
+  const keywordRoute = routeByServiceKeywords(normalizedMessage);
+  if (keywordRoute) {
+    logger.info("ai.router_keyword_match", {
+      route_id: keywordRoute,
+      flowId: flow?.id,
+    });
+    return { action: "route", route_id: keywordRoute, ai_used: false, clear_pending: Boolean(pendingQuestion) };
+  }
+
   const ruleRoute = routeByRules(normalizedMessage, routes);
   if (ruleRoute) {
     logger.info("ai.router_rule_match", {
@@ -463,16 +583,17 @@ async function routeWithAI({ text, flow, config, session }) {
           ai_used: false,
         };
       }
-      return null;
+      return { action: "services", ai_used: false };
     }
 
     if (parsed.action === "clarify") {
       if (!allowClarify) {
-        return null;
+        // Already asked a clarification, go to services menu instead
+        return { action: "services", ai_used: false };
       }
       const question = String(parsed.question || "").trim();
       if (!question) {
-        return null;
+        return { action: "services", ai_used: false };
       }
       logger.info("ai.router_decision", {
         provider,
@@ -501,7 +622,8 @@ async function routeWithAI({ text, flow, config, session }) {
         return { action: "route", route_id: fallbackRoute, ai_used: false };
       }
     }
-    return null;
+    // Always return something - go to services menu as last resort
+    return { action: "services", ai_used: false };
   }
 }
 

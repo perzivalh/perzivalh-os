@@ -521,7 +521,6 @@ async function resumeCampaign(campaignId) {
         where: { id: campaignId },
         data: { status: "scheduled" },
     });
-
     logger.info("Campaign resumed", { campaignId });
     return { resumed: true };
 }
@@ -530,55 +529,77 @@ async function resumeCampaign(campaignId) {
  * Handle message status update from webhook
  */
 async function handleMessageStatusUpdate(wamid, status, timestamp = null) {
-    if (!prisma?.campaignRecipient?.findFirst) {
+    // Comprehensive guard clauses to prevent any null pointer errors
+    if (!wamid || !status) {
         return;
     }
-    // Find recipient by wamid
-    const recipient = await prisma.campaignRecipient.findFirst({
-        where: { wamid },
-    });
 
-    if (!recipient) {
-        return; // Not a campaign message
+    // Check if prisma and required models are available
+    if (!prisma) {
+        logger.warn("campaign.status_update_skipped", { reason: "prisma_undefined" });
+        return;
     }
 
-    const updateData = {};
-
-    switch (status) {
-        case "delivered":
-            if (!recipient.delivered_at) {
-                updateData.status = "delivered";
-                updateData.delivered_at = timestamp ? new Date(timestamp * 1000) : new Date();
-            }
-            break;
-        case "read":
-            updateData.status = "read";
-            updateData.read_at = timestamp ? new Date(timestamp * 1000) : new Date();
-            break;
-        case "failed":
-            updateData.status = "failed";
-            updateData.failed_at = new Date();
-            break;
+    if (!prisma.campaignRecipient || typeof prisma.campaignRecipient.findFirst !== "function") {
+        // Silently skip - this tenant may not have campaign tables
+        return;
     }
 
-    if (Object.keys(updateData).length > 0) {
-        await prisma.campaignRecipient.update({
-            where: { id: recipient.id },
-            data: updateData,
+    try {
+        // Find recipient by wamid
+        const recipient = await prisma.campaignRecipient.findFirst({
+            where: { wamid },
         });
 
-        // Update campaign counts
-        if (status === "delivered") {
-            await prisma.campaign.update({
-                where: { id: recipient.campaign_id },
-                data: { delivered_count: { increment: 1 } },
-            });
-        } else if (status === "read") {
-            await prisma.campaign.update({
-                where: { id: recipient.campaign_id },
-                data: { read_count: { increment: 1 } },
-            });
+        if (!recipient) {
+            return; // Not a campaign message
         }
+
+        const updateData = {};
+
+        switch (status) {
+            case "delivered":
+                if (!recipient.delivered_at) {
+                    updateData.status = "delivered";
+                    updateData.delivered_at = timestamp ? new Date(timestamp * 1000) : new Date();
+                }
+                break;
+            case "read":
+                updateData.status = "read";
+                updateData.read_at = timestamp ? new Date(timestamp * 1000) : new Date();
+                break;
+            case "failed":
+                updateData.status = "failed";
+                updateData.failed_at = new Date();
+                break;
+        }
+
+        if (Object.keys(updateData).length > 0) {
+            await prisma.campaignRecipient.update({
+                where: { id: recipient.id },
+                data: updateData,
+            });
+
+            // Update campaign counts
+            if (status === "delivered" && prisma.campaign) {
+                await prisma.campaign.update({
+                    where: { id: recipient.campaign_id },
+                    data: { delivered_count: { increment: 1 } },
+                });
+            } else if (status === "read" && prisma.campaign) {
+                await prisma.campaign.update({
+                    where: { id: recipient.campaign_id },
+                    data: { read_count: { increment: 1 } },
+                });
+            }
+        }
+    } catch (error) {
+        // Log warning but don't throw - status updates should never break main flow
+        logger.warn("campaign.status_update_error", {
+            wamid,
+            status,
+            error: error.message,
+        });
     }
 }
 

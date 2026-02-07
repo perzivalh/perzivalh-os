@@ -60,13 +60,13 @@ async function callOpenAI({
     ],
     text: schema
       ? {
-          format: {
-            type: "json_schema",
-            name: "ai_router",
-            schema,
-            strict: true,
-          },
-        }
+        format: {
+          type: "json_schema",
+          name: "ai_router",
+          schema,
+          strict: true,
+        },
+      }
       : undefined,
     temperature,
     max_output_tokens: maxTokens,
@@ -94,10 +94,10 @@ async function callGemini({
 }) {
   const normalizedModel = String(model || "").replace(/^models\//, "").trim();
   const modelCandidates = [
-    normalizedModel || "gemini-flash-latest",
-    "gemini-flash-latest",
+    normalizedModel || "gemini-2.0-flash",
     "gemini-2.0-flash",
-    "gemini-2.0-flash-001",
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-latest",
   ].filter(Boolean);
 
   const basePayload = {
@@ -122,12 +122,17 @@ async function callGemini({
     const url = `${GEMINI_ENDPOINT}/${candidate}:generateContent?key=${apiKey}`;
     const payload = basePayload;
     try {
+      console.log(`[AI] Gemini request: model=${candidate}`);
       const response = await axios.post(url, payload, {
         headers: { "Content-Type": "application/json" },
         timeout: 20000,
       });
-      return extractGeminiText(response.data);
+      const resultText = extractGeminiText(response.data);
+      console.log(`[AI] Gemini response: status=${response.status}, length=${resultText.length}`);
+      return resultText;
     } catch (error) {
+      const status = error?.response?.status;
+      console.warn(`[AI] Gemini model ${candidate} failed: status=${status || "N/A"}`);
       lastError = error;
     }
   }
@@ -137,8 +142,7 @@ async function callGemini({
     ? JSON.stringify(lastError.response.data).slice(0, 500)
     : "";
   throw new Error(
-    `Gemini request failed${status ? ` (${status})` : ""}${
-      detail ? `: ${detail}` : ""
+    `Gemini request failed${status ? ` (${status})` : ""}${detail ? `: ${detail}` : ""
     }`
   );
 }

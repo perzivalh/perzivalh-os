@@ -127,9 +127,9 @@ async function sendNode(waId, flow, node, visited) {
     data: { flow_id: flow.id },
     ...(isBotpoditoV2
       ? {
-          inactivity_notice_at: null,
-          next_due_at: new Date(Date.now() + FIRST_NOTICE_MS),
-        }
+        inactivity_notice_at: null,
+        next_due_at: new Date(Date.now() + FIRST_NOTICE_MS),
+      }
       : {}),
   });
 
@@ -336,6 +336,18 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
       }
     }
 
+    // Fallback: if currentNode is WELCOME or has no buttons, go to SERVICIOS_MENU instead
+    // This prevents the loop of re-sending welcome/menu on every unmatched message
+    const isWelcomeNode = currentNodeId === "WELCOME" || currentNodeId === startNodeId;
+    const hasNoButtons = !currentNode.buttons || currentNode.buttons.length === 0;
+    const servicesId = flow.ai?.services_node_id || "SERVICIOS_MENU";
+
+    if ((isWelcomeNode || hasNoButtons) && nodeMap.has(servicesId)) {
+      await sendNode(waId, flow, nodeMap.get(servicesId), new Set([servicesId]));
+      return;
+    }
+
+    // Only resend current node if it has buttons (interactive context)
     await sendNode(waId, flow, currentNode, new Set([currentNodeId]));
     return;
   }

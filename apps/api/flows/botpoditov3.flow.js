@@ -27,7 +27,7 @@ module.exports = {
     {
       id: "WELCOME",
       type: "text",
-      text: "¡Hola, {nombre de la persona}! 👋",
+      text: "¡Hola! 👋 Bienvenido a PODOPIE.",
       next: "MAIN_MENU",
     },
     {

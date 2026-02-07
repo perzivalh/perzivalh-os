@@ -296,7 +296,7 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
 
       // Anti-repetition: Check if we'd be sending the same message
       const lastSentText = session.data?.last_sent_text || "";
-      const replyText = aiDecision.reply_text?.trim() || "";
+      const aiText = aiDecision.text?.trim() || aiDecision.reply_text?.trim() || "";
 
       // Helper to send reply text if not repeated
       async function sendReplyIfNotRepeated(text) {
@@ -338,11 +338,22 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
         });
       }
 
-      // Send the conversational reply_text first (if exists and not repeated)
-      if (replyText && replyText !== lastSentText) {
-        await sendText(waId, replyText);
+      // NEW: Handle 'respond' action - pure conversational response
+      if (aiDecision.action === "respond" && aiText) {
+        if (aiText !== lastSentText) {
+          await sendText(waId, aiText);
+          await sessionStore.updateSession(waId, lineId, {
+            data: { last_sent_text: aiText },
+          });
+        }
+        return;
+      }
+
+      // Send the conversational text first (if exists and not repeated)
+      if (aiText && aiText !== lastSentText) {
+        await sendText(waId, aiText);
         await sessionStore.updateSession(waId, lineId, {
-          data: { last_sent_text: replyText },
+          data: { last_sent_text: aiText },
         });
         // Small delay to make it feel conversational
         await sleep(800);
@@ -361,7 +372,7 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
         return;
       }
 
-      if (aiDecision.action === "services" && nodeMap.has(servicesId)) {
+      if ((aiDecision.action === "services" || aiDecision.action === "show_services") && nodeMap.has(servicesId)) {
         await sendNode(waId, flow, nodeMap.get(servicesId), new Set([servicesId]));
         return;
       }

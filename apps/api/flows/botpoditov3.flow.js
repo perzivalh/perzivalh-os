@@ -53,12 +53,10 @@ module.exports = {
     {
       id: "AI_HANDOFF_OFFER",
       type: "text",
-      text:
-        "Por lo que comentas, lo ideal es una valoración médica gratuita en la clínica. ¿Quieres que te derivemos con un operador?",
-      delayMs: 1500,
+      text: "¿Te derivamos con un operador?",
       buttons: [
-        { label: "👨‍💻 Sí, hablar con operador", next: "CONTACT_METHOD" },
-        { label: "📋 Ver menú", next: "MAIN_MENU" },
+        { label: "✅ Sí", next: "CONTACT_METHOD" },
+        { label: "❌ No, ver menú", next: "MAIN_MENU" },
       ],
     },
 

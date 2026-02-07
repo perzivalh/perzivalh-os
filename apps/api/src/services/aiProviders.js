@@ -2,7 +2,7 @@ const axios = require("axios");
 
 const OPENAI_ENDPOINT = "https://api.openai.com/v1/responses";
 const GEMINI_ENDPOINT =
-  "https://generativelanguage.googleapis.com/v1beta/models";
+  "https://generativelanguage.googleapis.com/v1/models";
 
 function extractOpenAIText(data) {
   if (!data) {
@@ -94,10 +94,10 @@ async function callGemini({
 }) {
   const normalizedModel = String(model || "").replace(/^models\//, "").trim();
   const modelCandidates = [
-    normalizedModel || "gemini-2.0-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
+    normalizedModel || "gemini-1.5-flash-latest",
     "gemini-1.5-flash-latest",
+    "gemini-1.5-pro-latest",
+    "gemini-pro",
   ].filter(Boolean);
 
   const basePayload = {

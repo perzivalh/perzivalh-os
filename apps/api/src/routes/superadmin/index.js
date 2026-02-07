@@ -800,6 +800,11 @@ router.post("/tenant-bots", requireAuth, requireSuperAdmin, async (req, res) => 
 
     const control = getControlClient();
     try {
+        await control.tenantBot.updateMany({
+            where: { tenant_id: tenantId, is_active: true },
+            data: { is_active: false },
+        });
+
         const tenantBot = await control.tenantBot.create({
             data: {
                 tenant_id: tenantId,
@@ -833,6 +838,7 @@ router.post("/tenant-bots", requireAuth, requireSuperAdmin, async (req, res) => 
 // Actualiza estado o config de un bot asignado
 router.patch("/tenant-bots/:id", requireAuth, requireSuperAdmin, async (req, res) => {
     const updates = {};
+    const shouldActivate = req.body?.is_active !== undefined && Boolean(req.body.is_active);
 
     if (req.body?.is_active !== undefined) {
         updates.is_active = Boolean(req.body.is_active);
@@ -848,6 +854,24 @@ router.patch("/tenant-bots/:id", requireAuth, requireSuperAdmin, async (req, res
     }
 
     const control = getControlClient();
+    if (shouldActivate) {
+        const current = await control.tenantBot.findUnique({
+            where: { id: req.params.id },
+            select: { tenant_id: true, id: true },
+        });
+        if (!current) {
+            return res.status(404).json({ error: "tenant_bot_not_found" });
+        }
+        await control.tenantBot.updateMany({
+            where: {
+                tenant_id: current.tenant_id,
+                is_active: true,
+                id: { not: current.id },
+            },
+            data: { is_active: false },
+        });
+    }
+
     const tenantBot = await control.tenantBot.update({
         where: { id: req.params.id },
         data: updates,

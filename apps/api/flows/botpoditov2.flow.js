@@ -856,7 +856,7 @@ module.exports = {
     "id": "OTR_CALLOSIDAD_STEP_3",
     "type": "image",
     "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/1.%20Callosidades/235a0c02-2a0e-4d93-a3b1-031880e3a7d3.jpg",
-    "text": "Si necesita un paquete completo 🦶✨ tiene una opción accesible y detallada por realizarse, PODOCALLOS incluye una valoración profesional 👨‍⚕️📋, pedicure clínico 🧼💅, tratamiento y limpieza de callosidades, todo por un costo de 200 Bs 💰.\nEste paquete se realiza únicamente bajo recomendación del especialista 🩺, ya que durante la valoración 🔍 se determinará si el paciente necesita o no dicho tratamiento ✅❌.",
+    "text": "Si necesita un paquete completo 🦶✨ tiene una opción accesible y detallada por realizarse, PODOCALLOS incluye una valoración profesional 👨‍⚕️📋, pedicure clínico 🧼💅, tratamiento y limpieza de callosidades, todo por un costo de 150 Bs 💰.\nEste paquete se realiza únicamente bajo recomendación del especialista 🩺, ya que durante la valoración 🔍 se determinará si el paciente necesita o no dicho tratamiento ✅❌.",
     "next": "OTR_CALLOSIDAD_ACTIONS"
   },
   {

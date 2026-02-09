@@ -73,8 +73,8 @@ router.get("/channels", requireAuth, async (req, res) => {
     }
     const control = getControlClient();
     const channels = await control.channel.findMany({
-        where: { tenant_id: req.user.tenant_id },
-        orderBy: { created_at: "asc" },
+        where: { tenant_id: req.user.tenant_id, provider: "whatsapp" },
+        orderBy: [{ is_default: "desc" }, { created_at: "asc" }],
     });
     return res.json({
         channels: channels.map((channel) => ({
@@ -82,6 +82,8 @@ router.get("/channels", requireAuth, async (req, res) => {
             phone_number_id: channel.phone_number_id,
             display_name: channel.display_name || null,
             waba_id: channel.waba_id || null,
+            is_active: channel.is_active,
+            is_default: channel.is_default,
             created_at: channel.created_at,
         })),
     });
@@ -99,12 +101,36 @@ router.patch("/channels/:id", requireAuth, async (req, res) => {
     if (!existing || existing.tenant_id !== req.user.tenant_id) {
         return res.status(404).json({ error: "not_found" });
     }
-    const displayName = String(req.body?.display_name || "").trim();
+    const updates = {};
+    if (req.body?.display_name !== undefined) {
+        const rawName = String(req.body.display_name || "").trim();
+        updates.display_name = rawName || null;
+    }
+    if (req.body?.is_active !== undefined) {
+        updates.is_active = Boolean(req.body.is_active);
+    }
+    if (req.body?.is_default !== undefined) {
+        updates.is_default = Boolean(req.body.is_default);
+    }
+    if (!Object.keys(updates).length) {
+        return res.status(400).json({ error: "empty_updates" });
+    }
     const { clearChannelCache } = require("../tenancy/tenantResolver");
     const channel = await control.channel.update({
         where: { id: req.params.id },
-        data: { display_name: displayName || null },
+        data: updates,
     });
+
+    if (updates.is_default === true) {
+        await control.channel.updateMany({
+            where: {
+                tenant_id: req.user.tenant_id,
+                id: { not: channel.id },
+            },
+            data: { is_default: false },
+        });
+    }
+
     clearChannelCache(channel.phone_number_id);
     return res.json({
         channel: {
@@ -112,6 +138,8 @@ router.patch("/channels/:id", requireAuth, async (req, res) => {
             phone_number_id: channel.phone_number_id,
             display_name: channel.display_name || null,
             waba_id: channel.waba_id || null,
+            is_active: channel.is_active,
+            is_default: channel.is_default,
             created_at: channel.created_at,
         },
     });

@@ -52,7 +52,12 @@ function App() {
   const [branding, setBranding] = useState(null);
   const [tenantMeta, setTenantMeta] = useState(null);
   const [tenantChannels, setTenantChannels] = useState([]);
-  const [channelForm, setChannelForm] = useState({ id: "", display_name: "" });
+  const [channelForm, setChannelForm] = useState({
+    id: "",
+    display_name: "",
+    is_default: false,
+    is_active: true,
+  });
   const [lastReadMap, setLastReadMap] = useState(() => {
     if (typeof window === "undefined") {
       return {};
@@ -145,6 +150,8 @@ function App() {
   const conversationStatusRef = useRef(new Map());
 
   const [metrics, setMetrics] = useState(null);
+  const [dashboardPeriod, setDashboardPeriod] = useState("30d");
+  const [dashboardChannel, setDashboardChannel] = useState(null);
   const [templates, setTemplates] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [campaignsTotal, setCampaignsTotal] = useState(0);
@@ -179,32 +186,6 @@ function App() {
   });
 
   const [settings, setSettings] = useState(null);
-
-  const [branches, setBranches] = useState([]);
-  const [services, setServices] = useState([]);
-  const [branchForm, setBranchForm] = useState({
-    id: "",
-    code: "",
-    name: "",
-    address: "",
-    lat: "",
-    lng: "",
-    hours_text: "",
-    phone: "",
-    is_active: true,
-  });
-  const [serviceForm, setServiceForm] = useState({
-    id: "",
-    code: "",
-    name: "",
-    subtitle: "",
-    description: "",
-    price_bob: "",
-    duration_min: "",
-    image_url: "",
-    is_featured: false,
-    is_active: true,
-  });
 
   const [templateForm, setTemplateForm] = useState({
     id: "",
@@ -557,13 +538,13 @@ function App() {
       return;
     }
     if (view === "dashboard") {
-      void loadMetrics();
+      void loadMetrics(dashboardPeriod, dashboardChannel);
     }
     if (view === "campaigns") {
       void loadTemplates();
       void loadCampaigns(1, 6);
     }
-  }, [user, view]);
+  }, [user, view, dashboardPeriod, dashboardChannel]);
 
   useEffect(() => {
     if (!user || view !== "admin") {
@@ -584,7 +565,7 @@ function App() {
       void loadSettings();
     }
     if (settingsSection === "general" && canGeneral) {
-      void loadCatalog();
+      void loadTenantChannels();
     }
     if (settingsSection === "templates" && canTemplates) {
       void loadTemplates();
@@ -1387,9 +1368,9 @@ function App() {
       setActiveConversation((prev) =>
         prev
           ? {
-              ...prev,
-              tags: (prev.tags || []).filter((tag) => tag.name !== tagName),
-            }
+            ...prev,
+            tags: (prev.tags || []).filter((tag) => tag.name !== tagName),
+          }
           : prev
       );
       await loadTags();
@@ -1399,10 +1380,45 @@ function App() {
     }
   }
 
-  async function loadMetrics() {
+  async function loadMetrics(period = "30d", channel = null) {
     try {
-      const data = await apiGet("/api/dashboard/metrics");
+      const params = new URLSearchParams();
+      params.set("period", period);
+      if (channel) {
+        params.set("channel", channel);
+      }
+      const data = await apiGet(`/api/dashboard/metrics?${params.toString()}`);
       setMetrics(data);
+    } catch (error) {
+      setPageError(normalizeError(error));
+    }
+  }
+
+  async function downloadDashboardReport() {
+    try {
+      const params = new URLSearchParams();
+      params.set("period", dashboardPeriod);
+      if (dashboardChannel) {
+        params.set("channel", dashboardChannel);
+      }
+      const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:3000";
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_BASE}/api/dashboard/report?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        throw new Error("report_failed");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `reporte-dashboard-${new Date().toISOString().split("T")[0]}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      pushToast({ message: "Reporte descargado" });
     } catch (error) {
       setPageError(normalizeError(error));
     }
@@ -1765,19 +1781,6 @@ function App() {
     }
   }
 
-  async function loadCatalog() {
-    try {
-      const [branchData, serviceData] = await Promise.all([
-        apiGet("/api/admin/branches"),
-        apiGet("/api/admin/services"),
-      ]);
-      setBranches(branchData.branches || []);
-      setServices(serviceData.services || []);
-    } catch (error) {
-      setPageError(normalizeError(error));
-    }
-  }
-
   async function loadTenantChannels() {
     try {
       const data = await apiGet("/api/channels");
@@ -1791,6 +1794,8 @@ function App() {
     setChannelForm({
       id: channel.id,
       display_name: channel.display_name || "",
+      is_default: Boolean(channel.is_default),
+      is_active: channel.is_active !== false,
     });
   }
 
@@ -1802,13 +1807,40 @@ function App() {
     try {
       await apiPatch(`/api/channels/${channelForm.id}`, {
         display_name: channelForm.display_name.trim(),
+        is_default: Boolean(channelForm.is_default),
+        is_active: Boolean(channelForm.is_active),
       });
-      setChannelForm({ id: "", display_name: "" });
+      setChannelForm({
+        id: "",
+        display_name: "",
+        is_default: false,
+        is_active: true,
+      });
       await loadTenantChannels();
       pushToast({ message: "Canal actualizado correctamente" });
     } catch (error) {
       setPageError(normalizeError(error));
       pushToast({ type: "error", message: normalizeError(error) || "Error al guardar canal" });
+    }
+  }
+
+  async function handleChannelQuickUpdate(channelId, updates) {
+    if (!channelId || !updates || typeof updates !== "object") {
+      return;
+    }
+    try {
+      await apiPatch(`/api/channels/${channelId}`, updates);
+      await loadTenantChannels();
+      if (updates.is_default === true) {
+        pushToast({ message: "Linea principal actualizada" });
+        return;
+      }
+      if (updates.is_active !== undefined) {
+        pushToast({ message: updates.is_active ? "Linea activada" : "Linea desactivada" });
+      }
+    } catch (error) {
+      setPageError(normalizeError(error));
+      pushToast({ type: "error", message: normalizeError(error) || "Error al actualizar linea" });
     }
   }
 
@@ -1859,163 +1891,6 @@ function App() {
     } catch (error) {
       setPageError(normalizeError(error));
       pushToast({ type: "error", message: normalizeError(error) || "Error al eliminar rol" });
-    }
-  }
-
-  async function handleBranchSubmit(event) {
-    event.preventDefault();
-    if (!branchForm.code.trim() || !branchForm.name.trim()) {
-      setPageError("Completa codigo y nombre");
-      return;
-    }
-    const payload = {
-      code: branchForm.code.trim(),
-      name: branchForm.name.trim(),
-      address: branchForm.address.trim(),
-      lat: branchForm.lat !== "" ? Number(branchForm.lat) : 0,
-      lng: branchForm.lng !== "" ? Number(branchForm.lng) : 0,
-      hours_text: branchForm.hours_text.trim(),
-      phone: branchForm.phone.trim() || null,
-      is_active: branchForm.is_active,
-    };
-    try {
-      if (branchForm.id) {
-        await apiPatch(`/api/admin/branches/${branchForm.id}`, payload);
-        pushToast({ message: "Sucursal actualizada correctamente" });
-      } else {
-        await apiPost("/api/admin/branches", payload);
-        pushToast({ message: "Sucursal creada correctamente" });
-      }
-      setBranchForm({
-        id: "",
-        code: "",
-        name: "",
-        address: "",
-        lat: "",
-        lng: "",
-        hours_text: "",
-        phone: "",
-        is_active: true,
-      });
-      await loadCatalog();
-    } catch (error) {
-      setPageError(normalizeError(error));
-      pushToast({ type: "error", message: normalizeError(error) || "Error al guardar sucursal" });
-    }
-  }
-
-  async function handleBranchDisable(branchId) {
-    try {
-      await apiDelete(`/api/admin/branches/${branchId}`);
-      await loadCatalog();
-      pushToast({
-        message: "Sucursal eliminada correctamente",
-        actionLabel: "DESHACER",
-        duration: 8000,
-        onAction: async () => {
-          try {
-            await apiPatch(`/api/admin/branches/${branchId}`, { is_active: true });
-            await loadCatalog();
-            pushToast({ message: "Sucursal restaurada" });
-          } catch (err) {
-            pushToast({
-              type: "error",
-              message: normalizeError(err) || "No se pudo restaurar la sucursal",
-            });
-          }
-        },
-      });
-    } catch (error) {
-      setPageError(normalizeError(error));
-      pushToast({ type: "error", message: normalizeError(error) || "Error al eliminar sucursal" });
-    }
-  }
-
-  async function handleServiceSubmit(event) {
-    event.preventDefault();
-    if (!serviceForm.code.trim() || !serviceForm.name.trim()) {
-      setPageError("Completa codigo y nombre");
-      return;
-    }
-    const payload = {
-      code: serviceForm.code.trim(),
-      name: serviceForm.name.trim(),
-      subtitle: serviceForm.subtitle.trim() || null,
-      description: serviceForm.description.trim(),
-      price_bob: serviceForm.price_bob ? Number(serviceForm.price_bob) : 0,
-      duration_min: serviceForm.duration_min
-        ? Number(serviceForm.duration_min)
-        : null,
-      image_url: serviceForm.image_url.trim() || null,
-      is_featured: serviceForm.is_featured,
-      is_active: serviceForm.is_active,
-    };
-    try {
-      if (serviceForm.id) {
-        await apiPatch(`/api/admin/services/${serviceForm.id}`, payload);
-        pushToast({ message: "Servicio actualizado correctamente" });
-      } else {
-        await apiPost("/api/admin/services", payload);
-        pushToast({ message: "Servicio creado correctamente" });
-      }
-      setServiceForm({
-        id: "",
-        code: "",
-        name: "",
-        subtitle: "",
-        description: "",
-        price_bob: "",
-        duration_min: "",
-        image_url: "",
-        is_featured: false,
-        is_active: true,
-      });
-      await loadCatalog();
-    } catch (error) {
-      setPageError(normalizeError(error));
-      pushToast({ type: "error", message: normalizeError(error) || "Error al guardar servicio" });
-    }
-  }
-
-  async function handleServiceDisable(serviceId) {
-    try {
-      await apiDelete(`/api/admin/services/${serviceId}`);
-      await loadCatalog();
-      pushToast({
-        message: "Servicio eliminado correctamente",
-        actionLabel: "DESHACER",
-        duration: 8000,
-        onAction: async () => {
-          try {
-            await apiPatch(`/api/admin/services/${serviceId}`, { is_active: true });
-            await loadCatalog();
-            pushToast({ message: "Servicio restaurado" });
-          } catch (err) {
-            pushToast({
-              type: "error",
-              message: normalizeError(err) || "No se pudo restaurar el servicio",
-            });
-          }
-        },
-      });
-    } catch (error) {
-      setPageError(normalizeError(error));
-      pushToast({ type: "error", message: normalizeError(error) || "Error al eliminar servicio" });
-    }
-  }
-
-  async function handleServiceBranchToggle(service, branchId, isAvailable) {
-    if (!service) {
-      return;
-    }
-    try {
-      await apiPost(`/api/admin/services/${service.id}/branches`, {
-        branch_id: branchId,
-        is_available: isAvailable,
-      });
-      await loadCatalog();
-    } catch (error) {
-      setPageError(normalizeError(error));
     }
   }
 
@@ -2328,22 +2203,12 @@ function App() {
           setSettings={setSettings}
           handleSaveSettings={handleSaveSettings}
           planName={tenantMeta?.plan || ""}
-          branches={branches}
-          services={services}
-          branchForm={branchForm}
-          setBranchForm={setBranchForm}
-          handleBranchSubmit={handleBranchSubmit}
-          handleBranchDisable={handleBranchDisable}
-          serviceForm={serviceForm}
-          setServiceForm={setServiceForm}
-          handleServiceSubmit={handleServiceSubmit}
-          handleServiceDisable={handleServiceDisable}
-          handleServiceBranchToggle={handleServiceBranchToggle}
           tenantChannels={tenantChannels}
           channelForm={channelForm}
           setChannelForm={setChannelForm}
           handleChannelSelect={handleChannelSelect}
           handleChannelSubmit={handleChannelSubmit}
+          handleChannelQuickUpdate={handleChannelQuickUpdate}
           handleRoleDelete={handleRoleDelete}
           templates={templates}
           templateForm={templateForm}
@@ -2372,80 +2237,91 @@ function App() {
           className={`content ${view === "chats" ? "content-chats" : "content-page"}`}
         >
           {view === "chats" && (
-              <ChatView
-                activeConversation={activeConversation}
-                conversations={conversations}
-                channels={tenantChannels}
-                brandName={displayBrandName}
-                lastReadMap={lastReadMap}
-                filters={filters}
-                showFilters={showFilters}
-                users={users}
-                tags={tags}
-                statusOptions={STATUS_OPTIONS}
-                statusLabels={statusLabels}
-                formatListTime={formatListTime}
-                messageBlocks={messageBlocks}
-                messageDraft={messageDraft}
-                messageMode={messageMode}
-                quickActions={quickActions}
-                tagInput={tagInput}
-                setTagInput={setTagInput}
-                noteInput={noteInput}
-                notesList={notesList}
-                latestNote={latestNote}
-                loadingConversation={loadingConversation}
-                isInfoOpen={isInfoOpen}
-                hasUnread={hasUnread}
-                scrollDayLabel={scrollDayLabel}
-                activeName={activeName}
-                activePhone={activePhone}
-                activeStatusLabel={activeStatusLabel}
-                canManageStatus={canManageStatus}
-                currentUser={user}
-                messageInputRef={messageInputRef}
-                chatBodyRef={chatBodyRef}
-                setShowFilters={setShowFilters}
-                setFilters={setFilters}
-                loadConversation={loadConversation}
-                handleBackToList={handleBackToList}
-                setIsInfoOpen={setIsInfoOpen}
-                handleChatScroll={handleChatScroll}
-                handleAssignSelf={handleAssignSelf}
-                handleStatusChange={handleStatusChange}
-                handleToggleTag={handleToggleTag}
-                handleAddTag={handleAddTag}
-                setNoteInput={setNoteInput}
-                handleAddNote={handleAddNote}
-                reassignUserId={reassignUserId}
-                setReassignUserId={setReassignUserId}
-                handleReassignConversation={handleReassignConversation}
-                handleOpenTagManager={() => setShowTagManager(true)}
-                handleCloseTagManager={() => setShowTagManager(false)}
-                showTagManager={showTagManager}
-                tagManagerForm={tagManagerForm}
-                setTagManagerForm={setTagManagerForm}
-                handleCreateTag={handleCreateTag}
-                handleDeleteTag={handleDeleteTag}
-                handleQuickAction={handleQuickAction}
-                handleSendMessage={handleSendMessage}
-                setMessageMode={setMessageMode}
-                setMessageDraft={setMessageDraft}
-                scrollChatToBottom={scrollChatToBottom}
-                getInitial={getInitial}
-                PlusIcon={PlusIcon}
-                SearchIcon={SearchIcon}
-                VideoIcon={VideoIcon}
-                PhoneIcon={PhoneIcon}
-                InfoIcon={InfoIcon}
-                SendIcon={SendIcon}
-              />
+            <ChatView
+              activeConversation={activeConversation}
+              conversations={conversations}
+              channels={tenantChannels}
+              brandName={displayBrandName}
+              lastReadMap={lastReadMap}
+              filters={filters}
+              showFilters={showFilters}
+              users={users}
+              tags={tags}
+              statusOptions={STATUS_OPTIONS}
+              statusLabels={statusLabels}
+              formatListTime={formatListTime}
+              messageBlocks={messageBlocks}
+              messageDraft={messageDraft}
+              messageMode={messageMode}
+              quickActions={quickActions}
+              tagInput={tagInput}
+              setTagInput={setTagInput}
+              noteInput={noteInput}
+              notesList={notesList}
+              latestNote={latestNote}
+              loadingConversation={loadingConversation}
+              isInfoOpen={isInfoOpen}
+              hasUnread={hasUnread}
+              scrollDayLabel={scrollDayLabel}
+              activeName={activeName}
+              activePhone={activePhone}
+              activeStatusLabel={activeStatusLabel}
+              canManageStatus={canManageStatus}
+              currentUser={user}
+              messageInputRef={messageInputRef}
+              chatBodyRef={chatBodyRef}
+              setShowFilters={setShowFilters}
+              setFilters={setFilters}
+              loadConversation={loadConversation}
+              handleBackToList={handleBackToList}
+              setIsInfoOpen={setIsInfoOpen}
+              handleChatScroll={handleChatScroll}
+              handleAssignSelf={handleAssignSelf}
+              handleStatusChange={handleStatusChange}
+              handleToggleTag={handleToggleTag}
+              handleAddTag={handleAddTag}
+              setNoteInput={setNoteInput}
+              handleAddNote={handleAddNote}
+              reassignUserId={reassignUserId}
+              setReassignUserId={setReassignUserId}
+              handleReassignConversation={handleReassignConversation}
+              handleOpenTagManager={() => setShowTagManager(true)}
+              handleCloseTagManager={() => setShowTagManager(false)}
+              showTagManager={showTagManager}
+              tagManagerForm={tagManagerForm}
+              setTagManagerForm={setTagManagerForm}
+              handleCreateTag={handleCreateTag}
+              handleDeleteTag={handleDeleteTag}
+              handleQuickAction={handleQuickAction}
+              handleSendMessage={handleSendMessage}
+              setMessageMode={setMessageMode}
+              setMessageDraft={setMessageDraft}
+              scrollChatToBottom={scrollChatToBottom}
+              getInitial={getInitial}
+              PlusIcon={PlusIcon}
+              SearchIcon={SearchIcon}
+              VideoIcon={VideoIcon}
+              PhoneIcon={PhoneIcon}
+              InfoIcon={InfoIcon}
+              SendIcon={SendIcon}
+            />
           )}
           {view === "dashboard" && (
             <DashboardView
-              statusCounts={statusCounts}
               metrics={metrics}
-              onRefresh={loadMetrics}
+              channels={tenantChannels}
+              selectedPeriod={dashboardPeriod}
+              selectedChannel={dashboardChannel}
+              onPeriodChange={(period) => {
+                setDashboardPeriod(period);
+                void loadMetrics(period, dashboardChannel);
+              }}
+              onChannelChange={(channel) => {
+                setDashboardChannel(channel);
+                void loadMetrics(dashboardPeriod, channel);
+              }}
+              onRefresh={() => loadMetrics(dashboardPeriod, dashboardChannel)}
+              onGenerateReport={downloadDashboardReport}
               brandName={displayBrandName}
             />
           )}

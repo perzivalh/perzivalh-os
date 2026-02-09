@@ -40,17 +40,6 @@ function AdminView({
   settings,
   setSettings,
   handleSaveSettings,
-  branches,
-  services,
-  branchForm,
-  setBranchForm,
-  handleBranchSubmit,
-  handleBranchDisable,
-  serviceForm,
-  setServiceForm,
-  handleServiceSubmit,
-  handleServiceDisable,
-  handleServiceBranchToggle,
   templates,
   templateForm,
   setTemplateForm,
@@ -66,6 +55,7 @@ function AdminView({
   setChannelForm,
   handleChannelSelect,
   handleChannelSubmit,
+  handleChannelQuickUpdate,
   handleUserDelete,
   defaultRolePermissions,
   handleRoleDelete,
@@ -169,22 +159,12 @@ function AdminView({
 
         {settingsSection === "general" && (
           <GeneralSection
-            branches={branches}
-            branchForm={branchForm}
-            setBranchForm={setBranchForm}
-            handleBranchSubmit={handleBranchSubmit}
-            handleBranchDisable={handleBranchDisable}
-            services={services}
-            serviceForm={serviceForm}
-            setServiceForm={setServiceForm}
-            handleServiceSubmit={handleServiceSubmit}
-            handleServiceDisable={handleServiceDisable}
-            handleServiceBranchToggle={handleServiceBranchToggle}
             tenantChannels={tenantChannels}
             channelForm={channelForm}
             setChannelForm={setChannelForm}
             handleChannelSelect={handleChannelSelect}
             handleChannelSubmit={handleChannelSubmit}
+            handleChannelQuickUpdate={handleChannelQuickUpdate}
           />
         )}
 

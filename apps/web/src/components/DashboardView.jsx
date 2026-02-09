@@ -1,16 +1,9 @@
 import React from "react";
 
-const FALLBACK_VOLUME = [
-  { day: "2024-01-01", in_count: 210, out_count: 90 },
-  { day: "2024-01-04", in_count: 280, out_count: 120 },
-  { day: "2024-01-07", in_count: 240, out_count: 110 },
-  { day: "2024-01-10", in_count: 320, out_count: 140 },
-  { day: "2024-01-13", in_count: 300, out_count: 130 },
-  { day: "2024-01-17", in_count: 310, out_count: 135 },
-  { day: "2024-01-20", in_count: 290, out_count: 120 },
-  { day: "2024-01-24", in_count: 260, out_count: 115 },
-  { day: "2024-01-27", in_count: 330, out_count: 150 },
-  { day: "2024-01-30", in_count: 340, out_count: 160 },
+const PERIOD_OPTIONS = [
+  { value: "24h", label: "Últimas 24h" },
+  { value: "7d", label: "Última semana" },
+  { value: "30d", label: "Último mes" },
 ];
 
 function formatChartLabel(value) {
@@ -45,33 +38,52 @@ function buildPath(points) {
     .join(" ");
 }
 
-function DashboardView({ statusCounts, metrics, onRefresh, brandName }) {
+function formatChange(value, suffix = "%") {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const formatted = value > 0 ? `+${value}${suffix}` : `${value}${suffix}`;
+  return formatted;
+}
+
+function DashboardView({
+  metrics,
+  channels,
+  selectedPeriod,
+  selectedChannel,
+  onPeriodChange,
+  onChannelChange,
+  onRefresh,
+  onGenerateReport,
+  brandName,
+}) {
   const brandLabel = (brandName || "Empresa").trim();
   const kicker = brandLabel ? `${brandLabel} Enterprise` : "Enterprise";
-  const activeConversations = (statusCounts.open || 0) + (statusCounts.pending || 0);
-  const responseMinutes = metrics?.avg_first_reply_seconds
-    ? Number(metrics.avg_first_reply_seconds) / 60
-    : null;
-  const responseValue = responseMinutes ? `${responseMinutes.toFixed(1)}m` : "-";
-  const conversionRaw =
-    metrics?.conversion_rate ?? metrics?.conversion_rate_percent ?? null;
-  const conversionPercent =
-    conversionRaw === null || conversionRaw === undefined
-      ? 18.4
-      : conversionRaw > 1
-        ? conversionRaw
-        : conversionRaw * 100;
-  const conversionValue = `${conversionPercent.toFixed(1)}%`;
 
-  const volume =
-    metrics?.message_volume?.length > 0
-      ? metrics.message_volume.slice(-10)
-      : FALLBACK_VOLUME;
+  // Parse metrics with fallbacks
+  const activeConversations = metrics?.active_conversations?.value ?? 0;
+  const activeChange = metrics?.active_conversations?.change ?? null;
+
+  const responseMinutes = metrics?.avg_response_time?.value;
+  const responseValue = responseMinutes ? `${responseMinutes.toFixed(1)}m` : "-";
+  const responseChange = metrics?.avg_response_time?.change;
+
+  const uniqueContacts = metrics?.unique_contacts?.value ?? 0;
+  const uniqueContactsChange = metrics?.unique_contacts?.change ?? null;
+
+  const conversionRate = metrics?.conversion_rate?.value ?? 0;
+  const conversionValue = `${conversionRate.toFixed(1)}%`;
+  const conversionChange = metrics?.conversion_rate?.change ?? null;
+
+  const volume = metrics?.message_volume?.length > 0
+    ? metrics.message_volume.slice(-14)
+    : [];
+
   const maxValue = Math.max(
     ...volume.map((item) => item.in_count + item.out_count),
     1
   );
-  const chartWidth = volume.length * 42 + 30;
+  const chartWidth = Math.max(volume.length * 42 + 30, 200);
   const chartHeight = 220;
   const plotHeight = 150;
   const baseline = 180;
@@ -100,11 +112,17 @@ function DashboardView({ statusCounts, metrics, onRefresh, brandName }) {
       y: baseline - bar.outHeight,
     }))
   );
-  const labelIndexes = Array.from(
-    new Set([0, Math.floor(volume.length / 3), Math.floor((2 * volume.length) / 3), volume.length - 1])
-  );
-  const efficiencyValue = Math.round(metrics?.team_efficiency || 94);
-  const topTags = (metrics?.top_tags || []).slice(0, 3);
+  const labelIndexes = volume.length > 0
+    ? Array.from(
+      new Set([0, Math.floor(volume.length / 3), Math.floor((2 * volume.length) / 3), volume.length - 1])
+    )
+    : [];
+
+  // Operators
+  const operators = metrics?.operators ?? [];
+  const efficiencyValue = Math.round(metrics?.team_efficiency ?? 0);
+  const dailyGoal = metrics?.daily_goal ?? 500;
+  const resolvedToday = metrics?.resolved_today ?? 0;
 
   return (
     <section className="dashboard-layout">
@@ -118,11 +136,30 @@ function DashboardView({ statusCounts, metrics, onRefresh, brandName }) {
             </div>
           </div>
           <div className="dashboard-actions">
-            <button className="dash-filter" type="button">
-              <span className="dash-filter-icon" aria-hidden="true" />
-              Ultimos 30 dias
-            </button>
-            <button className="primary" type="button" onClick={onRefresh}>
+            <select
+              className="dash-filter"
+              value={selectedChannel || ""}
+              onChange={(e) => onChannelChange(e.target.value || null)}
+            >
+              <option value="">Todas las líneas</option>
+              {(channels || []).map((ch) => (
+                <option key={ch.phone_number_id} value={ch.phone_number_id}>
+                  {ch.display_name || ch.phone_number_id}
+                </option>
+              ))}
+            </select>
+            <select
+              className="dash-filter"
+              value={selectedPeriod || "30d"}
+              onChange={(e) => onPeriodChange(e.target.value)}
+            >
+              {PERIOD_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <button className="primary" type="button" onClick={onGenerateReport}>
               Generar Reporte
             </button>
           </div>
@@ -139,7 +176,11 @@ function DashboardView({ statusCounts, metrics, onRefresh, brandName }) {
               </div>
               <div className="dash-kpi-icon">C</div>
             </div>
-            <div className="dash-kpi-change up">+12.5%</div>
+            {activeChange !== null && (
+              <div className={`dash-kpi-change ${activeChange >= 0 ? "up" : "down"}`}>
+                {formatChange(activeChange)}
+              </div>
+            )}
           </div>
           <div className="dash-kpi">
             <div className="dash-kpi-top">
@@ -149,17 +190,39 @@ function DashboardView({ statusCounts, metrics, onRefresh, brandName }) {
               </div>
               <div className="dash-kpi-icon">T</div>
             </div>
-            <div className="dash-kpi-change down">-0.8m</div>
+            {responseChange !== null && (
+              <div className={`dash-kpi-change ${responseChange <= 0 ? "up" : "down"}`}>
+                {formatChange(responseChange, "m")}
+              </div>
+            )}
           </div>
           <div className="dash-kpi">
             <div className="dash-kpi-top">
               <div>
-                <div className="dash-kpi-label">Tasa de conversion</div>
+                <div className="dash-kpi-label">Contactos únicos</div>
+                <div className="dash-kpi-value">{uniqueContacts.toLocaleString()}</div>
+              </div>
+              <div className="dash-kpi-icon">#</div>
+            </div>
+            {uniqueContactsChange !== null && (
+              <div className={`dash-kpi-change ${uniqueContactsChange >= 0 ? "up" : "down"}`}>
+                {formatChange(uniqueContactsChange)}
+              </div>
+            )}
+          </div>
+          <div className="dash-kpi">
+            <div className="dash-kpi-top">
+              <div>
+                <div className="dash-kpi-label">Tasa de conversión</div>
                 <div className="dash-kpi-value">{conversionValue}</div>
               </div>
               <div className="dash-kpi-icon">%</div>
             </div>
-            <div className="dash-kpi-change up">+2.1%</div>
+            {conversionChange !== null && (
+              <div className={`dash-kpi-change ${conversionChange >= 0 ? "up" : "down"}`}>
+                {formatChange(conversionChange)}
+              </div>
+            )}
           </div>
         </div>
 
@@ -178,139 +241,82 @@ function DashboardView({ statusCounts, metrics, onRefresh, brandName }) {
               </span>
             </div>
           </div>
-          <div className="dash-chart">
-            <svg
-              className="dash-chart-svg"
-              viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-              preserveAspectRatio="none"
-            >
-              <line className="dash-chart-grid" x1="0" y1="60" x2={chartWidth} y2="60" />
-              <line className="dash-chart-grid" x1="0" y1="120" x2={chartWidth} y2="120" />
-              {bars.map((bar, index) => (
-                <g key={`bar-${index}`}>
-                  <rect
-                    className="dash-bar in"
-                    x={bar.x}
-                    y={baseline - bar.inHeight}
-                    width="20"
-                    height={bar.inHeight}
-                    rx="6"
-                  />
-                  <rect
-                    className="dash-bar out"
-                    x={bar.x}
-                    y={baseline - bar.inHeight - bar.outHeight}
-                    width="20"
-                    height={bar.outHeight}
-                    rx="6"
-                  />
-                </g>
-              ))}
-              <path className="dash-line in" d={inLine} />
-              <path className="dash-line out" d={outLine} />
-            </svg>
-          </div>
-          <div className="dash-chart-labels">
-            {labelIndexes.map((index) => (
-              <span key={`label-${index}`}>
-                {formatChartLabel(volume[index]?.day)}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        <div className="dashboard-lower">
-          <div className="dash-card">
-            <div className="dash-card-header">
-              <div className="dash-card-title">Ultimas etiquetas detectadas</div>
-              <button className="link-button" type="button">
-                Ver todo
-              </button>
-            </div>
-            <div className="dash-tag-table">
-              <div className="dash-tag-head">
-                <span>Etiqueta</span>
-                <span>Frecuencia</span>
-                <span>Accion</span>
+          {volume.length > 0 ? (
+            <>
+              <div className="dash-chart">
+                <svg
+                  className="dash-chart-svg"
+                  viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+                  preserveAspectRatio="none"
+                >
+                  <line className="dash-chart-grid" x1="0" y1="60" x2={chartWidth} y2="60" />
+                  <line className="dash-chart-grid" x1="0" y1="120" x2={chartWidth} y2="120" />
+                  {bars.map((bar, index) => (
+                    <g key={`bar-${index}`}>
+                      <rect
+                        className="dash-bar in"
+                        x={bar.x}
+                        y={baseline - bar.inHeight}
+                        width="20"
+                        height={bar.inHeight}
+                        rx="6"
+                      />
+                      <rect
+                        className="dash-bar out"
+                        x={bar.x}
+                        y={baseline - bar.inHeight - bar.outHeight}
+                        width="20"
+                        height={bar.outHeight}
+                        rx="6"
+                      />
+                    </g>
+                  ))}
+                  <path className="dash-line in" d={inLine} />
+                  <path className="dash-line out" d={outLine} />
+                </svg>
               </div>
-              {topTags.map((tag) => (
-                <div className="dash-tag-row" key={tag.name}>
-                  <span className="dash-tag-chip">{tag.name}</span>
-                  <span className="dash-tag-count">{tag.count}</span>
-                  <span className="dash-tag-action">&gt;</span>
-                </div>
-              ))}
-              {!topTags.length && (
-                <div className="empty-state">Sin etiquetas recientes</div>
-              )}
-            </div>
-          </div>
-
-          <div className="dash-card">
-            <div className="dash-card-header">
-              <div className="dash-card-title">Actividad de Campana</div>
-              <span className="dash-pill">Monitor</span>
-            </div>
-            <div className="dash-campaign">
-              <div className="dash-campaign-title">
-                Campana de Verano "Pies Sanos"
+              <div className="dash-chart-labels">
+                {labelIndexes.map((index) => (
+                  <span key={`label-${index}`}>
+                    {formatChartLabel(volume[index]?.day)}
+                  </span>
+                ))}
               </div>
-              <div className="dash-campaign-meta">
-                <span className="dash-pill solid">84% enviado</span>
-                <span className="dash-muted">Hace 2 horas</span>
-              </div>
-              <div className="dash-progress">
-                <div className="dash-progress-fill" style={{ width: "84%" }} />
-              </div>
-              <div className="dash-muted">1,240 destinatarios</div>
-            </div>
-          </div>
+            </>
+          ) : (
+            <div className="empty-state">Sin datos para el periodo seleccionado</div>
+          )}
         </div>
       </div>
 
       <aside className="dashboard-side">
         <div className="dash-card">
           <div className="dash-card-title">Performance de Operadores</div>
-          <div className="dash-card-subtitle">Top 5 leaderboard - hoy</div>
+          <div className="dash-card-subtitle">Top 10 - {PERIOD_OPTIONS.find(p => p.value === selectedPeriod)?.label || "Último mes"}</div>
           <div className="dash-operator-list">
-            {[
-              {
-                name: "Lucia Fernandez",
-                role: "Especialista CRM",
-                resolved: 84,
-                pending: 3,
-              },
-              {
-                name: "Ricardo Gomez",
-                role: "Atencion Pacientes",
-                resolved: 71,
-                pending: 8,
-              },
-              {
-                name: "Ana Martinez",
-                role: "Soporte Medico",
-                resolved: 65,
-                pending: 12,
-              },
-            ].map((item) => (
-              <div className="dash-operator" key={item.name}>
-                <div className="dash-operator-avatar">{item.name[0]}</div>
-                <div className="dash-operator-meta">
-                  <div className="dash-operator-name">{item.name}</div>
-                  <div className="dash-operator-role">{item.role}</div>
-                  <div className="dash-operator-stats">
-                    <div>
-                      <div className="dash-stat-label">Resueltos</div>
-                      <div className="dash-stat-value">{item.resolved}</div>
-                    </div>
-                    <div>
-                      <div className="dash-stat-label">Pendientes</div>
-                      <div className="dash-stat-value danger">{item.pending}</div>
+            {operators.length > 0 ? (
+              operators.map((item, idx) => (
+                <div className="dash-operator" key={item.id || `op-${idx}`}>
+                  <div className="dash-operator-avatar">{item.name?.[0] || "?"}</div>
+                  <div className="dash-operator-meta">
+                    <div className="dash-operator-name">{item.name}</div>
+                    <div className="dash-operator-role">{item.role}</div>
+                    <div className="dash-operator-stats">
+                      <div>
+                        <div className="dash-stat-label">Resueltos</div>
+                        <div className="dash-stat-value">{item.resolved}</div>
+                      </div>
+                      <div>
+                        <div className="dash-stat-label">Pendientes</div>
+                        <div className="dash-stat-value danger">{item.pending}</div>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <div className="empty-state">Sin operadores activos</div>
+            )}
           </div>
         </div>
 
@@ -324,7 +330,9 @@ function DashboardView({ statusCounts, metrics, onRefresh, brandName }) {
                 style={{ width: `${efficiencyValue}%` }}
               />
             </div>
-            <div className="dash-muted">Objetivo diario: 500 conversiones</div>
+            <div className="dash-muted">
+              {resolvedToday} resueltas - Objetivo: {dailyGoal}
+            </div>
           </div>
         </div>
       </aside>

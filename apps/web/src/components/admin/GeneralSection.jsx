@@ -1,445 +1,330 @@
 /**
- * GeneralSection - Sucursales, Servicios, Canales WhatsApp
+ * GeneralSection - Gestion de lineas de WhatsApp
  */
-import React from "react";
+import React, { useMemo, useState } from "react";
+
+const INITIAL_CHANNEL_FORM = {
+    id: "",
+    display_name: "",
+    is_default: false,
+    is_active: true,
+};
+
+function formatShortDate(value) {
+    if (!value) {
+        return "Sin fecha";
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return "Sin fecha";
+    }
+    return date.toLocaleDateString("es-BO", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+    });
+}
+
+function getLineName(channel) {
+    if (channel?.display_name) {
+        return channel.display_name;
+    }
+    const suffix = channel?.phone_number_id
+        ? String(channel.phone_number_id).slice(-4)
+        : "----";
+    return `Linea ${suffix}`;
+}
 
 function GeneralSection({
-    branches,
-    branchForm,
-    setBranchForm,
-    handleBranchSubmit,
-    handleBranchDisable,
-    services,
-    serviceForm,
-    setServiceForm,
-    handleServiceSubmit,
-    handleServiceDisable,
-    handleServiceBranchToggle,
-    tenantChannels,
-    channelForm,
+    tenantChannels = [],
+    channelForm = INITIAL_CHANNEL_FORM,
     setChannelForm,
     handleChannelSelect,
     handleChannelSubmit,
+    handleChannelQuickUpdate,
 }) {
+    const [searchTerm, setSearchTerm] = useState("");
+    const [statusFilter, setStatusFilter] = useState("all");
+    const [copiedPhoneId, setCopiedPhoneId] = useState("");
+
+    const selectedChannel = useMemo(
+        () => tenantChannels.find((channel) => channel.id === channelForm.id) || null,
+        [tenantChannels, channelForm.id]
+    );
+
+    const stats = useMemo(() => {
+        const total = tenantChannels.length;
+        const active = tenantChannels.filter((channel) => channel.is_active).length;
+        const primary = tenantChannels.find((channel) => channel.is_default);
+        return {
+            total,
+            active,
+            inactive: total - active,
+            primaryName: primary ? getLineName(primary) : "Sin principal",
+        };
+    }, [tenantChannels]);
+
+    const filteredChannels = useMemo(() => {
+        const normalizedSearch = searchTerm.trim().toLowerCase();
+        return [...tenantChannels]
+            .filter((channel) => {
+                if (statusFilter === "active" && !channel.is_active) {
+                    return false;
+                }
+                if (statusFilter === "inactive" && channel.is_active) {
+                    return false;
+                }
+                if (!normalizedSearch) {
+                    return true;
+                }
+                const haystack = [
+                    channel.display_name || "",
+                    channel.phone_number_id || "",
+                    channel.waba_id || "",
+                ]
+                    .join(" ")
+                    .toLowerCase();
+                return haystack.includes(normalizedSearch);
+            })
+            .sort((a, b) => {
+                const byDefault = Number(Boolean(b.is_default)) - Number(Boolean(a.is_default));
+                if (byDefault !== 0) {
+                    return byDefault;
+                }
+                const byActive = Number(Boolean(b.is_active)) - Number(Boolean(a.is_active));
+                if (byActive !== 0) {
+                    return byActive;
+                }
+                return getLineName(a).localeCompare(getLineName(b), "es");
+            });
+    }, [tenantChannels, searchTerm, statusFilter]);
+
+    async function handleCopyPhoneId(phoneNumberId) {
+        if (!phoneNumberId) {
+            return;
+        }
+        const value = String(phoneNumberId);
+        try {
+            if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(value);
+            } else if (typeof document !== "undefined") {
+                const textarea = document.createElement("textarea");
+                textarea.value = value;
+                textarea.setAttribute("readonly", "");
+                textarea.style.position = "absolute";
+                textarea.style.left = "-9999px";
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand("copy");
+                document.body.removeChild(textarea);
+            }
+            setCopiedPhoneId(value);
+            setTimeout(() => {
+                setCopiedPhoneId((prev) => (prev === value ? "" : prev));
+            }, 1600);
+        } catch (_error) {
+            setCopiedPhoneId("");
+        }
+    }
+
+    function resetChannelForm() {
+        setChannelForm(INITIAL_CHANNEL_FORM);
+    }
+
     return (
-        <div className="page-grid">
-            {/* Sucursales Panel */}
-            <div className="panel">
-                <div className="panel-title">Sucursales</div>
-                <div className="table">
-                    <div className="table-head">
-                        <span>Nombre</span>
-                        <span>Codigo</span>
-                        <span>Estado</span>
-                        <span>Accion</span>
-                    </div>
-                    {branches.map((branch) => (
-                        <div className="table-row" key={branch.id}>
-                            <span>{branch.name}</span>
-                            <span>{branch.code}</span>
-                            <span>{branch.is_active ? "Activa" : "Inactiva"}</span>
-                            <div className="row-actions">
-                                <button
-                                    className="ghost"
-                                    onClick={() =>
-                                        setBranchForm({
-                                            id: branch.id,
-                                            code: branch.code,
-                                            name: branch.name,
-                                            address: branch.address,
-                                            lat: branch.lat,
-                                            lng: branch.lng,
-                                            hours_text: branch.hours_text,
-                                            phone: branch.phone || "",
-                                            is_active: branch.is_active,
-                                        })
-                                    }
-                                >
-                                    Editar
-                                </button>
-                                <button
-                                    className="danger"
-                                    onClick={() => handleBranchDisable(branch.id)}
-                                >
-                                    Desactivar
-                                </button>
-                            </div>
-                        </div>
-                    ))}
+        <section className="general-lines-shell">
+            <div className="general-lines-header">
+                <div>
+                    <h2 className="general-lines-title">Lineas de WhatsApp</h2>
+                    <p className="general-lines-description">
+                        Gestiona nombres visibles, estado operativo y linea principal para tus conversaciones.
+                    </p>
                 </div>
-                <div className="panel-title">
-                    {branchForm.id ? "Editar sucursal" : "Crear sucursal"}
-                </div>
-                <form className="form-grid" onSubmit={handleBranchSubmit}>
-                    <label className="field">
-                        <span>Codigo</span>
-                        <input
-                            type="text"
-                            value={branchForm.code}
-                            onChange={(event) =>
-                                setBranchForm((prev) => ({
-                                    ...prev,
-                                    code: event.target.value,
-                                }))
-                            }
-                        />
-                    </label>
-                    <label className="field">
-                        <span>Nombre</span>
-                        <input
-                            type="text"
-                            value={branchForm.name}
-                            onChange={(event) =>
-                                setBranchForm((prev) => ({
-                                    ...prev,
-                                    name: event.target.value,
-                                }))
-                            }
-                        />
-                    </label>
-                    <label className="field">
-                        <span>Direccion</span>
-                        <input
-                            type="text"
-                            value={branchForm.address}
-                            onChange={(event) =>
-                                setBranchForm((prev) => ({
-                                    ...prev,
-                                    address: event.target.value,
-                                }))
-                            }
-                        />
-                    </label>
-                    <label className="field">
-                        <span>Lat</span>
-                        <input
-                            type="number"
-                            value={branchForm.lat}
-                            onChange={(event) =>
-                                setBranchForm((prev) => ({
-                                    ...prev,
-                                    lat: event.target.value,
-                                }))
-                            }
-                        />
-                    </label>
-                    <label className="field">
-                        <span>Lng</span>
-                        <input
-                            type="number"
-                            value={branchForm.lng}
-                            onChange={(event) =>
-                                setBranchForm((prev) => ({
-                                    ...prev,
-                                    lng: event.target.value,
-                                }))
-                            }
-                        />
-                    </label>
-                    <label className="field">
-                        <span>Telefono</span>
-                        <input
-                            type="text"
-                            value={branchForm.phone}
-                            onChange={(event) =>
-                                setBranchForm((prev) => ({
-                                    ...prev,
-                                    phone: event.target.value,
-                                }))
-                            }
-                        />
-                    </label>
-                    <label className="field">
-                        <span>Horarios</span>
-                        <textarea
-                            rows="3"
-                            value={branchForm.hours_text}
-                            onChange={(event) =>
-                                setBranchForm((prev) => ({
-                                    ...prev,
-                                    hours_text: event.target.value,
-                                }))
-                            }
-                        />
-                    </label>
-                    <label className="toggle">
-                        <input
-                            type="checkbox"
-                            checked={branchForm.is_active}
-                            onChange={(event) =>
-                                setBranchForm((prev) => ({
-                                    ...prev,
-                                    is_active: event.target.checked,
-                                }))
-                            }
-                        />
-                        Activa
-                    </label>
-                    <div className="form-actions">
-                        <button className="primary" type="submit">
-                            Guardar
-                        </button>
+                <div className="general-lines-stats">
+                    <div className="line-stat">
+                        <span>Total</span>
+                        <strong>{stats.total}</strong>
                     </div>
-                </form>
+                    <div className="line-stat">
+                        <span>Activas</span>
+                        <strong>{stats.active}</strong>
+                    </div>
+                    <div className="line-stat">
+                        <span>Inactivas</span>
+                        <strong>{stats.inactive}</strong>
+                    </div>
+                    <div className="line-stat line-stat-wide">
+                        <span>Principal</span>
+                        <strong>{stats.primaryName}</strong>
+                    </div>
+                </div>
             </div>
 
-            {/* Servicios Panel */}
-            <div className="panel">
-                <div className="panel-title">Servicios</div>
-                <div className="table">
-                    <div className="table-head">
-                        <span>Servicio</span>
-                        <span>Precio</span>
-                        <span>Estado</span>
-                        <span>Accion</span>
+            <div className="page-grid general-lines-grid">
+                <div className="panel general-lines-panel">
+                    <div className="panel-title">Listado de lineas</div>
+                    <div className="general-lines-filters">
+                        <label className="field">
+                            <span>Buscar linea</span>
+                            <input
+                                type="text"
+                                placeholder="Nombre, Phone ID o WABA ID"
+                                value={searchTerm}
+                                onChange={(event) => setSearchTerm(event.target.value)}
+                            />
+                        </label>
+                        <label className="field">
+                            <span>Estado</span>
+                            <select
+                                value={statusFilter}
+                                onChange={(event) => setStatusFilter(event.target.value)}
+                            >
+                                <option value="all">Todas</option>
+                                <option value="active">Activas</option>
+                                <option value="inactive">Inactivas</option>
+                            </select>
+                        </label>
                     </div>
-                    {services.map((service) => (
-                        <div className="table-row" key={service.id}>
-                            <span>{service.name}</span>
-                            <span>Bs {service.price_bob}</span>
-                            <span>{service.is_active ? "Activo" : "Inactivo"}</span>
-                            <div className="row-actions">
-                                <button
-                                    className="ghost"
-                                    onClick={() =>
-                                        setServiceForm({
-                                            id: service.id,
-                                            code: service.code,
-                                            name: service.name,
-                                            subtitle: service.subtitle || "",
-                                            description: service.description,
-                                            price_bob: service.price_bob,
-                                            duration_min: service.duration_min || "",
-                                            image_url: service.image_url || "",
-                                            is_featured: service.is_featured,
-                                            is_active: service.is_active,
-                                        })
-                                    }
-                                >
-                                    Editar
-                                </button>
-                                <button
-                                    className="danger"
-                                    onClick={() => handleServiceDisable(service.id)}
-                                >
-                                    Desactivar
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-                <div className="panel-title">
-                    {serviceForm.id ? "Editar servicio" : "Crear servicio"}
-                </div>
-                <form className="form-grid" onSubmit={handleServiceSubmit}>
-                    <label className="field">
-                        <span>Codigo</span>
-                        <input
-                            type="text"
-                            value={serviceForm.code}
-                            onChange={(event) =>
-                                setServiceForm((prev) => ({
-                                    ...prev,
-                                    code: event.target.value,
-                                }))
-                            }
-                        />
-                    </label>
-                    <label className="field">
-                        <span>Nombre</span>
-                        <input
-                            type="text"
-                            value={serviceForm.name}
-                            onChange={(event) =>
-                                setServiceForm((prev) => ({
-                                    ...prev,
-                                    name: event.target.value,
-                                }))
-                            }
-                        />
-                    </label>
-                    <label className="field">
-                        <span>Subtitulo</span>
-                        <input
-                            type="text"
-                            value={serviceForm.subtitle}
-                            onChange={(event) =>
-                                setServiceForm((prev) => ({
-                                    ...prev,
-                                    subtitle: event.target.value,
-                                }))
-                            }
-                        />
-                    </label>
-                    <label className="field">
-                        <span>Descripcion</span>
-                        <textarea
-                            rows="3"
-                            value={serviceForm.description}
-                            onChange={(event) =>
-                                setServiceForm((prev) => ({
-                                    ...prev,
-                                    description: event.target.value,
-                                }))
-                            }
-                        />
-                    </label>
-                    <label className="field">
-                        <span>Precio (Bs)</span>
-                        <input
-                            type="number"
-                            value={serviceForm.price_bob}
-                            onChange={(event) =>
-                                setServiceForm((prev) => ({
-                                    ...prev,
-                                    price_bob: event.target.value,
-                                }))
-                            }
-                        />
-                    </label>
-                    <label className="field">
-                        <span>Duracion (min)</span>
-                        <input
-                            type="number"
-                            value={serviceForm.duration_min}
-                            onChange={(event) =>
-                                setServiceForm((prev) => ({
-                                    ...prev,
-                                    duration_min: event.target.value,
-                                }))
-                            }
-                        />
-                    </label>
-                    <label className="field">
-                        <span>Imagen URL</span>
-                        <input
-                            type="text"
-                            value={serviceForm.image_url}
-                            onChange={(event) =>
-                                setServiceForm((prev) => ({
-                                    ...prev,
-                                    image_url: event.target.value,
-                                }))
-                            }
-                        />
-                    </label>
-                    <label className="toggle">
-                        <input
-                            type="checkbox"
-                            checked={serviceForm.is_featured}
-                            onChange={(event) =>
-                                setServiceForm((prev) => ({
-                                    ...prev,
-                                    is_featured: event.target.checked,
-                                }))
-                            }
-                        />
-                        Destacado
-                    </label>
-                    <label className="toggle">
-                        <input
-                            type="checkbox"
-                            checked={serviceForm.is_active}
-                            onChange={(event) =>
-                                setServiceForm((prev) => ({
-                                    ...prev,
-                                    is_active: event.target.checked,
-                                }))
-                            }
-                        />
-                        Activo
-                    </label>
-                    {serviceForm.id && (
-                        <div className="field">
-                            <span>Disponibilidad por sucursal</span>
-                            <div className="chip-grid">
-                                {branches.map((branch) => {
-                                    const mapping = services
-                                        .find((item) => item.id === serviceForm.id)
-                                        ?.branches?.find((entry) => {
-                                            const branchId = entry.branch?.id || entry.branch_id;
-                                            return branchId === branch.id;
-                                        });
-                                    const available = mapping?.is_available || false;
-                                    return (
-                                        <label className="chip" key={branch.id}>
-                                            <input
-                                                type="checkbox"
-                                                checked={available}
-                                                onChange={(event) =>
-                                                    handleServiceBranchToggle(
-                                                        services.find((item) => item.id === serviceForm.id),
-                                                        branch.id,
-                                                        event.target.checked
-                                                    )
-                                                }
-                                            />
-                                            {branch.name}
-                                        </label>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-                    <div className="form-actions">
-                        <button className="primary" type="submit">
-                            Guardar
-                        </button>
-                    </div>
-                </form>
-            </div>
 
-            {/* WhatsApp Lines Panel */}
-            <div className="panel">
-                <div className="panel-title">Lineas de WhatsApp</div>
-                <div className="table">
-                    <div className="table-head">
-                        <span>Nombre</span>
-                        <span>Phone ID</span>
-                        <span>Accion</span>
+                    <div className="table">
+                        <div className="table-head general-lines-table-head">
+                            <span>Linea</span>
+                            <span>Phone ID</span>
+                            <span>Estado</span>
+                            <span>Acciones</span>
+                        </div>
+                        {filteredChannels.map((channel) => (
+                            <div className="table-row general-lines-row" key={channel.id}>
+                                <div className="line-cell">
+                                    <div className="line-main-name">{getLineName(channel)}</div>
+                                    <div className="line-meta">
+                                        {channel.is_default ? (
+                                            <span className="line-pill default">Principal</span>
+                                        ) : null}
+                                        {channel.waba_id ? (
+                                            <span className="line-pill">WABA {channel.waba_id}</span>
+                                        ) : null}
+                                        <span className="line-pill">Creada {formatShortDate(channel.created_at)}</span>
+                                    </div>
+                                </div>
+                                <span className="line-phone-id">{channel.phone_number_id}</span>
+                                <span>
+                                    <span className={`line-pill ${channel.is_active ? "active" : "inactive"}`}>
+                                        {channel.is_active ? "Activa" : "Inactiva"}
+                                    </span>
+                                </span>
+                                <div className="row-actions">
+                                    <button className="ghost" onClick={() => handleChannelSelect(channel)}>
+                                        Editar
+                                    </button>
+                                    <button
+                                        className="ghost"
+                                        onClick={() => handleCopyPhoneId(channel.phone_number_id)}
+                                    >
+                                        {copiedPhoneId === channel.phone_number_id ? "Copiado" : "Copiar ID"}
+                                    </button>
+                                    <button
+                                        className="ghost"
+                                        onClick={() =>
+                                            handleChannelQuickUpdate(channel.id, { is_default: true })
+                                        }
+                                        disabled={channel.is_default}
+                                    >
+                                        Principal
+                                    </button>
+                                    <button
+                                        className={channel.is_active ? "danger soft" : "ghost"}
+                                        onClick={() =>
+                                            handleChannelQuickUpdate(channel.id, {
+                                                is_active: !channel.is_active,
+                                            })
+                                        }
+                                    >
+                                        {channel.is_active ? "Desactivar" : "Activar"}
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                        {!filteredChannels.length && (
+                            <div className="empty-state">No hay lineas que coincidan con los filtros.</div>
+                        )}
                     </div>
-                    {(tenantChannels || []).map((channel) => (
-                        <div className="table-row" key={channel.id}>
-                            <span>{channel.display_name || "Linea sin nombre"}</span>
-                            <span>{channel.phone_number_id}</span>
+                </div>
+
+                <div className="panel general-lines-panel">
+                    <div className="panel-title">
+                        {channelForm.id ? "Editar linea seleccionada" : "Selecciona una linea"}
+                    </div>
+                    <form className="form-grid" onSubmit={handleChannelSubmit}>
+                        <label className="field">
+                            <span>Nombre visible</span>
+                            <input
+                                type="text"
+                                value={channelForm.display_name || ""}
+                                onChange={(event) =>
+                                    setChannelForm((prev) => ({
+                                        ...prev,
+                                        display_name: event.target.value,
+                                    }))
+                                }
+                                placeholder="Ej: Linea principal"
+                                disabled={!channelForm.id}
+                            />
+                        </label>
+                        <label className="field">
+                            <span>Phone ID</span>
+                            <input
+                                type="text"
+                                value={selectedChannel?.phone_number_id || ""}
+                                readOnly
+                                disabled
+                            />
+                        </label>
+                        <label className="toggle">
+                            <input
+                                type="checkbox"
+                                checked={Boolean(channelForm.is_default)}
+                                onChange={(event) =>
+                                    setChannelForm((prev) => ({
+                                        ...prev,
+                                        is_default: event.target.checked,
+                                    }))
+                                }
+                                disabled={!channelForm.id}
+                            />
+                            Marcar como principal
+                        </label>
+                        <label className="toggle">
+                            <input
+                                type="checkbox"
+                                checked={Boolean(channelForm.is_active)}
+                                onChange={(event) =>
+                                    setChannelForm((prev) => ({
+                                        ...prev,
+                                        is_active: event.target.checked,
+                                    }))
+                                }
+                                disabled={!channelForm.id}
+                            />
+                            Linea activa
+                        </label>
+                        <div className="form-actions">
+                            <button className="primary" type="submit" disabled={!channelForm.id}>
+                                Guardar cambios
+                            </button>
                             <button
                                 className="ghost"
-                                onClick={() => handleChannelSelect(channel)}
+                                type="button"
+                                disabled={!channelForm.id}
+                                onClick={resetChannelForm}
                             >
-                                Renombrar
+                                Cancelar
                             </button>
                         </div>
-                    ))}
-                    {!tenantChannels?.length && (
-                        <div className="empty-state">Sin lineas registradas</div>
-                    )}
+                    </form>
                 </div>
-                <div className="panel-title">
-                    {channelForm.id ? "Editar linea" : "Selecciona una linea"}
-                </div>
-                <form className="form-grid" onSubmit={handleChannelSubmit}>
-                    <label className="field">
-                        <span>Nombre visible</span>
-                        <input
-                            type="text"
-                            value={channelForm.display_name}
-                            onChange={(event) =>
-                                setChannelForm((prev) => ({
-                                    ...prev,
-                                    display_name: event.target.value,
-                                }))
-                            }
-                            disabled={!channelForm.id}
-                        />
-                    </label>
-                    <div className="form-actions">
-                        <button className="primary" type="submit" disabled={!channelForm.id}>
-                            Guardar
-                        </button>
-                    </div>
-                </form>
             </div>
-        </div>
+        </section>
     );
 }
 

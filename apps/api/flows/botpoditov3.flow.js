@@ -286,7 +286,7 @@ module.exports = {
   },
   {
     "id": "UNERO_INFO_4",
-    "type": "text",
+    "type": "video",
     "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/U%C3%B1ero/unero.mp4",
     "text": "Con una correcta extracción del uñero, puedes disfrutar de una rutina diaria más tranquila y cómoda 💆‍♂️💆‍♀️\nOlvídate del dolor, la inflamación y las molestias, y vuelve a caminar con total bienestar 👣😊",
     "next": "UNERO_INFO_5"
@@ -409,7 +409,7 @@ module.exports = {
   },
   {
     "id": "TRAT_MATRICECTOMIA_STEP_3",
-    "type": "text",
+    "type": "video",
     "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/U%C3%B1ero/Matricectomia/matricetomia.mp4",
     "text": "Valoración prequirúrgica:\nLa decisión de realizar la matricectomía dependerá de una evaluación individual por parte de un podólogo o médico cirujano especialista, considerando la gravedad del caso y la historia clínica del paciente.",
     "next": "TRAT_MATRICECTOMIA_STEP_4"
@@ -459,7 +459,7 @@ module.exports = {
   },
   {
     "id": "TRAT_ORTESIS_STEP_2",
-    "type": "text",
+    "type": "video",
     "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/U%C3%B1ero/Ortesis/ortesis.mp4",
     "text": "✨🦶 La ortesis ungueal ayuda a levantar la uña y evitar que se encarne, siendo un tratamiento eficaz para prevenir el uñero y aliviar molestias de forma segura 💅💙",
     "next": "TRAT_ORTESIS_ACTIONS"
@@ -503,7 +503,7 @@ module.exports = {
   },
   {
     "id": "TRAT_Tópico_STEP_2",
-    "type": "text",
+    "type": "video",
     "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/T%C3%B3pico/topico.mp4",
     "text": "👨‍⚕️ Te comparto este video explicativo sobre el tratamiento tópico para hongos.",
     "next": "TRAT_Tópico_ACTIONS"
@@ -567,7 +567,7 @@ module.exports = {
   },
   {
     "id": "TRAT_Láser_STEP_5",
-    "type": "text",
+    "type": "video",
     "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/L%C3%A1ser/laser.mp4",
     "text": "👩‍⚕️ Te comparto este video sobre el tratamiento con láser.",
     "next": "TRAT_Láser_ACTIONS"
@@ -669,7 +669,7 @@ module.exports = {
   },
   {
     "id": "SVC_PEDICURE_STEP_4",
-    "type": "text",
+    "type": "video",
     "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Pedicure%20Cl%C3%ADnico/pedicure.mp4",
     "text": "🌸 Te compartimos este video de nuestro tratamiento de pedicura para que veas cómo transformamos tus pies paso a paso.",
     "next": "SVC_PEDICURE_STEP_5"
@@ -747,7 +747,7 @@ module.exports = {
   },
   {
     "id": "SVC_PODOPEDIATRIA_STEP_5",
-    "type": "text",
+    "type": "video",
     "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podopediatr%C3%ADa/podopediatria.mp4",
     "text": "👣 ¿Preocupado por el caminar de tu hijo? 🎥 Te compartimos este video sobre podopediatría",
     "next": "SVC_PODOPEDIATRIA_ACTIONS"
@@ -798,7 +798,7 @@ module.exports = {
   },
   {
     "id": "SVC_PODOGERIATRIA_STEP_3",
-    "type": "text",
+    "type": "video",
     "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podogeriatria/podogediatria.mp4",
     "text": "Este servicio podológico está enfocado en los pies de los adultos mayores, con pies más sensibles, enfermedades crónicas como la diabetes y problemas circulatorios hacen que los pies sean más vulnerables a diversas afecciones, como piel frágil, mala circulación, uñas engrosadas o deformidades. 🤶🏽",
     "next": "SVC_PODOGERIATRIA_ACTIONS"
@@ -885,7 +885,7 @@ module.exports = {
   },
   {
     "id": "OTR_CALLOSIDAD_STEP_2_1",
-    "type": "image",
+    "type": "video",
     "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/1.%20Callosidades/callosidades.mp4",
     "text": "👣 Así tratamos las callosidades con seguridad.",
     "next": "OTR_CALLOSIDAD_STEP_3"
@@ -949,7 +949,7 @@ module.exports = {
   },
   {
     "id": "OTR_VERRUGA_STEP_4",
-    "type": "text",
+    "type": "video",
     "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/2.%20Verruga%20plantar/verrugaPlantar.mp4",
     "text": "Nuestro tratamiento especializado es eficaz, seguro y no invasivo, diseñado para eliminar las verrugas plantares y aliviar el dolor que causan. 🛑",
     "next": "OTR_VERRUGA_ACTIONS"
@@ -1036,7 +1036,7 @@ module.exports = {
   },
   {
     "id": "OTR_EXTRACCION_STEP_3",
-    "type": "text",
+    "type": "video",
     "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/4.%20Extracci%C3%B3n%20de%20u%C3%B1a/extraccionDeUna.mp4",
     "text": "IMPORTANTE: ⚠️\nNo siempre es necesario quitar la uña. En PODOPIE solo realizamos la extracción si es clínicamente justificado, ya que quitar la uña no elimina los hongos ni cura los uñeros por sí solo. Por eso, cada caso es evaluado individualmente",
     "next": "OTR_EXTRACCION_STEP_4"
@@ -1137,7 +1137,7 @@ module.exports = {
   },
   {
     "id": "OTR_PIE_DIABETICO_STEP_3_1",
-    "type": "image",
+    "type": "video",
     "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/6.%20Paciente%20Diab%C3%A9tico/pacienteDiabetico.mp4",
     "text": "Este servicio es realizado por un equipo profesional capacitado en complicaciones relacionadas con la diabetes. 🛡️",
     "next": "OTR_PIE_DIABETICO_STEP_3"

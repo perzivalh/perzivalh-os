@@ -64,6 +64,23 @@ function shouldUseList(buttons) {
   return buttons.some((btn) => (btn.label || "").length > BUTTON_TITLE_LIMIT);
 }
 
+function inferMediaType(node, mediaUrl) {
+  if (!mediaUrl || typeof mediaUrl !== "string") {
+    return null;
+  }
+  if (node.type === "image" || node.type === "video") {
+    return node.type;
+  }
+  const normalizedUrl = mediaUrl.split("?")[0].toLowerCase();
+  if (/\.(mp4|mov|webm)$/i.test(normalizedUrl)) {
+    return "video";
+  }
+  if (/\.(jpg|jpeg|png|gif|webp)$/i.test(normalizedUrl)) {
+    return "image";
+  }
+  return null;
+}
+
 function normalizeLabel(value) {
   return normalizeText(value || "").replace(/\s+/g, " ").trim();
 }
@@ -152,10 +169,12 @@ async function sendNode(waId, flow, node, visited) {
   const bodyText = node.text || node.title || "Selecciona una opcion:";
 
   const buttons = Array.isArray(node.buttons) ? node.buttons : [];
-  if (node.type === "image") {
-    await sendImage(waId, node.url || node.media || node.image, bodyText || null);
-  } else if (node.type === "video") {
-    await sendVideo(waId, node.url || node.media || node.video, bodyText || null);
+  const mediaUrl = node.url || node.media || node.video || node.image;
+  const mediaType = inferMediaType(node, mediaUrl);
+  if (mediaType === "image") {
+    await sendImage(waId, mediaUrl, bodyText || null);
+  } else if (mediaType === "video") {
+    await sendVideo(waId, mediaUrl, bodyText || null);
   } else if (buttons.length > 0) {
     if (shouldUseList(buttons)) {
       const rows = buttons.map((btn) => ({

@@ -147,12 +147,12 @@ router.get("/dashboard/metrics", requireAuth, async (req, res) => {
     try {
       const messageVolumeRaw = await prisma.$queryRaw`
                 SELECT 
-                    DATE(created_at) as day,
+                    DATE(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/La_Paz') as day,
                     COUNT(*) FILTER (WHERE direction = 'in') as in_count,
                     COUNT(*) FILTER (WHERE direction = 'out') as out_count
                 FROM "Message"
                 WHERE created_at >= ${startDate}
-                GROUP BY DATE(created_at)
+                GROUP BY DATE(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/La_Paz')
                 ORDER BY day ASC
             `;
       messageVolume = (messageVolumeRaw || []).map((row) => ({

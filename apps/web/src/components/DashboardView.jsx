@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 const PERIOD_OPTIONS = [
   { value: "24h", label: "Últimas 24h" },
@@ -7,43 +7,38 @@ const PERIOD_OPTIONS = [
 ];
 
 function formatChartLabel(value) {
-  const date = value ? new Date(value) : null;
-  if (!date || Number.isNaN(date.getTime())) {
-    return "--";
-  }
-  const months = [
-    "Ene",
-    "Feb",
-    "Mar",
-    "Abr",
-    "May",
-    "Jun",
-    "Jul",
-    "Ago",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dic",
-  ];
+  if (!value) return "--";
+  // Parse date string as local date
+  const parts = value.split("-");
+  if (parts.length !== 3) return "--";
+  const date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  if (Number.isNaN(date.getTime())) return "--";
+
+  const months = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
   const day = String(date.getDate()).padStart(2, "0");
-  return `${day} ${months[date.getMonth()].toUpperCase()}`;
+  return `${day} ${months[date.getMonth()]}`;
+}
+
+function formatFullDate(value) {
+  if (!value) return "--";
+  const parts = value.split("-");
+  if (parts.length !== 3) return value;
+  const date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  if (Number.isNaN(date.getTime())) return value;
+
+  const days = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+  const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+  return `${days[date.getDay()]} ${date.getDate()} de ${months[date.getMonth()]}`;
 }
 
 function buildPath(points) {
-  if (!points.length) {
-    return "";
-  }
-  return points
-    .map((point, index) => `${index === 0 ? "M" : "L"}${point.x} ${point.y}`)
-    .join(" ");
+  if (!points.length) return "";
+  return points.map((point, index) => `${index === 0 ? "M" : "L"}${point.x} ${point.y}`).join(" ");
 }
 
 function formatChange(value, suffix = "%") {
-  if (value === null || value === undefined) {
-    return null;
-  }
-  const formatted = value > 0 ? `+${value}${suffix}` : `${value}${suffix}`;
-  return formatted;
+  if (value === null || value === undefined) return null;
+  return value > 0 ? `+${value}${suffix}` : `${value}${suffix}`;
 }
 
 function DashboardView({
@@ -57,6 +52,9 @@ function DashboardView({
   onGenerateReport,
   brandName,
 }) {
+  const [hoveredBar, setHoveredBar] = useState(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+
   const brandLabel = (brandName || "Empresa").trim();
   const kicker = brandLabel ? `${brandLabel} Enterprise` : "Enterprise";
 
@@ -65,7 +63,7 @@ function DashboardView({
   const activeChange = metrics?.active_conversations?.change ?? null;
 
   const responseMinutes = metrics?.avg_response_time?.value;
-  const responseValue = responseMinutes ? `${responseMinutes.toFixed(1)}m` : "-";
+  const responseValue = responseMinutes != null ? `${responseMinutes.toFixed(1)}m` : "-";
   const responseChange = metrics?.avg_response_time?.change;
 
   const uniqueContacts = metrics?.unique_contacts?.value ?? 0;
@@ -79,43 +77,30 @@ function DashboardView({
     ? metrics.message_volume.slice(-14)
     : [];
 
-  const maxValue = Math.max(
-    ...volume.map((item) => item.in_count + item.out_count),
-    1
-  );
-  const chartWidth = Math.max(volume.length * 42 + 30, 200);
+  const maxValue = Math.max(...volume.map((item) => Math.max(item.in_count, item.out_count)), 1);
+  const chartWidth = Math.max(volume.length * 50 + 40, 200);
   const chartHeight = 220;
-  const plotHeight = 150;
-  const baseline = 180;
+  const plotHeight = 140;
+  const baseline = 175;
+  const barWidth = 16;
+  const barGap = 4;
+
   const bars = volume.map((item, index) => {
-    const total = item.in_count + item.out_count;
-    const totalHeight = (total / maxValue) * plotHeight;
     const inHeight = (item.in_count / maxValue) * plotHeight;
     const outHeight = (item.out_count / maxValue) * plotHeight;
-    const x = 22 + index * 42;
+    const x = 30 + index * 50;
     return {
       x,
-      totalHeight,
       inHeight,
       outHeight,
+      inCount: item.in_count,
+      outCount: item.out_count,
+      day: item.day,
     };
   });
-  const inLine = buildPath(
-    bars.map((bar, index) => ({
-      x: bar.x + 10,
-      y: baseline - bar.inHeight,
-    }))
-  );
-  const outLine = buildPath(
-    bars.map((bar) => ({
-      x: bar.x + 10,
-      y: baseline - bar.outHeight,
-    }))
-  );
+
   const labelIndexes = volume.length > 0
-    ? Array.from(
-      new Set([0, Math.floor(volume.length / 3), Math.floor((2 * volume.length) / 3), volume.length - 1])
-    )
+    ? Array.from(new Set([0, Math.floor(volume.length / 2), volume.length - 1]))
     : [];
 
   // Operators
@@ -123,6 +108,19 @@ function DashboardView({
   const efficiencyValue = Math.round(metrics?.team_efficiency ?? 0);
   const dailyGoal = metrics?.daily_goal ?? 500;
   const resolvedToday = metrics?.resolved_today ?? 0;
+
+  const handleBarMouseEnter = (bar, event) => {
+    const rect = event.currentTarget.closest(".dash-chart").getBoundingClientRect();
+    setHoveredBar(bar);
+    setTooltipPos({
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top - 60,
+    });
+  };
+
+  const handleBarMouseLeave = () => {
+    setHoveredBar(null);
+  };
 
   return (
     <section className="dashboard-layout">
@@ -174,7 +172,7 @@ function DashboardView({
                   {activeConversations.toLocaleString()}
                 </div>
               </div>
-              <div className="dash-kpi-icon">C</div>
+              <div className="dash-kpi-icon">💬</div>
             </div>
             {activeChange !== null && (
               <div className={`dash-kpi-change ${activeChange >= 0 ? "up" : "down"}`}>
@@ -188,7 +186,7 @@ function DashboardView({
                 <div className="dash-kpi-label">Tiempo de respuesta</div>
                 <div className="dash-kpi-value">{responseValue}</div>
               </div>
-              <div className="dash-kpi-icon">T</div>
+              <div className="dash-kpi-icon">⏱️</div>
             </div>
             {responseChange !== null && (
               <div className={`dash-kpi-change ${responseChange <= 0 ? "up" : "down"}`}>
@@ -202,7 +200,7 @@ function DashboardView({
                 <div className="dash-kpi-label">Contactos únicos</div>
                 <div className="dash-kpi-value">{uniqueContacts.toLocaleString()}</div>
               </div>
-              <div className="dash-kpi-icon">#</div>
+              <div className="dash-kpi-icon">👥</div>
             </div>
             {uniqueContactsChange !== null && (
               <div className={`dash-kpi-change ${uniqueContactsChange >= 0 ? "up" : "down"}`}>
@@ -216,7 +214,7 @@ function DashboardView({
                 <div className="dash-kpi-label">Tasa de conversión</div>
                 <div className="dash-kpi-value">{conversionValue}</div>
               </div>
-              <div className="dash-kpi-icon">%</div>
+              <div className="dash-kpi-icon">📈</div>
             </div>
             {conversionChange !== null && (
               <div className={`dash-kpi-change ${conversionChange >= 0 ? "up" : "down"}`}>
@@ -230,49 +228,94 @@ function DashboardView({
           <div className="dash-card-header">
             <div>
               <div className="dash-card-title">Flujo de Mensajes</div>
-              <div className="dash-card-subtitle">Volumen diario</div>
+              <div className="dash-card-subtitle">Volumen diario por dirección</div>
             </div>
             <div className="dash-legend">
               <span className="dash-legend-item">
-                <span className="dash-legend-dot in" /> Entrantes
+                <span className="dash-legend-dot in" /> Recibidos (clientes)
               </span>
               <span className="dash-legend-item">
-                <span className="dash-legend-dot out" /> Salientes
+                <span className="dash-legend-dot out" /> Enviados (operadores/bot)
               </span>
             </div>
           </div>
           {volume.length > 0 ? (
             <>
-              <div className="dash-chart">
+              <div className="dash-chart" style={{ position: "relative" }}>
+                {hoveredBar && (
+                  <div
+                    className="dash-chart-tooltip"
+                    style={{
+                      left: Math.min(tooltipPos.x, chartWidth - 160),
+                      top: Math.max(tooltipPos.y, 10),
+                    }}
+                  >
+                    <div className="tooltip-date">{formatFullDate(hoveredBar.day)}</div>
+                    <div className="tooltip-row">
+                      <span className="tooltip-dot in" />
+                      <span>Recibidos:</span>
+                      <strong>{hoveredBar.inCount.toLocaleString()}</strong>
+                    </div>
+                    <div className="tooltip-row">
+                      <span className="tooltip-dot out" />
+                      <span>Enviados:</span>
+                      <strong>{hoveredBar.outCount.toLocaleString()}</strong>
+                    </div>
+                    <div className="tooltip-total">
+                      Total: {(hoveredBar.inCount + hoveredBar.outCount).toLocaleString()}
+                    </div>
+                  </div>
+                )}
                 <svg
                   className="dash-chart-svg"
                   viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-                  preserveAspectRatio="none"
+                  preserveAspectRatio="xMidYMid meet"
                 >
-                  <line className="dash-chart-grid" x1="0" y1="60" x2={chartWidth} y2="60" />
-                  <line className="dash-chart-grid" x1="0" y1="120" x2={chartWidth} y2="120" />
+                  {/* Grid lines */}
+                  <line className="dash-chart-grid" x1="20" y1="45" x2={chartWidth - 10} y2="45" />
+                  <line className="dash-chart-grid" x1="20" y1="110" x2={chartWidth - 10} y2="110" />
+                  <line className="dash-chart-grid" x1="20" y1="175" x2={chartWidth - 10} y2="175" />
+
+                  {/* Y-axis labels */}
+                  <text className="dash-chart-axis" x="15" y="48" textAnchor="end">{maxValue}</text>
+                  <text className="dash-chart-axis" x="15" y="113" textAnchor="end">{Math.round(maxValue / 2)}</text>
+                  <text className="dash-chart-axis" x="15" y="178" textAnchor="end">0</text>
+
                   {bars.map((bar, index) => (
-                    <g key={`bar-${index}`}>
+                    <g
+                      key={`bar-${index}`}
+                      onMouseEnter={(e) => handleBarMouseEnter(bar, e)}
+                      onMouseLeave={handleBarMouseLeave}
+                      style={{ cursor: "pointer" }}
+                    >
+                      {/* Invisible hit area for better hover */}
+                      <rect
+                        x={bar.x - 5}
+                        y={baseline - Math.max(bar.inHeight, bar.outHeight) - 10}
+                        width={barWidth * 2 + barGap + 10}
+                        height={Math.max(bar.inHeight, bar.outHeight) + 20}
+                        fill="transparent"
+                      />
+                      {/* Received (green) bar */}
                       <rect
                         className="dash-bar in"
                         x={bar.x}
                         y={baseline - bar.inHeight}
-                        width="20"
-                        height={bar.inHeight}
-                        rx="6"
+                        width={barWidth}
+                        height={Math.max(bar.inHeight, 2)}
+                        rx="4"
                       />
+                      {/* Sent (blue) bar */}
                       <rect
                         className="dash-bar out"
-                        x={bar.x}
-                        y={baseline - bar.inHeight - bar.outHeight}
-                        width="20"
-                        height={bar.outHeight}
-                        rx="6"
+                        x={bar.x + barWidth + barGap}
+                        y={baseline - bar.outHeight}
+                        width={barWidth}
+                        height={Math.max(bar.outHeight, 2)}
+                        rx="4"
                       />
                     </g>
                   ))}
-                  <path className="dash-line in" d={inLine} />
-                  <path className="dash-line out" d={outLine} />
                 </svg>
               </div>
               <div className="dash-chart-labels">
@@ -284,7 +327,7 @@ function DashboardView({
               </div>
             </>
           ) : (
-            <div className="empty-state">Sin datos para el periodo seleccionado</div>
+            <div className="empty-state">Sin datos de mensajes para el periodo seleccionado</div>
           )}
         </div>
       </div>
@@ -292,7 +335,16 @@ function DashboardView({
       <aside className="dashboard-side">
         <div className="dash-card">
           <div className="dash-card-title">Performance de Operadores</div>
-          <div className="dash-card-subtitle">Top 10 - {PERIOD_OPTIONS.find(p => p.value === selectedPeriod)?.label || "Último mes"}</div>
+          <div className="dash-card-subtitle">
+            Top 10 - {PERIOD_OPTIONS.find(p => p.value === selectedPeriod)?.label || "Último mes"}
+          </div>
+          <div className="dash-operator-help">
+            <small>
+              <strong>Cerrados:</strong> Conversaciones que el operador resolvió (status cerrado).
+              <br />
+              <strong>En curso:</strong> Conversaciones asignadas que aún están activas.
+            </small>
+          </div>
           <div className="dash-operator-list">
             {operators.length > 0 ? (
               operators.map((item, idx) => (
@@ -303,12 +355,12 @@ function DashboardView({
                     <div className="dash-operator-role">{item.role}</div>
                     <div className="dash-operator-stats">
                       <div>
-                        <div className="dash-stat-label">Resueltos</div>
-                        <div className="dash-stat-value">{item.resolved}</div>
+                        <div className="dash-stat-label">Cerrados</div>
+                        <div className="dash-stat-value success">{item.resolved}</div>
                       </div>
                       <div>
-                        <div className="dash-stat-label">Pendientes</div>
-                        <div className="dash-stat-value danger">{item.pending}</div>
+                        <div className="dash-stat-label">En curso</div>
+                        <div className="dash-stat-value warning">{item.pending}</div>
                       </div>
                     </div>
                   </div>
@@ -331,7 +383,7 @@ function DashboardView({
               />
             </div>
             <div className="dash-muted">
-              {resolvedToday} resueltas - Objetivo: {dailyGoal}
+              {resolvedToday.toLocaleString()} cerradas de {dailyGoal.toLocaleString()} objetivo
             </div>
           </div>
         </div>

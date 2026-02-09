@@ -17,7 +17,7 @@ export const MAIN_MODULES = [
 ];
 
 export const SETTINGS_MODULES = [
-    { id: "general", label: "General" },
+    { id: "general", label: "Lineas" },
     { id: "users", label: "Gestion de Usuarios" },
     { id: "bot", label: "Configuracion de Bot" },
     { id: "templates", label: "Plantillas de Meta" },

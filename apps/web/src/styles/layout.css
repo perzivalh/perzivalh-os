@@ -303,9 +303,18 @@
   grid-template-columns: 1fr minmax(150px, 220px);
 }
 
+.general-lines-table-wrap {
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.general-lines-table-wrap .table {
+  min-width: 620px;
+}
+
 .general-lines-table-head,
 .general-lines-row {
-  grid-template-columns: minmax(200px, 1.6fr) minmax(160px, 1fr) minmax(100px, 0.7fr) minmax(260px, 1.4fr);
+  grid-template-columns: minmax(200px, 1.6fr) minmax(170px, 1fr) minmax(100px, 0.7fr) 56px;
 }
 
 .general-lines-row {
@@ -326,6 +335,7 @@
 .line-phone-id {
   font-family: "Space Mono", monospace;
   font-size: 0.84rem;
+  word-break: break-all;
 }
 
 .line-meta {
@@ -361,6 +371,70 @@
   background: rgba(226, 85, 85, 0.14);
 }
 
+.line-actions-menu-wrap {
+  position: relative;
+  justify-self: end;
+}
+
+.line-more-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel-muted);
+  color: var(--muted);
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.line-more-btn:hover {
+  color: var(--ink);
+  border-color: var(--accent-soft);
+  background: var(--accent-soft-2);
+}
+
+.line-actions-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 12;
+  min-width: 170px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 14px 28px var(--shadow);
+  padding: 0.35rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.line-actions-menu-item {
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  border-radius: 9px;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.88rem;
+}
+
+.line-actions-menu-item:hover:not(:disabled) {
+  background: var(--panel-muted);
+}
+
+.line-actions-menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.line-actions-menu-item.danger {
+  color: var(--danger);
+}
+
 @media (max-width: 1320px) {
   .general-lines-header {
     flex-direction: column;
@@ -383,6 +457,10 @@
 @media (max-width: 860px) {
   .general-lines-filters {
     grid-template-columns: 1fr;
+  }
+
+  .general-lines-table-wrap .table {
+    min-width: 560px;
   }
 }
 

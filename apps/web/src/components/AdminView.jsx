@@ -71,7 +71,7 @@ function AdminView({
     {
       title: "Principal",
       items: [
-        { id: "general", label: "General", icon: SlidersIcon },
+        { id: "general", label: "Lineas", icon: SlidersIcon },
         { id: "users", label: "Gestion de Usuarios", icon: UsersIcon },
         { id: "bot", label: "Configuracion de Bot", icon: BotIcon },
       ],

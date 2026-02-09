@@ -1,7 +1,7 @@
 /**
  * GeneralSection - Gestion de lineas de WhatsApp
  */
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 const INITIAL_CHANNEL_FORM = {
     id: "",
@@ -46,6 +46,26 @@ function GeneralSection({
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [copiedPhoneId, setCopiedPhoneId] = useState("");
+    const [openMenuId, setOpenMenuId] = useState("");
+
+    useEffect(() => {
+        function handleOutsideClick(event) {
+            if (!event.target.closest(".line-actions-menu-wrap")) {
+                setOpenMenuId("");
+            }
+        }
+        function handleEsc(event) {
+            if (event.key === "Escape") {
+                setOpenMenuId("");
+            }
+        }
+        document.addEventListener("mousedown", handleOutsideClick);
+        document.addEventListener("keydown", handleEsc);
+        return () => {
+            document.removeEventListener("mousedown", handleOutsideClick);
+            document.removeEventListener("keydown", handleEsc);
+        };
+    }, []);
 
     const selectedChannel = useMemo(
         () => tenantChannels.find((channel) => channel.id === channelForm.id) || null,
@@ -127,6 +147,26 @@ function GeneralSection({
         }
     }
 
+    function handleEditFromMenu(channel) {
+        handleChannelSelect(channel);
+        setOpenMenuId("");
+    }
+
+    async function handleCopyFromMenu(channel) {
+        await handleCopyPhoneId(channel.phone_number_id);
+        setOpenMenuId("");
+    }
+
+    async function handleMarkPrimary(channel) {
+        await handleChannelQuickUpdate(channel.id, { is_default: true });
+        setOpenMenuId("");
+    }
+
+    async function handleToggleActive(channel) {
+        await handleChannelQuickUpdate(channel.id, { is_active: !channel.is_active });
+        setOpenMenuId("");
+    }
+
     function resetChannelForm() {
         setChannelForm(INITIAL_CHANNEL_FORM);
     }
@@ -186,7 +226,8 @@ function GeneralSection({
                         </label>
                     </div>
 
-                    <div className="table">
+                    <div className="general-lines-table-wrap">
+                        <div className="table">
                         <div className="table-head general-lines-table-head">
                             <span>Linea</span>
                             <span>Phone ID</span>
@@ -213,41 +254,57 @@ function GeneralSection({
                                         {channel.is_active ? "Activa" : "Inactiva"}
                                     </span>
                                 </span>
-                                <div className="row-actions">
-                                    <button className="ghost" onClick={() => handleChannelSelect(channel)}>
-                                        Editar
-                                    </button>
+                                <div className="line-actions-menu-wrap">
                                     <button
-                                        className="ghost"
-                                        onClick={() => handleCopyPhoneId(channel.phone_number_id)}
-                                    >
-                                        {copiedPhoneId === channel.phone_number_id ? "Copiado" : "Copiar ID"}
-                                    </button>
-                                    <button
-                                        className="ghost"
+                                        type="button"
+                                        className="line-more-btn"
+                                        aria-label={`Abrir acciones de ${getLineName(channel)}`}
                                         onClick={() =>
-                                            handleChannelQuickUpdate(channel.id, { is_default: true })
-                                        }
-                                        disabled={channel.is_default}
-                                    >
-                                        Principal
-                                    </button>
-                                    <button
-                                        className={channel.is_active ? "danger soft" : "ghost"}
-                                        onClick={() =>
-                                            handleChannelQuickUpdate(channel.id, {
-                                                is_active: !channel.is_active,
-                                            })
+                                            setOpenMenuId((prev) => (prev === channel.id ? "" : channel.id))
                                         }
                                     >
-                                        {channel.is_active ? "Desactivar" : "Activar"}
+                                        <span aria-hidden="true">...</span>
                                     </button>
+                                    {openMenuId === channel.id ? (
+                                        <div className="line-actions-menu" role="menu">
+                                            <button
+                                                type="button"
+                                                className="line-actions-menu-item"
+                                                onClick={() => handleEditFromMenu(channel)}
+                                            >
+                                                Editar
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="line-actions-menu-item"
+                                                onClick={() => handleCopyFromMenu(channel)}
+                                            >
+                                                {copiedPhoneId === channel.phone_number_id ? "Copiado" : "Copiar ID"}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="line-actions-menu-item"
+                                                onClick={() => handleMarkPrimary(channel)}
+                                                disabled={channel.is_default}
+                                            >
+                                                Marcar principal
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="line-actions-menu-item danger"
+                                                onClick={() => handleToggleActive(channel)}
+                                            >
+                                                {channel.is_active ? "Desactivar" : "Activar"}
+                                            </button>
+                                        </div>
+                                    ) : null}
                                 </div>
                             </div>
                         ))}
                         {!filteredChannels.length && (
                             <div className="empty-state">No hay lineas que coincidan con los filtros.</div>
                         )}
+                        </div>
                     </div>
                 </div>
 

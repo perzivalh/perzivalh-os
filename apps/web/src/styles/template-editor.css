@@ -568,3 +568,84 @@
         border-top: 1px solid #e2e8f0;
     }
 }
+
+/* ==========================================
+   DARK MODE - TemplateEditorView
+   ========================================== */
+
+body[data-theme="dark"] .template-editor {
+    background: var(--bg);
+}
+
+body[data-theme="dark"] .editor-topbar,
+body[data-theme="dark"] .editor-left,
+body[data-theme="dark"] .editor-right {
+    background: var(--panel);
+    border-color: var(--border);
+}
+
+body[data-theme="dark"] .editor-left h2,
+body[data-theme="dark"] .editor-section h3,
+body[data-theme="dark"] .tabs button.active {
+    color: #ffffff;
+}
+
+body[data-theme="dark"] .breadcrumb,
+body[data-theme="dark"] .editor-left .subtitle,
+body[data-theme="dark"] .variables-panel h4,
+body[data-theme="dark"] .buttons-panel h4,
+body[data-theme="dark"] .no-vars {
+    color: #cbd5e1;
+}
+
+body[data-theme="dark"] .editor-section,
+body[data-theme="dark"] .variable-mapping,
+body[data-theme="dark"] .button-preview,
+body[data-theme="dark"] .btn-add-button {
+    background: var(--panel-muted);
+    border-color: var(--border);
+}
+
+body[data-theme="dark"] .form-group label,
+body[data-theme="dark"] .form-group small,
+body[data-theme="dark"] .char-count,
+body[data-theme="dark"] .button-type {
+    color: #cbd5e1;
+}
+
+body[data-theme="dark"] .form-group input,
+body[data-theme="dark"] .form-group select,
+body[data-theme="dark"] .form-group textarea,
+body[data-theme="dark"] .button-row input,
+body[data-theme="dark"] .variable-mapping input,
+body[data-theme="dark"] .variable-mapping select {
+    background: var(--panel);
+    border-color: var(--border);
+    color: #ffffff;
+}
+
+body[data-theme="dark"] .btn-outline,
+body[data-theme="dark"] .toolbar-btn {
+    background: var(--panel-muted);
+    border-color: var(--border);
+    color: #e5e7eb;
+}
+
+body[data-theme="dark"] .tabs {
+    border-bottom-color: var(--border);
+}
+
+body[data-theme="dark"] .tabs button {
+    color: #94a3b8;
+}
+
+body[data-theme="dark"] .btn-add-button:hover,
+body[data-theme="dark"] .btn-outline:hover,
+body[data-theme="dark"] .toolbar-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+body[data-theme="dark"] .editor-statusbar {
+    background: #0b1220;
+    color: #cbd5e1;
+}

@@ -1044,3 +1044,103 @@
     width: 100%;
     background: transparent;
 }
+
+/* ==========================================
+   DARK MODE OVERRIDES - Templates Section
+   ========================================== */
+
+body[data-theme="dark"] .templates-section {
+    background: transparent;
+}
+
+body[data-theme="dark"] .templates-title-row h1 {
+    color: #ffffff;
+}
+
+body[data-theme="dark"] .template-card {
+    background: var(--panel);
+    border-color: var(--border);
+}
+
+body[data-theme="dark"] .template-card-name {
+    color: #ffffff;
+}
+
+body[data-theme="dark"] .template-card-preview,
+body[data-theme="dark"] .templates-empty {
+    color: #e5e7eb;
+}
+
+body[data-theme="dark"] .template-category-icon,
+body[data-theme="dark"] .tag-category,
+body[data-theme="dark"] .tag-language {
+    background: var(--panel-muted);
+    color: #cbd5e1;
+}
+
+body[data-theme="dark"] .template-card-actions {
+    border-top-color: var(--border);
+}
+
+body[data-theme="dark"] .search-input-wrap input,
+body[data-theme="dark"] .status-filter-select {
+    background: var(--panel);
+    border-color: var(--border);
+    color: #ffffff;
+}
+
+body[data-theme="dark"] .btn-sync {
+    background: var(--panel-muted);
+    border-color: var(--border);
+    color: #e5e7eb;
+}
+
+/* ==========================================
+   DARK MODE OVERRIDES - Embedded Editor
+   ========================================== */
+
+body[data-theme="dark"] .template-editor {
+    background: transparent;
+}
+
+body[data-theme="dark"] .editor-header,
+body[data-theme="dark"] .editor-form-panel,
+body[data-theme="dark"] .editor-mapping-panel {
+    background: var(--panel);
+    border-color: var(--border);
+}
+
+body[data-theme="dark"] .editor-breadcrumb span,
+body[data-theme="dark"] .form-section h3,
+body[data-theme="dark"] .mapping-section h4,
+body[data-theme="dark"] .mapping-empty {
+    color: #ffffff;
+}
+
+body[data-theme="dark"] .form-field span,
+body[data-theme="dark"] .char-count,
+body[data-theme="dark"] .preview-summary-title,
+body[data-theme="dark"] .preview-summary-row span {
+    color: #cbd5e1;
+}
+
+body[data-theme="dark"] .form-field input,
+body[data-theme="dark"] .form-field select,
+body[data-theme="dark"] textarea,
+body[data-theme="dark"] .mapping-item select,
+body[data-theme="dark"] .button-item input {
+    background: var(--panel-muted);
+    border-color: var(--border);
+    color: #ffffff;
+}
+
+body[data-theme="dark"] .preview-summary {
+    background: var(--panel);
+    border-color: var(--border);
+}
+
+body[data-theme="dark"] .mapping-item,
+body[data-theme="dark"] .button-item {
+    background: var(--panel-muted);
+    border-color: var(--border);
+}

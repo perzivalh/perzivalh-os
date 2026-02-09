@@ -677,11 +677,15 @@
    ========================================== */
 
 .bot-section {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 1.2rem;
-  /* margin-top: 1rem; */
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  height: calc(100vh - 8.2rem);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .bot-section-header {
@@ -771,6 +775,16 @@
   display: grid;
   grid-template-columns: 280px 1fr;
   gap: 1.2rem;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.bot-flows-panel,
+.bot-metrics-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .bot-panel-header {
@@ -804,10 +818,14 @@
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.35rem;
 }
 
 .bot-flow-card {
-  background: var(--panel-muted);
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 0.8rem;
@@ -973,7 +991,7 @@
 }
 
 .bot-metric-card {
-  background: var(--panel-muted);
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 1rem;
@@ -1085,8 +1103,18 @@
 }
 
 @media (max-width: 900px) {
+  .bot-section {
+    height: auto;
+    overflow: visible;
+  }
+
   .bot-section-content {
     grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  .bot-flows-list {
+    max-height: 360px;
   }
 
   .bot-metrics-grid {

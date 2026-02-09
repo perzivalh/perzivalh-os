@@ -10,6 +10,7 @@ function BotSection() {
     const [metrics, setMetrics] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [updatingBotId, setUpdatingBotId] = useState("");
 
     useEffect(() => {
         loadData();
@@ -34,13 +35,27 @@ function BotSection() {
     }
 
     async function handleToggleBot(botId, newActive) {
+        if (updatingBotId) {
+            return;
+        }
+        setUpdatingBotId(botId);
+        setError("");
         try {
             await apiPatch(`/api/admin/bots/${botId}`, { is_active: newActive });
-            setBots((prev) =>
-                prev.map((b) => (b.id === botId ? { ...b, is_active: newActive } : b))
-            );
+            setBots((prev) => {
+                if (newActive) {
+                    // Solo un bot puede quedar activo al mismo tiempo.
+                    return prev.map((b) => ({ ...b, is_active: b.id === botId }));
+                }
+                return prev.map((b) =>
+                    b.id === botId ? { ...b, is_active: false } : b
+                );
+            });
         } catch (err) {
             setError(err.message || "Error al cambiar estado");
+            await loadData();
+        } finally {
+            setUpdatingBotId("");
         }
     }
 
@@ -118,6 +133,7 @@ function BotSection() {
                                             <input
                                                 type="checkbox"
                                                 checked={bot.is_active}
+                                                disabled={Boolean(updatingBotId)}
                                                 onChange={() => handleToggleBot(bot.id, !bot.is_active)}
                                             />
                                             <span className="bot-toggle-slider" />

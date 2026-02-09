@@ -50,13 +50,9 @@ function DashboardView({
   onChannelChange,
   onRefresh,
   onGenerateReport,
-  brandName,
 }) {
   const [hoveredBar, setHoveredBar] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
-
-  const brandLabel = (brandName || "Empresa").trim();
-  const kicker = brandLabel ? `${brandLabel} Enterprise` : "Enterprise";
 
   // Parse metrics with fallbacks
   const activeConversations = metrics?.active_conversations?.value ?? 0;
@@ -127,10 +123,9 @@ function DashboardView({
       <div className="dashboard-main">
         <header className="dashboard-header">
           <div>
-            <div className="dashboard-kicker">{kicker}</div>
             <h2 className="dashboard-title">Dashboard</h2>
             <div className="dashboard-subtitle">
-              Marketing Analytics & WhatsApp CRM Overview
+              Analitica de marketing y resumen del CRM de WhatsApp
             </div>
           </div>
           <div className="dashboard-actions">

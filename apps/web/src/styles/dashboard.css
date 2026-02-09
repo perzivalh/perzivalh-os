@@ -56,8 +56,9 @@
 
 .dashboard-title {
   margin: 0.3rem 0 0;
-  font-family: "Space Grotesk", sans-serif;
-  font-size: 2rem;
+  font-family: inherit;
+  font-size: 1.9rem;
+  font-weight: 700;
 }
 
 .dashboard-subtitle {

@@ -1,0 +1,108 @@
+body[data-theme="dark"] .primary,
+body[data-theme="dark"] .danger,
+body[data-theme="dark"] .settings-primary,
+body[data-theme="dark"] .campaigns-primary,
+body[data-theme="dark"] .campaigns-danger,
+body[data-theme="dark"] .audit-export,
+body[data-theme="dark"] .rail-button.active,
+body[data-theme="dark"] .rail-logo,
+body[data-theme="dark"] .icon-button.add-chat {
+  color: #0b1220;
+}
+
+body[data-theme="dark"] .rail-button.active .rail-icon {
+  color: #0b1220;
+}
+
+body[data-theme="dark"] .danger.soft,
+body[data-theme="dark"] .line-actions-menu-item.danger,
+body[data-theme="dark"] .role-subtitle.alert,
+body[data-theme="dark"] .bot-metric-sub.error-sub,
+body[data-theme="dark"] .dash-stat-value.danger {
+  color: rgb(191, 219, 254);
+}
+
+body[data-theme="dark"] .danger.soft {
+  background: rgba(191, 219, 254, 0.12);
+  border-color: rgba(191, 219, 254, 0.4);
+}
+
+body[data-theme="dark"] .list-subtitle {
+  color: #ffffff;
+}
+
+body[data-theme="dark"] .icon-button.add-chat,
+body[data-theme="dark"] .icon-button.add-chat:hover,
+body[data-theme="dark"] .presence-dot,
+body[data-theme="dark"] .conversation-unread,
+body[data-theme="dark"] .operator-dot,
+body[data-theme="dark"] .status-dot.closed,
+body[data-theme="dark"] .campaigns-danger,
+body[data-theme="dark"] .audit-export,
+body[data-theme="dark"] .users-kicker {
+  background: rgb(191, 219, 254);
+  border-color: rgb(191, 219, 254);
+}
+
+body[data-theme="dark"] .role-pill.admin {
+  background: rgba(191, 219, 254, 0.18);
+  color: rgb(191, 219, 254);
+}
+
+body[data-theme="dark"] .bot-error,
+body[data-theme="dark"] .bot-metric-icon.error {
+  background: rgba(191, 219, 254, 0.12);
+  border-color: rgba(191, 219, 254, 0.32);
+  color: rgb(191, 219, 254);
+}
+
+body[data-theme="dark"] .status-pill.closed,
+body[data-theme="dark"] .info-avatar {
+  background: rgba(191, 219, 254, 0.18);
+  color: rgb(191, 219, 254);
+}
+
+body[data-theme="dark"] .chat-shell .info-section,
+body[data-theme="dark"] .chat-shell .icon-button,
+body[data-theme="dark"] .chat-shell .reassign-card {
+  background: rgba(191, 219, 254, 0.08);
+  border-color: rgba(191, 219, 254, 0.28);
+}
+
+body[data-theme="dark"] .chat-shell .action-stack .ghost {
+  background: rgba(191, 219, 254, 0.12);
+  border-color: rgba(191, 219, 254, 0.35);
+  color: rgb(191, 219, 254);
+}
+
+body[data-theme="dark"] .chat-shell .action-stack .ghost:hover {
+  background: rgba(191, 219, 254, 0.18);
+}
+
+body[data-theme="dark"] .notice-banner-error {
+  border-color: rgba(191, 219, 254, 0.35);
+  background: linear-gradient(135deg, rgba(191, 219, 254, 0.18), rgba(191, 219, 254, 0.04));
+}
+
+body[data-theme="dark"] .notice-banner-error .notice-icon {
+  background: rgba(191, 219, 254, 0.2);
+  color: rgb(191, 219, 254);
+}
+
+body[data-theme="dark"] .toast-error .toast-icon,
+body[data-theme="dark"] .toast-progress-error,
+body[data-theme="dark"] .toast-info .toast-icon,
+body[data-theme="dark"] .toast-progress-info {
+  background: rgb(191, 219, 254);
+  color: #0b1220;
+}
+
+body[data-theme="dark"] .toast-action {
+  color: rgb(191, 219, 254);
+}
+
+body[data-theme="dark"] .campaigns-subtitle--upper {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.9rem;
+}

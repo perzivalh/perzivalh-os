@@ -33,7 +33,7 @@ const CAMPAIGN_TABS = [
     id: "audiences",
     label: "Audiencias",
     title: "Audiencias",
-    subtitle: "MÓDULO DE GESTIÓN Y CAMPAÑAS",
+    subtitle: "Modulo de gestion y campanas",
   },
   {
     id: "templates",

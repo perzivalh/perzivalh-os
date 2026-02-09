@@ -66,7 +66,6 @@ router.get("/dashboard/metrics", requireAuth, async (req, res) => {
       },
     });
 
-    // Previous period active (approximation based on created_at)
     const prevActiveConversations = await prisma.conversation.count({
       where: {
         ...channelWhere,
@@ -75,7 +74,7 @@ router.get("/dashboard/metrics", requireAuth, async (req, res) => {
       },
     });
 
-    // ========== UNIQUE CONTACTS ==========
+    // ========== UNIQUE CONTACTS (new conversations in period) ==========
     const uniqueContactsCurrent = await prisma.conversation.count({
       where: {
         ...channelWhere,
@@ -91,123 +90,115 @@ router.get("/dashboard/metrics", requireAuth, async (req, res) => {
     });
 
     // ========== AVERAGE RESPONSE TIME ==========
-    const avgFirstReplyRaw = await prisma.$queryRaw`
-            WITH pending AS (
-                SELECT (data_json->>'conversation_id') AS conversation_id,
-                       MIN(created_at) AS pending_at
-                FROM "AuditLog"
-                WHERE action = 'conversation.status_changed'
-                  AND data_json->>'status' = 'pending'
-                  AND created_at >= ${startDate}
-                GROUP BY data_json->>'conversation_id'
-            ),
-            first_reply AS (
-                SELECT m.conversation_id,
-                       MIN(m.created_at) AS reply_at
-                FROM "Message" m
-                WHERE m.direction = 'out'
-                  AND m.created_at >= ${startDate}
-                GROUP BY m.conversation_id
-            )
-            SELECT AVG(EXTRACT(EPOCH FROM (fr.reply_at - p.pending_at))) AS avg_seconds
-            FROM pending p
-            JOIN first_reply fr ON fr.conversation_id = p.conversation_id
-            WHERE fr.reply_at > p.pending_at
-        `;
+    // Simplified: get average time between first in and first out message per conversation
+    let avgResponseMinutes = null;
+    let avgResponseMinutesPrev = null;
 
-    const avgFirstReplyPrevRaw = await prisma.$queryRaw`
-            WITH pending AS (
-                SELECT (data_json->>'conversation_id') AS conversation_id,
-                       MIN(created_at) AS pending_at
-                FROM "AuditLog"
-                WHERE action = 'conversation.status_changed'
-                  AND data_json->>'status' = 'pending'
-                  AND created_at >= ${prevStartDate}
-                  AND created_at < ${prevEndDate}
-                GROUP BY data_json->>'conversation_id'
-            ),
-            first_reply AS (
-                SELECT m.conversation_id,
-                       MIN(m.created_at) AS reply_at
-                FROM "Message" m
-                WHERE m.direction = 'out'
-                  AND m.created_at >= ${prevStartDate}
-                  AND m.created_at < ${prevEndDate}
-                GROUP BY m.conversation_id
-            )
-            SELECT AVG(EXTRACT(EPOCH FROM (fr.reply_at - p.pending_at))) AS avg_seconds
-            FROM pending p
-            JOIN first_reply fr ON fr.conversation_id = p.conversation_id
-            WHERE fr.reply_at > p.pending_at
-        `;
+    try {
+      const avgResponseRaw = await prisma.$queryRaw`
+                WITH first_messages AS (
+                    SELECT 
+                        conversation_id,
+                        MIN(CASE WHEN direction = 'in' THEN created_at END) as first_in,
+                        MIN(CASE WHEN direction = 'out' THEN created_at END) as first_out
+                    FROM "Message"
+                    WHERE created_at >= ${startDate}
+                    GROUP BY conversation_id
+                    HAVING MIN(CASE WHEN direction = 'out' THEN created_at END) IS NOT NULL
+                       AND MIN(CASE WHEN direction = 'in' THEN created_at END) IS NOT NULL
+                )
+                SELECT AVG(EXTRACT(EPOCH FROM (first_out - first_in)) / 60) as avg_minutes
+                FROM first_messages
+                WHERE first_out > first_in
+            `;
+      avgResponseMinutes = avgResponseRaw?.[0]?.avg_minutes
+        ? Number(Number(avgResponseRaw[0].avg_minutes).toFixed(1))
+        : null;
+    } catch (e) {
+      console.error("[dashboard] avg_response query error:", e.message);
+    }
 
-    const avgResponseSeconds = avgFirstReplyRaw?.[0]?.avg_seconds
-      ? Number(avgFirstReplyRaw[0].avg_seconds)
-      : null;
-    const avgResponseSecondsPrev = avgFirstReplyPrevRaw?.[0]?.avg_seconds
-      ? Number(avgFirstReplyPrevRaw[0].avg_seconds)
-      : null;
-    const avgResponseMinutes = avgResponseSeconds ? avgResponseSeconds / 60 : null;
-    const avgResponseMinutesPrev = avgResponseSecondsPrev ? avgResponseSecondsPrev / 60 : null;
+    try {
+      const avgResponsePrevRaw = await prisma.$queryRaw`
+                WITH first_messages AS (
+                    SELECT 
+                        conversation_id,
+                        MIN(CASE WHEN direction = 'in' THEN created_at END) as first_in,
+                        MIN(CASE WHEN direction = 'out' THEN created_at END) as first_out
+                    FROM "Message"
+                    WHERE created_at >= ${prevStartDate} AND created_at < ${prevEndDate}
+                    GROUP BY conversation_id
+                    HAVING MIN(CASE WHEN direction = 'out' THEN created_at END) IS NOT NULL
+                       AND MIN(CASE WHEN direction = 'in' THEN created_at END) IS NOT NULL
+                )
+                SELECT AVG(EXTRACT(EPOCH FROM (first_out - first_in)) / 60) as avg_minutes
+                FROM first_messages
+                WHERE first_out > first_in
+            `;
+      avgResponseMinutesPrev = avgResponsePrevRaw?.[0]?.avg_minutes
+        ? Number(Number(avgResponsePrevRaw[0].avg_minutes).toFixed(1))
+        : null;
+    } catch (e) {
+      console.error("[dashboard] avg_response_prev query error:", e.message);
+    }
 
     // ========== MESSAGE VOLUME BY DAY ==========
-    const messageVolumeRaw = await prisma.$queryRaw`
-            SELECT 
-                DATE(created_at) as day,
-                COUNT(*) FILTER (WHERE direction = 'in') as in_count,
-                COUNT(*) FILTER (WHERE direction = 'out') as out_count
-            FROM "Message"
-            WHERE created_at >= ${startDate}
-            GROUP BY DATE(created_at)
-            ORDER BY day ASC
-        `;
-
-    const messageVolume = (messageVolumeRaw || []).map((row) => ({
-      day: row.day ? row.day.toISOString().split("T")[0] : null,
-      in_count: Number(row.in_count || 0),
-      out_count: Number(row.out_count || 0),
-    }));
+    let messageVolume = [];
+    try {
+      const messageVolumeRaw = await prisma.$queryRaw`
+                SELECT 
+                    DATE(created_at) as day,
+                    COUNT(*) FILTER (WHERE direction = 'in') as in_count,
+                    COUNT(*) FILTER (WHERE direction = 'out') as out_count
+                FROM "Message"
+                WHERE created_at >= ${startDate}
+                GROUP BY DATE(created_at)
+                ORDER BY day ASC
+            `;
+      messageVolume = (messageVolumeRaw || []).map((row) => ({
+        day: row.day ? row.day.toISOString().split("T")[0] : null,
+        in_count: Number(row.in_count || 0),
+        out_count: Number(row.out_count || 0),
+      }));
+    } catch (e) {
+      console.error("[dashboard] message_volume query error:", e.message);
+    }
 
     // ========== OPERATOR RANKINGS ==========
-    // Get operators who resolved conversations (changed status to closed or took pending)
-    const operatorStatsRaw = await prisma.$queryRaw`
-            SELECT 
-                u.id,
-                u.name,
-                u.role,
-                COUNT(DISTINCT CASE 
-                    WHEN al.action = 'conversation.assigned' 
-                    AND al.created_at >= ${startDate}
-                    THEN al.data_json->>'conversation_id' 
-                END) as resolved,
-                (
-                    SELECT COUNT(*) 
-                    FROM "Conversation" c 
-                    WHERE c.assigned_user_id = u.id 
-                    AND c.status IN ('open', 'pending')
-                ) as pending
-            FROM "User" u
-            LEFT JOIN "AuditLog" al ON al.user_id = u.id
-            WHERE u.is_active = true
-            AND u.role != 'admin'
-            GROUP BY u.id, u.name, u.role
-            ORDER BY resolved DESC
-            LIMIT 10
-        `;
-
-    const operators = (operatorStatsRaw || []).map((row) => ({
-      id: row.id,
-      name: row.name,
-      role: row.role,
-      resolved: Number(row.resolved || 0),
-      pending: Number(row.pending || 0),
-    }));
+    // Get operators with their assigned conversation counts
+    let operators = [];
+    try {
+      const operatorStatsRaw = await prisma.$queryRaw`
+                SELECT 
+                    u.id,
+                    u.name,
+                    u.role,
+                    COUNT(DISTINCT CASE WHEN c.status = 'closed' THEN c.id END) as resolved,
+                    COUNT(DISTINCT CASE WHEN c.status IN ('open', 'pending') THEN c.id END) as pending
+                FROM "User" u
+                LEFT JOIN "Conversation" c ON c.assigned_user_id = u.id
+                WHERE u.is_active = true
+                  AND u.role != 'admin'
+                GROUP BY u.id, u.name, u.role
+                ORDER BY resolved DESC
+                LIMIT 10
+            `;
+      operators = (operatorStatsRaw || []).map((row) => ({
+        id: row.id,
+        name: row.name,
+        role: row.role,
+        resolved: Number(row.resolved || 0),
+        pending: Number(row.pending || 0),
+      }));
+    } catch (e) {
+      console.error("[dashboard] operators query error:", e.message);
+    }
 
     // ========== TEAM EFFICIENCY ==========
-    const totalResolved = await prisma.auditLog.count({
+    const totalClosed = await prisma.conversation.count({
       where: {
-        action: "conversation.assigned",
-        created_at: { gte: startDate },
+        ...channelWhere,
+        status: "closed",
       },
     });
 
@@ -218,13 +209,27 @@ router.get("/dashboard/metrics", requireAuth, async (req, res) => {
       },
     });
 
-    const dailyGoal = 500;
-    const efficiency = totalResolved > 0
-      ? Math.min(100, Math.round((totalResolved / (totalResolved + totalPending)) * 100))
+    const totalOpen = await prisma.conversation.count({
+      where: {
+        ...channelWhere,
+        status: "open",
+      },
+    });
+
+    const totalAll = totalClosed + totalPending + totalOpen;
+    const efficiency = totalAll > 0
+      ? Math.round((totalClosed / totalAll) * 100)
       : 0;
 
-    // ========== CONVERSION RATE (messages that led to resolution) ==========
-    const totalConversationsClosed = await prisma.conversation.count({
+    // ========== CONVERSION RATE ==========
+    const totalConversationsInPeriod = await prisma.conversation.count({
+      where: {
+        ...channelWhere,
+        last_message_at: { gte: startDate },
+      },
+    });
+
+    const closedInPeriod = await prisma.conversation.count({
       where: {
         ...channelWhere,
         status: "closed",
@@ -232,19 +237,19 @@ router.get("/dashboard/metrics", requireAuth, async (req, res) => {
       },
     });
 
-    const totalConversationsAll = await prisma.conversation.count({
-      where: {
-        ...channelWhere,
-        last_message_at: { gte: startDate },
-      },
-    });
-
-    const conversionRate = totalConversationsAll > 0
-      ? Number(((totalConversationsClosed / totalConversationsAll) * 100).toFixed(1))
+    const conversionRate = totalConversationsInPeriod > 0
+      ? Number(((closedInPeriod / totalConversationsInPeriod) * 100).toFixed(1))
       : 0;
 
     // Previous period conversion
-    const totalConversationsClosedPrev = await prisma.conversation.count({
+    const totalConversationsInPrevPeriod = await prisma.conversation.count({
+      where: {
+        ...channelWhere,
+        last_message_at: { gte: prevStartDate, lt: prevEndDate },
+      },
+    });
+
+    const closedInPrevPeriod = await prisma.conversation.count({
       where: {
         ...channelWhere,
         status: "closed",
@@ -252,15 +257,8 @@ router.get("/dashboard/metrics", requireAuth, async (req, res) => {
       },
     });
 
-    const totalConversationsAllPrev = await prisma.conversation.count({
-      where: {
-        ...channelWhere,
-        last_message_at: { gte: prevStartDate, lt: prevEndDate },
-      },
-    });
-
-    const conversionRatePrev = totalConversationsAllPrev > 0
-      ? Number(((totalConversationsClosedPrev / totalConversationsAllPrev) * 100).toFixed(1))
+    const conversionRatePrev = totalConversationsInPrevPeriod > 0
+      ? Number(((closedInPrevPeriod / totalConversationsInPrevPeriod) * 100).toFixed(1))
       : 0;
 
     // ========== BUILD RESPONSE ==========
@@ -271,7 +269,7 @@ router.get("/dashboard/metrics", requireAuth, async (req, res) => {
         change: calcChange(activeConversations, prevActiveConversations),
       },
       avg_response_time: {
-        value: avgResponseMinutes ? Number(avgResponseMinutes.toFixed(1)) : null,
+        value: avgResponseMinutes,
         change: avgResponseMinutes && avgResponseMinutesPrev
           ? Number((avgResponseMinutes - avgResponseMinutesPrev).toFixed(1))
           : null,
@@ -288,16 +286,16 @@ router.get("/dashboard/metrics", requireAuth, async (req, res) => {
       message_volume: messageVolume,
       operators,
       team_efficiency: efficiency,
-      daily_goal: dailyGoal,
-      resolved_today: totalResolved,
+      daily_goal: 500,
+      resolved_today: totalClosed,
     });
   } catch (error) {
-    console.error("[dashboard.metrics] Error:", error);
-    return res.status(500).json({ error: "metrics_failed" });
+    console.error("[dashboard.metrics] Error:", error.message, error.stack);
+    return res.status(500).json({ error: "metrics_failed", details: error.message });
   }
 });
 
-// GET /api/dashboard/report - Generate PDF report
+// GET /api/dashboard/report - Generate report
 router.get("/dashboard/report", requireAuth, async (req, res) => {
   try {
     const period = req.query.period || "30d";
@@ -319,39 +317,34 @@ router.get("/dashboard/report", requireAuth, async (req, res) => {
       where: { created_at: { gte: startDate } },
     });
 
-    const operatorStatsRaw = await prisma.$queryRaw`
-            SELECT 
-                u.id,
-                u.name,
-                u.role,
-                COUNT(DISTINCT CASE 
-                    WHEN al.action = 'conversation.assigned' 
-                    AND al.created_at >= ${startDate}
-                    THEN al.data_json->>'conversation_id' 
-                END) as resolved,
-                (
-                    SELECT COUNT(*) 
-                    FROM "Conversation" c 
-                    WHERE c.assigned_user_id = u.id 
-                    AND c.status IN ('open', 'pending')
-                ) as pending
-            FROM "User" u
-            LEFT JOIN "AuditLog" al ON al.user_id = u.id
-            WHERE u.is_active = true
-            AND u.role != 'admin'
-            GROUP BY u.id, u.name, u.role
-            ORDER BY resolved DESC
-            LIMIT 10
-        `;
+    let operators = [];
+    try {
+      const operatorStatsRaw = await prisma.$queryRaw`
+                SELECT 
+                    u.id,
+                    u.name,
+                    u.role,
+                    COUNT(DISTINCT CASE WHEN c.status = 'closed' THEN c.id END) as resolved,
+                    COUNT(DISTINCT CASE WHEN c.status IN ('open', 'pending') THEN c.id END) as pending
+                FROM "User" u
+                LEFT JOIN "Conversation" c ON c.assigned_user_id = u.id
+                WHERE u.is_active = true
+                  AND u.role != 'admin'
+                GROUP BY u.id, u.name, u.role
+                ORDER BY resolved DESC
+                LIMIT 10
+            `;
+      operators = (operatorStatsRaw || []).map((row) => ({
+        name: row.name,
+        role: row.role,
+        resolved: Number(row.resolved || 0),
+        pending: Number(row.pending || 0),
+      }));
+    } catch (e) {
+      console.error("[dashboard.report] operators query error:", e.message);
+    }
 
-    const operators = (operatorStatsRaw || []).map((row) => ({
-      name: row.name,
-      role: row.role,
-      resolved: Number(row.resolved || 0),
-      pending: Number(row.pending || 0),
-    }));
-
-    // Generate simple text-based report (CSV format for easy download)
+    // Generate simple text-based report
     const periodLabels = {
       "24h": "Últimas 24 horas",
       "7d": "Última semana",
@@ -379,7 +372,7 @@ router.get("/dashboard/report", requireAuth, async (req, res) => {
     res.setHeader("Content-Disposition", `attachment; filename="reporte-dashboard-${reportDate}.txt"`);
     return res.send(reportContent);
   } catch (error) {
-    console.error("[dashboard.report] Error:", error);
+    console.error("[dashboard.report] Error:", error.message);
     return res.status(500).json({ error: "report_generation_failed" });
   }
 });

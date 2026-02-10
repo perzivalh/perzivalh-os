@@ -280,11 +280,19 @@ async function routeWithAI({ text, flow, config, session }) {
       : process.env.OPENAI_API_KEY);
   const apiKey = rawKey ? String(rawKey).trim() : "";
 
-  // Check max turns
-  const maxTurns = Number(aiFlow.max_turns || 5);
+  // Check max turns - but ALWAYS allow keyword fallback first
+  const maxTurns = Number(aiFlow.max_turns || 20);
   const usedTurns = Number(session?.data?.ai_turns || 0);
-  if (usedTurns >= maxTurns) {
+  const turnsExceeded = usedTurns >= maxTurns;
+
+  // If turns exceeded, try keyword routing before giving up
+  if (turnsExceeded) {
     logger.info("ai.router_max_turns", { flowId, usedTurns, maxTurns });
+    const fallbackRoute = fallbackKeywordRoute(text);
+    if (fallbackRoute) {
+      return { action: "route", route_id: fallbackRoute, text: "", ai_used: false, reset_turns: true };
+    }
+    // No keyword match either - show services as last resort
     return { action: "show_services", text: "Te muestro nuestros servicios:", ai_used: false };
   }
 
@@ -380,10 +388,13 @@ async function routeWithAI({ text, flow, config, session }) {
       reason: parsed.reason || null,
     });
 
+    // Reset turns on successful route to prevent lockout in new context
+    const shouldResetTurns = parsed.action === "route" || parsed.action === "show_services";
     return {
       ...parsed,
       ai_used: true,
       clear_pending: Boolean(previousQuestion),
+      reset_turns: shouldResetTurns,
     };
 
   } catch (error) {

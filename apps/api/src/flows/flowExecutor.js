@@ -313,6 +313,13 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
         });
       }
 
+      // Reset AI turns when routing to a new node (fresh context)
+      if (aiDecision.reset_turns) {
+        await sessionStore.updateSession(waId, lineId, {
+          data: { ai_turns: 0 },
+        });
+      }
+
       // Anti-repetition: Check if we'd be sending the same message
       const lastSentText = session.data?.last_sent_text || "";
       const aiText = aiDecision.text?.trim() || aiDecision.reply_text?.trim() || "";
@@ -446,6 +453,7 @@ async function executeDynamicInteractive(waId, selectionId, flowData, context = 
       flow_id: flow.id,
       last_user_at: new Date().toISOString(),
       ai_pending: null,
+      ai_turns: 0,  // Reset AI turns on interactive button press
     },
     flow_id: flow.id,
   });

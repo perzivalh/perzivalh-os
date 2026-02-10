@@ -295,7 +295,7 @@ module.exports = {
     "id": "UNERO_INFO_5",
     "type": "image",
     "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/U%C3%B1ero/podomix.jpg",
-    "text": "Si necesita un paquete completo 🦶✨ tiene una opción accesible y detallada por realizarse, PODOMIX incluye una valoración profesional 👨‍⚕️📋, extracción de uñeros ✂️🦶 y pedicure clínico 🧼💅, todo por un costo de 300 Bs 💰.\nEste paquete se realiza únicamente bajo recomendación del especialista 🩺, ya que durante la valoración 🔍 se determinará si el paciente necesita o no dicho tratamiento ✅❌.",
+    "text": "Si necesita un paquete completo 🦶✨ tiene una opción accesible y detallada por realizarse, PODOMIX incluye una valoración profesional 👨‍⚕️📋, extracción de uñeros ✂️🦶 y pedicure clínico 🧼💅, todo por un costo de 350 Bs 💰.\nEste paquete se realiza únicamente bajo recomendación del especialista 🩺, ya que durante la valoración 🔍 se determinará si el paciente necesita o no dicho tratamiento ✅❌.",
     "next": "UNERO_TIPO_TRAT_OPTIONS"
   },
   {
@@ -454,7 +454,7 @@ module.exports = {
     "id": "TRAT_ORTESIS_STEP_1",
     "type": "image",
     "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/U%C3%B1ero/Ortesis/IMAGEN%201.jpg",
-    "text": "🦶✨ La ortesis ungueal es un tratamiento que corrige la forma de la uña del pie, ayudando a que crezca correctamente y evitando que se encarne 💅😊",
+    "text": "🦶✨ La ortesis ungueal es un tratamiento que corrige la forma de la uña del pie, ayudando a que crezca correctamente y evitando que se encarne 💅😊* Costo: 150 Bs un dedo.",
     "next": "TRAT_ORTESIS_STEP_2"
   },
   {
@@ -750,6 +750,13 @@ module.exports = {
     "type": "video",
     "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podopediatr%C3%ADa/podopediatria.mp4",
     "text": "👣 ¿Preocupado por el caminar de tu hijo? 🎥 Te compartimos este video sobre podopediatría",
+    "next": "SVC_PODOPEDIATRIA_STEP_5_1"
+  },
+  {
+    "id": "SVC_PODOPEDIATRIA_STEP_5_1",
+    "type": "image",
+    "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podopediatr%C3%ADa/5.jpg",
+    "text": "Si necesita un paquete completo 🦶🩵 tiene una opción accesible y detallada por realizarse, PODOPEDIATRIK incluye un chequeo médico 🩺📋, revisión podal 👣🔍, y limpieza podal 💧✨, todo por un costo de 150 Bs 💵. \nEste paquete se realiza únicamente bajo recomendación del especialista 🩺, ya que durante la valoración 🔍 se determinará si el paciente necesita o no dicho tratamiento ✅❌.",
     "next": "SVC_PODOPEDIATRIA_ACTIONS"
   },
   {
@@ -801,6 +808,13 @@ module.exports = {
     "type": "video",
     "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podogeriatria/podogediatria.mp4",
     "text": "Este servicio podológico está enfocado en los pies de los adultos mayores, con pies más sensibles, enfermedades crónicas como la diabetes y problemas circulatorios hacen que los pies sean más vulnerables a diversas afecciones, como piel frágil, mala circulación, uñas engrosadas o deformidades. 🤶🏽",
+    "next": "SVC_PODOGERIATRIA_STEP_3_1"
+  },
+  {
+    "id": "SVC_PODOGERIATRIA_STEP_3_1",
+    "type": "image",
+    "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podogeriatria/4.jpg",
+    "text": "Si necesita un paquete completo 🦶✨ tiene una opción accesible y detallada por realizarse, PODOGERIATRIK incluye un chequeo médico 👨‍⚕️📋, revisión podal 👣🔍, limpieza profunda ✂️🦶 e hidratación podal 🧼💅, todo por un costo de 200 Bs 💰. \nEste paquete se realiza únicamente bajo recomendación del especialista 🩺, ya que durante la valoración 🔍 se determinará si el paciente necesita o no dicho tratamiento ✅❌.",
     "next": "SVC_PODOGERIATRIA_ACTIONS"
   },
   {
@@ -944,7 +958,7 @@ module.exports = {
     "id": "OTR_VERRUGA_STEP_3",
     "type": "image",
     "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/2.%20Verruga%20plantar/2.jpg",
-    "text": "Precio del servicio. 💵\n- Verrugas simple, 200 Bs.\n- Verrugas dobles, 400 Bs.\n- Verrugas múltiples, 800 Bs",
+    "text": "Precio del servicio. 💵\n- Verrugas simple, 400 Bs.\n- Verrugas dobles, 600 Bs.\n- Verrugas múltiples, 800 Bs",
     "next": "OTR_VERRUGA_STEP_4"
   },
   {

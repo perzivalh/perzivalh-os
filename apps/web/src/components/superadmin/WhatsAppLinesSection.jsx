@@ -1,6 +1,7 @@
 ﻿import React, { useState } from "react";
 import { PlusIcon, SmartphoneIcon, EditIcon, TrashIcon } from "./icons";
 import { WhatsAppLineModal } from "./WhatsAppLineModal";
+import { WhatsAppEmbeddedSignup } from "./WhatsAppEmbeddedSignup";
 import { apiDelete, apiPatch, apiPost } from "../../api";
 
 export function WhatsAppLinesSection({ channels = [], tenantId, onRefresh }) {
@@ -53,10 +54,20 @@ export function WhatsAppLinesSection({ channels = [], tenantId, onRefresh }) {
                         <p>Gestiona las conexiones activas de WhatsApp para este tenant.</p>
                     </div>
                 </div>
-                <button className="sa-btn primary" onClick={handleAdd}>
-                    <PlusIcon width={16} height={16} style={{ marginRight: "0.5rem" }} />
-                    Agregar Nueva Línea
-                </button>
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <WhatsAppEmbeddedSignup
+                        tenantId={tenantId}
+                        onSuccess={() => {
+                            alert("¡Línea conectada correctamente!");
+                            onRefresh();
+                        }}
+                        onError={(msg) => alert(`Error: ${msg}`)}
+                    />
+                    <button className="sa-btn ghost" onClick={handleAdd}>
+                        <PlusIcon width={16} height={16} style={{ marginRight: "0.5rem" }} />
+                        Manual
+                    </button>
+                </div>
             </header>
 
             <div className="sa-lines-body">
@@ -106,7 +117,7 @@ export function WhatsAppLinesSection({ channels = [], tenantId, onRefresh }) {
                         <div className="sa-add-icon-circle">
                             <PlusIcon width={24} height={24} />
                         </div>
-                        <span>Nueva Conexión</span>
+                        <span>Nueva Conexión Manual</span>
                     </button>
                 </div>
             </div>

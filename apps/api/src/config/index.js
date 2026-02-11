@@ -41,6 +41,7 @@ function isAllowedOrigin(origin) {
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const ADMIN_PHONE_E164 = process.env.ADMIN_PHONE_E164;
 const WHATSAPP_APP_SECRET = process.env.WHATSAPP_APP_SECRET || "";
+const WHATSAPP_CONFIG_ID = process.env.WHATSAPP_CONFIG_ID || "";
 
 // Configuración de campañas
 const CAMPAIGN_BATCH_SIZE = Number(process.env.CAMPAIGN_BATCH_SIZE || 8);
@@ -63,23 +64,25 @@ module.exports = {
   FRONTEND_ORIGINS,
   normalizeOrigin,
   isAllowedOrigin,
-  
+
   // WhatsApp
   VERIFY_TOKEN,
   ADMIN_PHONE_E164,
+  WHATSAPP_APP_ID: process.env.WHATSAPP_APP_ID || "",
   WHATSAPP_APP_SECRET,
-  
+  WHATSAPP_CONFIG_ID,
+
   // Campañas
   CAMPAIGN_BATCH_SIZE,
   CAMPAIGN_INTERVAL_MS,
-  
+
   // Rate limiting
   RATE_LIMIT_MAX,
   RATE_LIMIT_WINDOW_MS,
-  
+
   // Cache
   SETTINGS_CACHE_MS,
-  
+
   // Estados
   ALLOWED_STATUS,
 };

@@ -31,6 +31,10 @@ function requireSuperAdmin(req, res, next) {
     return next();
 }
 
+// Montar rutas de integracion de WhatsApp (Embedded Signup / Coexistence)
+const whatsappIntegrations = require("./whatsappIntegrations");
+router.use("/", whatsappIntegrations);
+
 function sanitizeTenantBotConfig(config) {
     if (!config || typeof config !== "object") {
         return config;

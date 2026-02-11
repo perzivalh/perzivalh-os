@@ -697,14 +697,14 @@ module.exports = {
       "id": "SVC_PODOPEDIATRIA_STEP_3",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podopediatr%C3%ADa/2.jpg",
-      "text": "Costo de la PODOPEDIATRIA es de 150 Bs. Este servicio incluye limpieza, corte correcto de uñas, eliminación de callosidades leves y recomendaciones personalizadas para el cuidado de tus pies. 💵\nNuestros podólogos te darán ASESORAMIENTO PERSONALIZADO para la salud de tus pies, incluyendo el uso del calzado adecuado y consejos en la higiene de tus pies. 🧼",
+      "text": "Este servicio se enfoca en PREVENIR Y TRATAR MOLESTIAS COMUNES en los pies de niños como son las uñas encarnadas, malos cortes de uñas o infecciones por mala higiene. 🍼",
       "next": "SVC_PODOPEDIATRIA_STEP_4"
     },
     {
       "id": "SVC_PODOPEDIATRIA_STEP_4",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podopediatr%C3%ADa/3.jpg",
-      "text": "Si en la consulta se detecta la necesidad de tratar UÑEROS, FISURAS, VERRUGAS, HONGOS E HIPERQUERATOSIS el precio variará según el servicio a realizar, así usted decide si desea el SERVICIO ADICIONAL en ese momento. 👣🚶‍♂️🚶‍♀️",
+      "text": "Sabemos que este cuidado debe ser constante, por ese motivo, la PRIMERA CONSULTA TIENE UN COSTO DE 150 BS y posteriormente a su registro en PODOPIE, el paciente es beneficiado de un SEGUIMIENTO Y TRATAMIENTO POR SOLO 50 BS. 🤓",
       "next": "SVC_PODOPEDIATRIA_STEP_5"
     },
     {

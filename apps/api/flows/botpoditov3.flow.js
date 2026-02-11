@@ -735,14 +735,14 @@ module.exports = {
       "id": "SVC_PODOPEDIATRIA_STEP_3",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podopediatr%C3%ADa/2.jpg",
-      "text": "Costo de la PODOPEDIATRIA es de 150 Bs. Este servicio incluye limpieza, corte correcto de uñas, eliminación de callosidades leves y recomendaciones personalizadas para el cuidado de tus pies. 💵\nNuestros podólogos te darán ASESORAMIENTO PERSONALIZADO para la salud de tus pies, incluyendo el uso del calzado adecuado y consejos en la higiene de tus pies. 🧼",
+      "text": "Este servicio se enfoca en PREVENIR Y TRATAR MOLESTIAS COMUNES en los pies de niños como son las uñas encarnadas, malos cortes de uñas o infecciones por mala higiene. 🍼",
       "next": "SVC_PODOPEDIATRIA_STEP_4"
     },
     {
       "id": "SVC_PODOPEDIATRIA_STEP_4",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podopediatr%C3%ADa/3.jpg",
-      "text": "Si en la consulta se detecta la necesidad de tratar UÑEROS, FISURAS, VERRUGAS, HONGOS E HIPERQUERATOSIS el precio variará según el servicio a realizar, así usted decide si desea el SERVICIO ADICIONAL en ese momento. 👣🚶‍♂️🚶‍♀️",
+      "text": "Sabemos que este cuidado debe ser constante, por ese motivo, la PRIMERA CONSULTA TIENE UN COSTO DE 150 BS y posteriormente a su registro en PODOPIE, el paciente es beneficiado de un SEGUIMIENTO Y TRATAMIENTO POR SOLO 50 BS. 🤓",
       "next": "SVC_PODOPEDIATRIA_STEP_5"
     },
     {
@@ -756,7 +756,7 @@ module.exports = {
       "id": "SVC_PODOPEDIATRIA_STEP_5_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podopediatr%C3%ADa/5.jpg",
-      "text": "Si necesita un paquete completo 🦶🩵 tiene una opción accesible y detallada por realizarse, PODOPEDIATRIK incluye un chequeo médico 🩺📋, revisión podal 👣🔍, y limpieza podal 💧✨, todo por un costo de 150 Bs 💵. \nEste paquete se realiza únicamente bajo recomendación del especialista 🩺, ya que durante la valoración 🔍 se determinará si el paciente necesita o no dicho tratamiento ✅❌.",
+      "text": "Si necesita un paquete completo 🦶 tiene una opción accesible y detallada por realizarse, PODOPEDIATRIK incluye un chequeo médico 🩺📋, revisión podal 👣🔍, y limpieza podal 💧✨, todo por un costo de 150 Bs 💵. \nEste paquete se realiza únicamente bajo recomendación del especialista 🩺, ya que durante la valoración 🔍 se determinará si el paciente necesita o no dicho tratamiento ✅❌.",
       "next": "SVC_PODOPEDIATRIA_ACTIONS"
     },
     {

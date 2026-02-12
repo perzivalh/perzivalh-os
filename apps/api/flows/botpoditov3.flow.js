@@ -1263,7 +1263,7 @@ module.exports = {
     {
       "id": "CIERRE_HORARIO_CENTRAL_1",
       "type": "image",
-      "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/centralHorario.jpg",
+      "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/horario-norte.jpg",
       "text": "Puede venir en estos horarios",
       "next": "CIERRE_HORARIO_CENTRAL_2"
     },
@@ -1290,7 +1290,7 @@ module.exports = {
     {
       "id": "CIERRE_HORARIO_SUCURSAL_1",
       "type": "image",
-      "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/sucursalHorario.jpg",
+      "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/horario-sur.jpg",
       "text": "Puede venir en estos horarios",
       "next": "CIERRE_HORARIO_SUCURSAL_2"
     },

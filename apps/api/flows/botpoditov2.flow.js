@@ -18,7 +18,7 @@ module.exports = {
     {
       "id": "WELCOME",
       "type": "text",
-      "text": "¡Hola! 👋 Bienvenido a PODOPIE.",
+      "text": "¡Hola! 👋 Bienvenido a PODOPIE.\nIMPORTANTE: La valoración es totalmente gratuita y realizada por un especialista 🤩🦶",
       "next": "MAIN_MENU"
     },
     {

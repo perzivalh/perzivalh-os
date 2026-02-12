@@ -28,7 +28,7 @@ module.exports = {
     {
       "id": "WELCOME",
       "type": "text",
-      "text": "¡Hola! 👋 Bienvenido a PODOPIE.",
+      "text": "¡Hola! 👋 Bienvenido a PODOPIE.\nIMPORTANTE: La valoración es totalmente gratuita y realizada por un especialista 🤩🦶",
       "next": "MAIN_MENU"
     },
     {
@@ -86,8 +86,8 @@ module.exports = {
     {
       "id": "HORARIOS_CENTRAL_HORARIO_IMG",
       "type": "image",
-      "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/centralHorario.jpg",
-      "text": "ATENCIÓN CENTRAL\nPuede venir en estos horarios ?",
+      "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/horario-norte.jpg",
+      "text": "Puede venir en estos horarios",
       "next": "HORARIOS_CENTRAL_UBICACION_IMG"
     },
     {
@@ -121,8 +121,8 @@ module.exports = {
     {
       "id": "HORARIOS_SUCURSAL_HORARIO_IMG",
       "type": "image",
-      "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/sucursalHorario.jpg",
-      "text": "ATENCIÓN SUCURSAL\nPuede venir en estos horarios ?",
+      "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/horario-sur.jpg",
+      "text": "Puede venir en estos horarios",
       "next": "HORARIOS_SUCURSAL_UBICACION_IMG"
     },
     {

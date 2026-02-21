@@ -444,7 +444,7 @@ router.post("/webhook", async (req, res) => {
                                     logger.info("webhook.audio_received", { mediaId, waId });
 
                                     // 1. Download media
-                                    const media = await downloadMedia(mediaId, { config: channelConfig });
+                                    const media = await downloadMedia(mediaId);
 
                                     // 2. Setup AI provider for transcription
                                     let aiConfig = activeFlow.flow?.ai || {};

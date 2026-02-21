@@ -447,13 +447,20 @@ router.post("/webhook", async (req, res) => {
                                     const media = await downloadMedia(mediaId);
 
                                     // 2. Setup AI provider for transcription
-                                    let aiConfig = activeFlow.flow?.ai || {};
+                                    let aiConfig = activeFlow.config?.ai || {};
                                     if (!aiConfig.provider) {
-                                        // fallback to global settings if flow doesn't specify but we have one
-                                        const settings = await getSettingsCached();
-                                        if (settings.ai_provider) {
-                                            aiConfig.provider = settings.ai_provider;
-                                            aiConfig.key = settings.ai_api_key;
+                                        // fallback: check the flow file's AI settings for provider only
+                                        const flowAi = activeFlow.flow?.ai || {};
+                                        if (flowAi.provider) {
+                                            aiConfig = { ...aiConfig, provider: flowAi.provider };
+                                        }
+                                        // fallback to global settings if flow doesn't specify
+                                        if (!aiConfig.provider) {
+                                            const settings = await getSettingsCached();
+                                            if (settings.ai_provider) {
+                                                aiConfig.provider = settings.ai_provider;
+                                                aiConfig.key = settings.ai_api_key;
+                                            }
                                         }
                                     }
 

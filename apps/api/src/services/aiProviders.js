@@ -127,4 +127,126 @@ async function callAiProvider(provider, options) {
   return callOpenAI(options);
 }
 
-module.exports = { callAiProvider };
+// ----------------------------------------------------------------------------
+// AUDIO TRANSCRIPTION
+// ----------------------------------------------------------------------------
+
+async function transcribeAudioOpenAI({ apiKey, audioBuffer, mimeType }) {
+  // Use FormData to send the audio file to Whisper API
+  const FormData = require("form-data");
+  const form = new FormData();
+
+  // Determine file extension based on mimeType
+  let filename = "audio.ogg";
+  if (mimeType?.includes("mp4")) filename = "audio.mp4";
+  else if (mimeType?.includes("mpeg") || mimeType?.includes("mp3")) filename = "audio.mp3";
+  else if (mimeType?.includes("wav")) filename = "audio.wav";
+
+  form.append("file", audioBuffer, {
+    filename,
+    contentType: mimeType || "audio/ogg",
+  });
+  form.append("model", "whisper-1");
+
+  try {
+    const response = await axios.post("https://api.openai.com/v1/audio/transcriptions", form, {
+      headers: {
+        ...form.getHeaders(),
+        Authorization: `Bearer ${apiKey}`,
+      },
+      timeout: 30000,
+    });
+    return response.data?.text || "";
+  } catch (error) {
+    const status = error.response?.status;
+    const detail = error.response?.data ? JSON.stringify(error.response.data).slice(0, 500) : "";
+    throw new Error(`OpenAI transcription request failed${status ? ` (${status})` : ""}${detail ? `: ${detail}` : ""}`);
+  }
+}
+
+async function transcribeAudioGemini({ apiKey, audioBuffer, mimeType }) {
+  console.log("=".repeat(60));
+  console.log("[GEMINI-AUDIO] Starting transcription call");
+
+  // STEP 1: List models natively (reusing the same robust logic as text generation)
+  let availableGenerateModels = [];
+  try {
+    const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+    const listResponse = await axios.get(listUrl, { timeout: 10000 });
+    const allModels = listResponse.data?.models || [];
+
+    // Filter to generateContent models
+    availableGenerateModels = allModels
+      .filter(m => m.supportedGenerationMethods?.includes("generateContent"))
+      .map(m => m.name.replace("models/", ""));
+  } catch (listError) {
+    console.error("[GEMINI-AUDIO] Failed to list models:", listError.message);
+  }
+
+  // STEP 2: Candidates to try
+  const modelCandidates = availableGenerateModels.length > 0
+    ? availableGenerateModels.slice(0, 5)
+    : ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp"];
+
+  // Prepare payload
+  const base64Audio = audioBuffer.toString("base64");
+  const payload = {
+    system_instruction: { parts: [{ text: "Eres un asistente de transcripción experto. Tu única tarea es transcribir el audio al texto español exacto, sin agregar notas, descripciones ni explicaciones adicionales." }] },
+    contents: [{
+      role: "user",
+      parts: [
+        { text: "Por favor transcribe este mensaje de audio:" },
+        {
+          inlineData: {
+            mimeType: mimeType || "audio/ogg",
+            data: base64Audio
+          }
+        }
+      ]
+    }],
+    generationConfig: {
+      temperature: 0,
+    }
+  };
+
+  let lastError = null;
+  for (const candidate of modelCandidates) {
+    const url = `${GEMINI_ENDPOINT}/${candidate}:generateContent?key=${apiKey}`;
+    console.log("[GEMINI-AUDIO] Trying:", candidate);
+
+    try {
+      const response = await axios.post(url, payload, {
+        headers: { "Content-Type": "application/json" },
+        timeout: 30000,
+      });
+
+      console.log("[GEMINI-AUDIO] SUCCESS with model:", candidate);
+      const resultText = extractGeminiText(response.data);
+      console.log("=".repeat(60));
+      return resultText;
+    } catch (error) {
+      console.error("[GEMINI-AUDIO] FAILED:", candidate, "status:", error?.response?.status || "N/A");
+      lastError = error;
+    }
+  }
+
+  console.error("[GEMINI-AUDIO] ALL MODELS FAILED!");
+  console.error("=".repeat(60));
+  const status = lastError?.response?.status;
+  const detail = lastError?.response?.data ? JSON.stringify(lastError.response.data).slice(0, 500) : "";
+  throw new Error(`Gemini audio request failed${status ? ` (${status})` : ""}${detail ? `: ${detail}` : ""}`);
+}
+
+async function transcribeAudio({ provider, apiKey, audioBuffer, mimeType }) {
+  console.log("[AI-AUDIO] Provider:", provider, "| Has key:", !!apiKey);
+  if (!audioBuffer) {
+    throw new Error("audioBuffer is required");
+  }
+
+  if (provider === "gemini") {
+    return transcribeAudioGemini({ apiKey, audioBuffer, mimeType });
+  }
+  return transcribeAudioOpenAI({ apiKey, audioBuffer, mimeType });
+}
+
+module.exports = { callAiProvider, transcribeAudio };

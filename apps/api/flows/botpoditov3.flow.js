@@ -311,6 +311,10 @@ module.exports = {
         {
           "label": "🦴 Ortesis",
           "next": "TRAT_ORTESIS_INFO"
+        },
+        {
+          "label": "🧼 Volver a servicios",
+          "next": "SERVICIOS_MENU"
         }
       ]
     },

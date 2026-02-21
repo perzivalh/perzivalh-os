@@ -15,6 +15,8 @@ const { handleIncomingText, handleInteractive } = require("../flows");
 const { executeDynamicFlow, executeDynamicInteractive } = require("../flows/flowExecutor");
 const sessionStore = require("../sessionStore");
 const { getTenantContext } = require("../tenancy/tenantContext");
+const { downloadMedia } = require("../services/metaGraphApi");
+const { transcribeAudio } = require("../services/aiProviders");
 const {
     resolveTenantContextByPhoneNumberId,
     resolveChannelByPhoneNumberId,
@@ -124,18 +126,18 @@ function extractContactName(value) {
 }
 
 function extractIncomingText(message) {
-  if (message.type === "text") {
-    return message.text?.body || "";
-  }
-  if (message.type === "button") {
-    return message.button?.text || message.button?.payload || "";
-  }
-  if (message.type === "interactive") {
-    const selection = parseInteractiveSelection(message);
-    if (!selection) return "";
-    return [selection.id, selection.title].filter(Boolean).join(" | ");
-  }
-  return "";
+    if (message.type === "text") {
+        return message.text?.body || "";
+    }
+    if (message.type === "button") {
+        return message.button?.text || message.button?.payload || "";
+    }
+    if (message.type === "interactive") {
+        const selection = parseInteractiveSelection(message);
+        if (!selection) return "";
+        return [selection.id, selection.title].filter(Boolean).join(" | ");
+    }
+    return "";
 }
 
 function mapMessageType(type) {
@@ -146,6 +148,7 @@ function mapMessageType(type) {
         "text",
         "interactive",
         "image",
+        "audio",
         "location",
         "template",
         "video",
@@ -426,12 +429,77 @@ router.post("/webhook", async (req, res) => {
                             continue;
                         }
 
-                        if (message.type === "text") {
+                        if (message.type === "text" || message.type === "audio") {
                             // Check if tenant has an active flow
                             const activeFlow = await getActiveTenantFlow(tenantContext.tenantId);
                             if (!activeFlow) {
                                 logger.info("bot.no_active_flow", { tenant_id: tenantContext.tenantId });
                                 continue; // No flow active, don't respond
+                            }
+
+                            // If audio, transcribe first
+                            if (message.type === "audio" && message.audio?.id) {
+                                try {
+                                    const mediaId = message.audio.id;
+                                    logger.info("webhook.audio_received", { mediaId, waId });
+
+                                    // 1. Download media
+                                    const media = await downloadMedia(mediaId, { config: channelConfig });
+
+                                    // 2. Setup AI provider for transcription
+                                    let aiConfig = activeFlow.flow?.ai || {};
+                                    if (!aiConfig.provider) {
+                                        // fallback to global settings if flow doesn't specify but we have one
+                                        const settings = await getSettingsCached();
+                                        if (settings.ai_provider) {
+                                            aiConfig.provider = settings.ai_provider;
+                                            aiConfig.key = settings.ai_api_key;
+                                        }
+                                    }
+
+                                    const provider = aiConfig.provider || "gemini";
+                                    const rawKey = aiConfig.key || aiConfig.api_key ||
+                                        (provider === "gemini" ? (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) : process.env.OPENAI_API_KEY);
+
+                                    if (!rawKey) {
+                                        logger.warn("webhook.audio_no_ai_key", { provider, waId });
+                                        await sendText(waId, "Lo siento, no pude escuchar tu audio por un problema de configuración.");
+                                        continue;
+                                    }
+
+                                    // 3. Transcribe
+                                    const transcribedText = await transcribeAudio({
+                                        provider,
+                                        apiKey: rawKey,
+                                        audioBuffer: media.buffer,
+                                        mimeType: media.mimeType
+                                    });
+
+                                    if (!transcribedText) {
+                                        await sendText(waId, "No pude entender el mensaje de audio. ¿Podrías escribirlo?");
+                                        continue;
+                                    }
+
+                                    // Reassign incomingText and normalized for the flow to use
+                                    incomingText = `(Audio transcrito: ${transcribedText})`;
+                                    logger.info("webhook.audio_transcribed", { waId, text: transcribedText });
+
+                                    // Update the message created previously to reflect the transcription (optional, but good for history)
+                                    await prisma.message.updateMany({
+                                        where: {
+                                            conversationId: conversation.id,
+                                            direction: "in",
+                                            type: "audio",
+                                            text: null // the one we just created
+                                        },
+                                        data: { text: incomingText }
+                                    });
+
+                                } catch (error) {
+                                    logger.error("webhook.audio_process_error", { error: error.message, waId });
+                                    await sendText(waId, "Lo siento, tuve un problema procesando tu nota de voz.");
+                                    continue;
+                                }
                             }
 
                             // If flow uses legacy handler (flows.js), use the old logic

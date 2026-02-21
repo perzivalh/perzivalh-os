@@ -400,6 +400,57 @@ function parseMetaTemplate(metaTemplate) {
     return result;
 }
 
+/**
+ * Get media URL and download the file from WhatsApp Cloud API
+ * @param {string} mediaId - ID of the media to download
+ * @param {Object} options - config options overriding context
+ */
+async function downloadMedia(mediaId, options = {}) {
+    if (!mediaId) {
+        throw new Error("mediaId is required");
+    }
+
+    const config = options.config || getWabaConfig();
+    if (!config.accessToken) {
+        throw new Error("ACCESS_TOKEN not configured");
+    }
+
+    // Step 1: Get the media URL from the media ID
+    const urlResult = await graphRequest("GET", `/${mediaId}`, null, { config });
+    if (!urlResult.ok || !urlResult.data?.url) {
+        logger.error("Failed to retrieve media URL", { mediaId, error: urlResult.error });
+        throw new Error("Failed to retrieve media URL");
+    }
+
+    const downloadUrl = urlResult.data.url;
+    const mimeType = urlResult.data.mime_type;
+
+    // Step 2: Download the actual media binary
+    try {
+        const response = await axios({
+            method: "GET",
+            url: downloadUrl,
+            headers: {
+                Authorization: `Bearer ${config.accessToken}`,
+            },
+            responseType: "arraybuffer", // Important to receive binary data
+            timeout: 30000,
+        });
+
+        return {
+            buffer: Buffer.from(response.data),
+            mimeType: mimeType || response.headers["content-type"],
+        };
+    } catch (error) {
+        logger.error("Failed to download media binary", {
+            mediaId,
+            url: downloadUrl,
+            error: error.message,
+        });
+        throw new Error("Failed to download media binary");
+    }
+}
+
 module.exports = {
     getWabaConfig,
     graphRequest,
@@ -411,4 +462,5 @@ module.exports = {
     buildTemplateComponents,
     extractVariables,
     parseMetaTemplate,
+    downloadMedia,
 };

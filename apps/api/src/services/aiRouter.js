@@ -87,7 +87,7 @@ function buildSystemPrompt(knowledge, session) {
 
   // Build services summary
   const serviciosList = Object.entries(servicios)
-    .map(([key, svc]) => `- ${svc.nombre}: ${svc.descripcion} (desde ${svc.precio_desde} ${svc.moneda || "Bs"})`)
+    .map(([key, svc]) => `- ${svc.nombre}: ${svc.descripcion}`)
     .join("\n");
 
   // Build locations summary  

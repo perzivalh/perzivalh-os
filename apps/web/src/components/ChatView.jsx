@@ -63,8 +63,6 @@ function ChatView({
   getInitial,
   PlusIcon,
   SearchIcon,
-  VideoIcon,
-  PhoneIcon,
   InfoIcon,
   SendIcon,
 }) {
@@ -327,7 +325,7 @@ function ChatView({
                 <div className="chat-avatar">
                   <span>{getInitial(activeName)}</span>
                 </div>
-                <div>
+                <div className="chat-title-copy">
                   <div className="chat-name">{activeName}</div>
                   {activeConversation ? (
                     <div className="chat-status">{activeStatusLabel}</div>
@@ -339,15 +337,6 @@ function ChatView({
                 </div>
               </div>
               <div className="chat-actions">
-                <button className="icon-button" type="button" title="Video">
-                  <VideoIcon className="icon" />
-                </button>
-                <button className="icon-button" type="button" title="Llamar">
-                  <PhoneIcon className="icon" />
-                </button>
-                <button className="icon-button" type="button" title="Buscar">
-                  <SearchIcon className="icon" />
-                </button>
                 <button
                   className={`icon-button ${isInfoOpen ? "active" : ""}`}
                   type="button"

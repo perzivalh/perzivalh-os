@@ -141,6 +141,13 @@
     height: 100%;
   }
 
+  .chat-view,
+  .chat-main,
+  .chat-card {
+    min-width: 0;
+    width: 100%;
+  }
+
   .chat-shell.has-active .chat-list-panel {
     display: none;
   }
@@ -186,6 +193,7 @@
     top: 0;
     z-index: 4;
     padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+    flex-wrap: nowrap;
   }
 
   .chat-shell[data-mobile-pane="chat"] .chat-composer {
@@ -217,15 +225,28 @@
     min-width: 0;
   }
 
+  .chat-shell[data-mobile-pane="chat"] .chat-title-copy {
+    min-width: 0;
+  }
+
   .chat-shell[data-mobile-pane="chat"] .chat-name {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 42vw;
+    max-width: 52vw;
+  }
+
+  .chat-shell[data-mobile-pane="chat"] .chat-status {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .chat-list-panel {
     border-right: none;
+    max-height: none;
+    height: 100%;
+    min-height: 0;
     padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
   }
@@ -278,7 +299,17 @@
   }
 
   .message {
-    max-width: 88%;
+    max-width: 92%;
+    padding: 0.75rem 0.9rem 0.55rem;
+    border-radius: 18px 18px 18px 10px;
+  }
+
+  .message.out {
+    border-radius: 18px 18px 10px 18px;
+  }
+
+  .message-meta {
+    font-size: 0.64rem;
   }
 
   .chat-info {

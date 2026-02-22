@@ -29,6 +29,11 @@
     padding: 1.2rem;
   }
 
+  .content.content-chats {
+    padding: 0;
+    gap: 0;
+  }
+
   .chat-shell {
     grid-template-columns: 1fr;
   }
@@ -139,6 +144,11 @@
   .chat-shell {
     grid-template-columns: 1fr;
     height: 100%;
+  }
+
+  .app-shell.chat-mobile-shell .content.content-chats {
+    padding: 0;
+    gap: 0;
   }
 
   .chat-view,

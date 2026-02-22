@@ -818,6 +818,7 @@ function App() {
   }
 
   async function loadConversation(conversationId) {
+    setIsInfoOpen(false);
     scrollOnLoadRef.current = true;
     const cached = getCachedConversation(conversationId);
     const quickConversation = conversations.find((item) => item.id === conversationId);
@@ -1115,6 +1116,7 @@ function App() {
   }
 
   function handleBackToList() {
+    setIsInfoOpen(false);
     setActiveConversation(null);
     resetMessageState();
   }
@@ -2162,7 +2164,9 @@ function App() {
   const canReturnToSuperadmin = Boolean(superadminToken) && user.role !== "superadmin";
 
   return (
-    <div className={`app-shell ${view === "admin" ? "admin-shell" : ""}`}>
+    <div
+      className={`app-shell ${view === "admin" ? "admin-shell" : ""} ${view === "chats" ? "chat-mobile-shell" : ""}`}
+    >
       <NavRail
         navItems={navItems}
         view={view}

@@ -81,6 +81,11 @@ function ChatView({
   const isAssignedToOther =
     activeConversation?.assigned_user_id &&
     activeConversation.assigned_user_id !== currentUser?.id;
+  const mobilePane = !activeConversation
+    ? "list"
+    : isInfoOpen
+      ? "info"
+      : "chat";
 
   function getPreview(conversation) {
     if (!conversation) {
@@ -102,7 +107,10 @@ function ChatView({
 
   return (
     <>
-      <section className={`chat-shell ${activeConversation ? "has-active" : ""}`}>
+      <section
+        className={`chat-shell ${activeConversation ? "has-active" : ""}`}
+        data-mobile-pane={mobilePane}
+      >
       <aside className="chat-list-panel">
         <div className="chat-list-header">
           <div>
@@ -344,6 +352,7 @@ function ChatView({
                   className={`icon-button ${isInfoOpen ? "active" : ""}`}
                   type="button"
                   title="Info"
+                  disabled={!activeConversation}
                   onClick={() => setIsInfoOpen((prev) => !prev)}
                 >
                   <InfoIcon className="icon" />
@@ -430,6 +439,18 @@ function ChatView({
         </div>
 
         <aside className="chat-info">
+          {activeConversation && (
+            <div className="info-mobile-header">
+              <button
+                className="back-button info-mobile-back"
+                type="button"
+                onClick={() => setIsInfoOpen(false)}
+              >
+                Chat
+              </button>
+              <div className="info-mobile-title">Info del chat</div>
+            </div>
+          )}
           <div className="info-card">
             <div className="info-avatar">
               <span>{getInitial(activeName)}</span>

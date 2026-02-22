@@ -1,0 +1,26 @@
+{
+  "name": "Podopie Chats",
+  "short_name": "Podopie",
+  "description": "Inbox de chats de WhatsApp para operadores de Podopie.",
+  "lang": "es",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f1f5fb",
+  "theme_color": "#1e3a8a",
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

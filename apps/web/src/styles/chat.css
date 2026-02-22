@@ -418,6 +418,16 @@ body[data-theme="dark"] .status-pill.line-pill {
   display: none;
 }
 
+.info-mobile-header {
+  display: none;
+}
+
+.info-mobile-title {
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 600;
+  color: var(--ink);
+}
+
 .chat-avatar {
   width: 44px;
   height: 44px;
@@ -788,6 +798,10 @@ body[data-theme="dark"] .chat-encryption {
   background: var(--panel);
   padding: 1rem;
   animation: none;
+}
+
+body[data-theme="dark"] .info-mobile-header {
+  background: #111111;
 }
 
 .info-card {

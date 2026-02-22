@@ -67,6 +67,7 @@
   display: grid;
   grid-template-columns: 88px minmax(0, 1fr);
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background: var(--bg);
 }

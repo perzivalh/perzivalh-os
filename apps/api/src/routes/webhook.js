@@ -303,7 +303,7 @@ router.post("/webhook", async (req, res) => {
                             continue;
                         }
 
-                        const incomingText = extractIncomingText(message);
+                        let incomingText = extractIncomingText(message);
                         logIncoming(message, incomingText);
 
                         const createdAt = message.timestamp
@@ -339,7 +339,7 @@ router.post("/webhook", async (req, res) => {
                             },
                         });
 
-                        const normalized = normalizeText(incomingText);
+                        let normalized = normalizeText(incomingText);
 
                         if (isAdminPhone(waId)) {
                             if (normalized === "bot") {
@@ -489,6 +489,7 @@ router.post("/webhook", async (req, res) => {
 
                                     // Reassign incomingText and normalized for the flow to use
                                     incomingText = `(Audio transcrito: ${transcribedText})`;
+                                    normalized = normalizeText(incomingText);
                                     logger.info("webhook.audio_transcribed", { waId, text: transcribedText });
 
                                     // Update the message created previously to reflect the transcription (optional, but good for history)

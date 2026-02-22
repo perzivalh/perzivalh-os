@@ -1,7 +1,7 @@
 {
-  "name": "Podopie Chats",
-  "short_name": "Podopie",
-  "description": "Inbox de chats de WhatsApp para operadores de Podopie.",
+  "name": "Perzivalh Chats",
+  "short_name": "Perzivalh",
+  "description": "Inbox de chats de WhatsApp para operadores de Perzivalh.",
   "lang": "es",
   "start_url": "/",
   "scope": "/",

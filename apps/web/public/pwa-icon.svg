@@ -6,10 +6,9 @@
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#g)"/>
-  <circle cx="176" cy="140" r="34" fill="#fff" opacity="0.95"/>
-  <circle cx="234" cy="111" r="30" fill="#fff" opacity="0.95"/>
-  <circle cx="299" cy="99" r="26" fill="#fff" opacity="0.95"/>
-  <circle cx="356" cy="114" r="22" fill="#fff" opacity="0.95"/>
-  <path d="M138 214c0-42 30-70 69-70h84c59 0 105 46 105 105 0 71-53 121-128 121h-47c-47 0-83-29-83-74V214z" fill="#fff"/>
-  <path d="M210 227h72c38 0 63 25 63 63s-25 63-63 63h-72V227z" fill="#1e3a8a" opacity="0.9"/>
+  <path d="M104 150c0-40 32-72 72-72h164c40 0 72 32 72 72v108c0 40-32 72-72 72H244l-63 53c-9 8-23 1-23-10v-43h-54c-40 0-72-32-72-72V150z" fill="#fff"/>
+  <path d="M218 322h118c50 0 90 40 90 90v9c0 11-12 17-21 10l-49-39h-97c-50 0-90-40-90-90v-11c0-7 5-12 12-12h37v43z" fill="#dbe7ff" opacity=".92"/>
+  <circle cx="210" cy="205" r="18" fill="#1e3a8a"/>
+  <circle cx="258" cy="205" r="18" fill="#1e3a8a"/>
+  <circle cx="306" cy="205" r="18" fill="#1e3a8a"/>
 </svg>

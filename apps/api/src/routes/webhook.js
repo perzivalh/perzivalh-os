@@ -327,7 +327,7 @@ router.post("/webhook", async (req, res) => {
                         }
 
                         const messageType = mapMessageType(message.type);
-                        await createMessage({
+                        const createdInboundMessage = await createMessage({
                             conversationId: conversation.id,
                             direction: "in",
                             type: messageType,
@@ -492,16 +492,45 @@ router.post("/webhook", async (req, res) => {
                                     normalized = normalizeText(incomingText);
                                     logger.info("webhook.audio_transcribed", { waId, text: transcribedText });
 
-                                    // Update the message created previously to reflect the transcription (optional, but good for history)
-                                    await prisma.message.updateMany({
-                                        where: {
+                                    // Update the inbound audio message with the transcription (optional for history).
+                                    // This must never block the bot response if DB history update fails.
+                                    try {
+                                        const inboundMessageId = createdInboundMessage?.message?.id || null;
+                                        if (inboundMessageId) {
+                                            await prisma.message.update({
+                                                where: { id: inboundMessageId },
+                                                data: { text: incomingText }
+                                            });
+                                            logger.info("webhook.audio_history_updated", {
+                                                waId,
+                                                messageId: inboundMessageId,
+                                                strategy: "update_by_id"
+                                            });
+                                        } else {
+                                            const updated = await prisma.message.updateMany({
+                                                where: {
+                                                    conversation_id: conversation.id,
+                                                    direction: "in",
+                                                    type: "audio",
+                                                    text: null
+                                                },
+                                                data: { text: incomingText }
+                                            });
+                                            logger.warn("webhook.audio_history_updated_fallback", {
+                                                waId,
+                                                conversationId: conversation.id,
+                                                strategy: "update_many_fallback",
+                                                count: updated?.count || 0
+                                            });
+                                        }
+                                    } catch (historyError) {
+                                        logger.warn("webhook.audio_history_update_failed", {
+                                            waId,
                                             conversationId: conversation.id,
-                                            direction: "in",
-                                            type: "audio",
-                                            text: null // the one we just created
-                                        },
-                                        data: { text: incomingText }
-                                    });
+                                            messageId: createdInboundMessage?.message?.id || null,
+                                            error: historyError?.message || String(historyError)
+                                        });
+                                    }
 
                                 } catch (error) {
                                     logger.error("webhook.audio_process_error", { error: error.message, waId });
@@ -511,6 +540,13 @@ router.post("/webhook", async (req, res) => {
                             }
 
                             // If flow uses legacy handler (flows.js), use the old logic
+                            if (message.type === "audio") {
+                                logger.info("webhook.audio_dispatching_to_flow", {
+                                    waId,
+                                    useLegacyHandler: !!activeFlow.flow.useLegacyHandler,
+                                    textPreview: String(incomingText || "").slice(0, 120)
+                                });
+                            }
                             if (activeFlow.flow.useLegacyHandler) {
                                 void handleIncomingText(waId, incomingText);
                             } else {

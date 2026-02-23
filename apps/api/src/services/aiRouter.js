@@ -115,85 +115,36 @@ function detectUrgency(text) {
 /**
  * Build comprehensive system prompt with full context
  */
-function buildSystemPrompt(knowledge, session) {
+function buildSystemPrompt(knowledge, session, flow) {
   const kb = knowledge || {};
-  const personalidad = kb.personalidad || {};
-  const clinica = kb.clinica || {};
-  const servicios = kb.servicios || {};
-  const ubicaciones = kb.ubicaciones || {};
+  const nombre = kb.personalidad?.nombre || "PODITO";
+  const clinica = kb.clinica?.nombre || "PODOPIE";
+  const ciudad = kb.clinica?.ciudad || "Santa Cruz, Bolivia";
 
-  // Build services summary
-  const serviciosList = Object.entries(servicios)
-    .map(([key, svc]) => `- ${svc.nombre}: ${svc.descripcion}`)
-    .join("\n");
+  const nodeCatalog = flow ? buildRoutingNodeCatalog(flow) : `MAIN_MENU, SERVICIOS_MENU, HORARIOS_INFO, PRECIOS_INFO, CONTACT_METHOD, UNERO_TIPO_TRAT, HONGOS_TIPO_TRAT, SVC_PEDICURE_INFO, SVC_PODOPEDIATRIA_INFO, SVC_PODOGERIATRIA_INFO, OTR_PIE_DIABETICO_INFO, OTR_CALLOSIDAD_INFO, OTR_HELOMA_INFO, OTR_VERRUGA_PLANTAR_INFO, OTR_EXTRACCION_UNA_INFO, OTR_PIE_ATLETA_INFO, OTROS_MENU`;
 
-  // Build locations summary  
-  const ubicacionesList = Object.entries(ubicaciones)
-    .map(([key, loc]) => `- ${loc.nombre}: ${loc.horario}`)
-    .join("\n");
+  return `Eres ${nombre}, router de WhatsApp de ${clinica} (podología, ${ciudad}). SOLO pies. No manos/manicure.
+Responde SOLO JSON válido: {"action":"...","text":"...","route_id":"...","question":"...","reason":"..."}
 
-  return `# ${personalidad.nombre || "PODITO"} - Asistente Virtual de ${clinica.nombre || "PODOPIE"}
+ACCIONES:
+respond → texto corto (máx 2 oraciones, español amable). Para saludos o temas sin nodo específico.
+route → ir a nodo (requiere route_id)
+handoff → derivar a humano (dolor intenso, urgencia, sangrado, pus, infección, úlcera)
+clarify → pedir dato faltante (requiere question, máx 1 vez por sesión)
+show_services → mostrar menú de servicios
+out_of_scope → tema no es podología de pies
 
-## Tu Identidad
-Eres ${personalidad.nombre || "PODITO"} ${personalidad.emoji || "🤖"}, el asistente virtual de ${clinica.nombre || "PODOPIE"}, una clínica de podología en ${clinica.ciudad || "Santa Cruz, Bolivia"}.
+NODOS (usa route_id exacto):
+${nodeCatalog}
 
-## Tu Personalidad
-- Tono: ${personalidad.tono || "amable, cálido, profesional"}
-- Idioma: ${personalidad.idioma || "español boliviano casual"}
-- Usas emojis moderadamente: ${(personalidad.emojis_frecuentes || ["🦶", "✨"]).join(" ")}
-- Máximo ${personalidad.maximo_oraciones || 2} oraciones por respuesta
-- Sé conversacional, NO robótico
-
-## Importante
-- ${clinica.especialidad || "SOLO trabajamos con PIES"}
-- NO hacemos: ${(clinica.no_hacemos || ["manos", "manicure"]).join(", ")}
-
-## Servicios Disponibles
-${serviciosList || "Consultar en menú"}
-
-## Ubicaciones y Horarios
-${ubicacionesList || "Consultar disponibilidad"}
-
-## Cómo Responder (JSON)
-{
-  "action": "respond|route|handoff|clarify|show_services",
-  "text": "Tu respuesta conversacional",
-  "route_id": "NODO_ID (solo si action=route)",
-  "question": "Pregunta (solo si action=clarify)",
-  "reason": "Por qué tomaste esta decisión"
-}
-
-## Acciones:
-- **respond**: Solo responder sin cambiar de pantalla
-- **route**: Ir a un nodo específico (incluye route_id)
-- **handoff**: Derivar a humano (urgencia/dolor/síntomas graves)
-- **clarify**: Necesitas más información (incluye question)
-- **show_services**: Mostrar menú de servicios
-
-## Nodos Disponibles para Routing:
-- MAIN_MENU: Menú principal
-- SERVICIOS_MENU: Lista de servicios
-- HORARIOS_INFO: Ubicaciones y horarios
-- PRECIOS_INFO: Lista de precios
-- CONTACT_METHOD: Opciones de contacto
-- UNERO_TIPO_TRAT: Tratamientos de uñeros
-- HONGOS_TIPO_TRAT: Tratamientos de hongos
-- SVC_PEDICURE_INFO: Info de pedicure clínico
-- SVC_PODOPEDIATRIA_INFO: Info de podopediatría
-- SVC_PODOGERIATRIA_INFO: Info de podogeriatría
-- OTR_PIE_DIABETICO_INFO: Info de pie diabético
-
-## Reglas de Decisión:
-1. Si saluda → respond con saludo + pregunta cómo ayudar
-2. Si pregunta por servicio específico → respond con info breve + route al nodo
-3. Si tiene síntomas/dolor/urgencia → handoff con empatía
-4. Si pide ubicación/horarios → route a HORARIOS_INFO
-5. Si pide precios → route a PRECIOS_INFO  
-6. Si está confundido/no sabe → show_services amablemente
-7. Si tema fuera de podología → respond explicando que solo hacemos pies
-8. Si necesitas clarificar → clarify (máximo 1 vez)
-9. NUNCA repitas la misma pregunta dos veces
-10. El "text" siempre debe ser conversacional y cálido`;
+REGLAS:
+- Saludo → respond
+- Tema de pies o servicio → route al nodo correcto
+- Dolor intenso/urgencia/síntomas graves → handoff
+- No es podología → out_of_scope
+- No sabe qué quiere → show_services
+- Falta dato clave → clarify (solo 1 vez)
+- Nunca repitas la misma pregunta`;
 }
 
 /**
@@ -203,20 +154,20 @@ function buildUserPrompt({ message, history, summary, previousQuestion }) {
   const contextParts = [];
 
   if (history && history !== "(Primera interacción)") {
-    contextParts.push(`## Historial de Conversación:\n${history}`);
+    contextParts.push(`[historial]\n${history}`);
   }
 
   if (previousQuestion) {
-    contextParts.push(`## Pregunta Anterior (NO repitas):\n${previousQuestion}`);
+    contextParts.push(`[pregunta anterior, no repetir]: ${previousQuestion}`);
   }
 
   if (summary?.clarificationsAsked > 0) {
-    contextParts.push(`## Nota: Ya pediste ${summary.clarificationsAsked} clarificación(es). No pidas más.`);
+    contextParts.push(`[ya se pidió clarificación ${summary.clarificationsAsked} vez/veces, no pedir más]`);
   }
 
-  contextParts.push(`## Mensaje Actual del Usuario:\n${message}`);
+  contextParts.push(`[mensaje]: ${message}`);
 
-  return contextParts.join("\n\n");
+  return contextParts.join("\n");
 }
 
 /**
@@ -974,7 +925,7 @@ async function routeWithAI({ text, flow, config, session }) {
   }
 
   // Build prompts
-  const system = buildSystemPrompt(knowledge, session);
+  const system = buildSystemPrompt(knowledge, session, flow);
   const user = buildUserPrompt({ message: text, history, summary, previousQuestion });
 
   // Only use saved model if it's compatible with the current provider.

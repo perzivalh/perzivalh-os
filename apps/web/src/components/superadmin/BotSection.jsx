@@ -4,6 +4,17 @@
  */
 import React, { useMemo, useState } from "react";
 
+const CLOUDFLARE_DEFAULT_MODEL = "@cf/meta/llama-3-8b-instruct";
+
+function isCloudflareProvider(value) {
+  const provider = String(value || "").toLowerCase();
+  return (
+    provider === "cloudflare" ||
+    provider === "cloudflare-workers-ai" ||
+    provider === "workers-ai"
+  );
+}
+
 function BotIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -27,6 +38,8 @@ function BotSection({
   const [selectedFlow, setSelectedFlow] = useState("");
   const [selectedAiProvider, setSelectedAiProvider] = useState("openai");
   const [selectedAiKey, setSelectedAiKey] = useState("");
+  const [selectedAiAccountId, setSelectedAiAccountId] = useState("");
+  const [selectedAiModel, setSelectedAiModel] = useState(CLOUDFLARE_DEFAULT_MODEL);
   const [botDrafts, setBotDrafts] = useState({});
 
   const usedFlowIds = new Set(tenantBots.map((tb) => tb.flow_id));
@@ -46,6 +59,12 @@ function BotSection({
           ai: {
             provider: selectedAiProvider,
             key: selectedAiKey || undefined,
+            ...(isCloudflareProvider(selectedAiProvider)
+              ? {
+                  account_id: selectedAiAccountId || undefined,
+                  model: selectedAiModel || CLOUDFLARE_DEFAULT_MODEL,
+                }
+              : {}),
           },
         }
       : null;
@@ -68,10 +87,26 @@ function BotSection({
     const draft = botDrafts[bot.id] || {};
     const provider = draft.provider || bot.config?.ai?.provider || "openai";
     const keyValue = draft.key || "";
+    const accountIdValue =
+      draft.account_id ||
+      draft.accountId ||
+      bot.config?.ai?.account_id ||
+      bot.config?.ai?.accountId ||
+      "";
+    const modelValue =
+      draft.model ||
+      bot.config?.ai?.model ||
+      CLOUDFLARE_DEFAULT_MODEL;
     const config = {
       ai: {
         provider,
         ...(keyValue ? { key: keyValue } : {}),
+        ...(isCloudflareProvider(provider)
+          ? {
+              ...(accountIdValue ? { account_id: accountIdValue } : {}),
+              model: modelValue,
+            }
+          : {}),
       },
     };
     onUpdateBotConfig(bot.id, config);
@@ -130,15 +165,30 @@ function BotSection({
                             "openai"
                           }
                           onChange={(event) =>
-                            updateDraft(bot.id, { provider: event.target.value })
+                            updateDraft(bot.id, {
+                              provider: event.target.value,
+                              ...(isCloudflareProvider(event.target.value) &&
+                              !(botDrafts[bot.id]?.model || bot.config?.ai?.model)
+                                ? { model: CLOUDFLARE_DEFAULT_MODEL }
+                                : {}),
+                            })
                           }
                         >
                           <option value="openai">OpenAI</option>
                           <option value="gemini">Gemini</option>
+                          <option value="cloudflare">Cloudflare Workers AI</option>
                         </select>
                       </div>
                       <div className="sa-ai-field">
-                        <label className="sa-select-label">API Key</label>
+                        <label className="sa-select-label">
+                          {isCloudflareProvider(
+                            botDrafts[bot.id]?.provider ||
+                              bot.config?.ai?.provider ||
+                              "openai"
+                          )
+                            ? "API Token"
+                            : "API Key"}
+                        </label>
                         <input
                           type="password"
                           className="sa-input"
@@ -153,6 +203,50 @@ function BotSection({
                           }
                         />
                       </div>
+                      {isCloudflareProvider(
+                        botDrafts[bot.id]?.provider ||
+                          bot.config?.ai?.provider ||
+                          "openai"
+                      ) && (
+                        <>
+                          <div className="sa-ai-field">
+                            <label className="sa-select-label">Account ID</label>
+                            <input
+                              type="text"
+                              className="sa-input"
+                              placeholder="2cf98d32..."
+                              value={
+                                botDrafts[bot.id]?.account_id ||
+                                botDrafts[bot.id]?.accountId ||
+                                bot.config?.ai?.account_id ||
+                                bot.config?.ai?.accountId ||
+                                ""
+                              }
+                              onChange={(event) =>
+                                updateDraft(bot.id, {
+                                  account_id: event.target.value,
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="sa-ai-field">
+                            <label className="sa-select-label">Modelo</label>
+                            <input
+                              type="text"
+                              className="sa-input"
+                              placeholder={CLOUDFLARE_DEFAULT_MODEL}
+                              value={
+                                botDrafts[bot.id]?.model ||
+                                bot.config?.ai?.model ||
+                                CLOUDFLARE_DEFAULT_MODEL
+                              }
+                              onChange={(event) =>
+                                updateDraft(bot.id, { model: event.target.value })
+                              }
+                            />
+                          </div>
+                        </>
+                      )}
                       <button
                         type="button"
                         className="sa-btn-assign sa-btn-save"
@@ -205,23 +299,54 @@ function BotSection({
               <select
                 className="sa-select-styled"
                 value={selectedAiProvider}
-                onChange={(event) => setSelectedAiProvider(event.target.value)}
-              >
-                <option value="openai">OpenAI</option>
-                <option value="gemini">Gemini</option>
-              </select>
-            </div>
-            <div className="sa-ai-field">
-              <label className="sa-select-label">API Key</label>
-              <input
-                type="password"
-                className="sa-input"
-                placeholder="Pegue la API key"
-                value={selectedAiKey}
-                onChange={(event) => setSelectedAiKey(event.target.value)}
-              />
-            </div>
+              onChange={(event) => setSelectedAiProvider(event.target.value)}
+            >
+              <option value="openai">OpenAI</option>
+              <option value="gemini">Gemini</option>
+              <option value="cloudflare">Cloudflare Workers AI</option>
+            </select>
           </div>
+          <div className="sa-ai-field">
+            <label className="sa-select-label">
+              {isCloudflareProvider(selectedAiProvider) ? "API Token" : "API Key"}
+            </label>
+            <input
+              type="password"
+              className="sa-input"
+              placeholder={
+                isCloudflareProvider(selectedAiProvider)
+                  ? "Pegue el API token de Cloudflare"
+                  : "Pegue la API key"
+              }
+              value={selectedAiKey}
+              onChange={(event) => setSelectedAiKey(event.target.value)}
+            />
+          </div>
+          {isCloudflareProvider(selectedAiProvider) && (
+            <>
+              <div className="sa-ai-field">
+                <label className="sa-select-label">Account ID</label>
+                <input
+                  type="text"
+                  className="sa-input"
+                  placeholder="2cf98d32..."
+                  value={selectedAiAccountId}
+                  onChange={(event) => setSelectedAiAccountId(event.target.value)}
+                />
+              </div>
+              <div className="sa-ai-field">
+                <label className="sa-select-label">Modelo</label>
+                <input
+                  type="text"
+                  className="sa-input"
+                  placeholder={CLOUDFLARE_DEFAULT_MODEL}
+                  value={selectedAiModel}
+                  onChange={(event) => setSelectedAiModel(event.target.value)}
+                />
+              </div>
+            </>
+          )}
+        </div>
         )}
         <button
           type="button"

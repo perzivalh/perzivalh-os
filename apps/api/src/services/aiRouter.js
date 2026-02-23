@@ -13,6 +13,7 @@ const { getHistoryForAI, getConversationSummary } = require("./conversationMemor
 const DEFAULT_MODELS = {
   openai: "gpt-4o-mini",
   gemini: "gemini-2.5-flash",
+  cloudflare: "@cf/meta/llama-3-8b-instruct",
 };
 
 // Schema para respuestas de la IA
@@ -273,12 +274,17 @@ async function routeWithAI({ text, flow, config, session }) {
   }
 
   // Get API configuration
-  const provider = aiConfig.provider || aiFlow.provider || "gemini";
+  const provider = String(aiConfig.provider || aiFlow.provider || "gemini").toLowerCase();
   const rawKey = aiConfig.key || aiConfig.api_key ||
     (provider === "gemini"
       ? process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
-      : process.env.OPENAI_API_KEY);
+      : (provider === "cloudflare" || provider === "cloudflare-workers-ai" || provider === "workers-ai")
+        ? process.env.CLOUDFLARE_AI_API_TOKEN || process.env.CLOUDFLARE_API_TOKEN
+        : process.env.OPENAI_API_KEY);
   const apiKey = rawKey ? String(rawKey).trim() : "";
+  const cloudflareAccountId = aiConfig.account_id || aiConfig.accountId ||
+    aiConfig.cloudflare_account_id || aiConfig.cloudflareAccountId ||
+    process.env.CLOUDFLARE_ACCOUNT_ID || "";
 
   // Check max turns - but ALWAYS allow keyword fallback first
   const maxTurns = Number(aiFlow.max_turns || 20);
@@ -328,14 +334,24 @@ async function routeWithAI({ text, flow, config, session }) {
   const system = buildSystemPrompt(knowledge, session);
   const user = buildUserPrompt({ message: text, history, summary, previousQuestion });
 
-  const model = aiConfig.model || DEFAULT_MODELS[provider];
-  logger.info("ai.router_request", { provider, model, flowId, historyLength: summary.messageCount });
+  const model = aiConfig.model || DEFAULT_MODELS[provider] || DEFAULT_MODELS.openai;
+  logger.info("ai.router_request", {
+    provider,
+    model,
+    flowId,
+    historyLength: summary.messageCount,
+    cloudflareAccountConfigured:
+      provider === "cloudflare" || provider === "cloudflare-workers-ai" || provider === "workers-ai"
+        ? Boolean(cloudflareAccountId)
+        : undefined,
+  });
 
   try {
     // Call AI
     const raw = await callAiProvider(provider, {
       apiKey,
       model,
+      accountId: cloudflareAccountId,
       system,
       user,
       schema: ROUTER_SCHEMA,
@@ -354,6 +370,7 @@ async function routeWithAI({ text, flow, config, session }) {
       const retryRaw = await callAiProvider(provider, {
         apiKey,
         model,
+        accountId: cloudflareAccountId,
         system: system + "\n\nIMPORTANTE: Responde SOLO con JSON válido, sin texto adicional.",
         user,
         schema: ROUTER_SCHEMA,

@@ -464,9 +464,13 @@ router.post("/webhook", async (req, res) => {
                                         }
                                     }
 
-                                    const provider = aiConfig.provider || "gemini";
+                                    const provider = String(aiConfig.provider || "gemini").toLowerCase();
                                     const rawKey = aiConfig.key || aiConfig.api_key ||
-                                        (provider === "gemini" ? (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) : process.env.OPENAI_API_KEY);
+                                        (provider === "gemini"
+                                            ? (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)
+                                            : (provider === "cloudflare" || provider === "cloudflare-workers-ai" || provider === "workers-ai")
+                                                ? (process.env.CLOUDFLARE_AI_API_TOKEN || process.env.CLOUDFLARE_API_TOKEN)
+                                                : process.env.OPENAI_API_KEY);
 
                                     if (!rawKey) {
                                         logger.warn("webhook.audio_no_ai_key", { provider, waId });

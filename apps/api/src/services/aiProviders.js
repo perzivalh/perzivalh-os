@@ -6,6 +6,7 @@ const { spawn } = require("child_process");
 
 const OPENAI_ENDPOINT = "https://api.openai.com/v1/responses";
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
+const CLOUDFLARE_AI_BASE = "https://api.cloudflare.com/client/v4/accounts";
 
 function extractOpenAIText(data) {
   if (!data) return "";
@@ -28,6 +29,25 @@ function extractGeminiText(data) {
     .map((part) => (typeof part?.text === "string" ? part.text : ""))
     .filter(Boolean)
     .join("\n");
+}
+
+function extractCloudflareText(data) {
+  const result = data?.result;
+  if (typeof result === "string") return result;
+  if (typeof result?.response === "string") return result.response;
+  if (typeof result?.text === "string") return result.text;
+  if (Array.isArray(result)) {
+    return result
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (typeof item?.text === "string") return item.text;
+        if (typeof item?.response === "string") return item.response;
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n");
+  }
+  return "";
 }
 
 async function callOpenAI({ apiKey, model, system, user, schema, temperature = 0, maxTokens = 220 }) {
@@ -123,10 +143,72 @@ async function callGemini({ apiKey, model, system, user, schema, temperature = 0
   throw new Error(`Gemini request failed${status ? ` (${status})` : ""}${detail ? `: ${detail}` : ""}`);
 }
 
+async function callCloudflare({ apiKey, accountId, model, system, user, temperature = 0, maxTokens = 220 }) {
+  console.log("=".repeat(60));
+  console.log("[CLOUDFLARE-AI] Starting call");
+  console.log("[CLOUDFLARE-AI] Account:", accountId || "MISSING");
+  console.log("[CLOUDFLARE-AI] Model:", model || "MISSING");
+
+  if (!accountId) {
+    throw new Error("Cloudflare Workers AI accountId is required");
+  }
+  if (!model) {
+    throw new Error("Cloudflare Workers AI model is required");
+  }
+
+  const url = `${CLOUDFLARE_AI_BASE}/${accountId}/ai/run/${model}`;
+  const payload = {
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    temperature,
+    max_tokens: maxTokens,
+  };
+
+  try {
+    const response = await axios.post(url, payload, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      timeout: 20000,
+    });
+
+    if (response.data?.success === false) {
+      const detail = JSON.stringify(response.data?.errors || response.data).slice(0, 500);
+      throw new Error(`Cloudflare Workers AI request failed: ${detail}`);
+    }
+
+    const text = extractCloudflareText(response.data);
+    console.log("[CLOUDFLARE-AI] Response length:", text.length);
+    console.log("[CLOUDFLARE-AI] Preview:", text.substring(0, 150));
+    console.log("=".repeat(60));
+    return text;
+  } catch (error) {
+    const status = error?.response?.status;
+    const detail = error?.response?.data
+      ? JSON.stringify(error.response.data).slice(0, 500)
+      : "";
+    throw new Error(
+      `Cloudflare Workers AI request failed${status ? ` (${status})` : ""}${detail ? `: ${detail}` : ""}`
+    );
+  }
+}
+
 async function callAiProvider(provider, options) {
   console.log("[AI] Provider:", provider, "| Model:", options.model, "| Has key:", !!options.apiKey);
   if (provider === "gemini") {
     return callGemini(options);
+  }
+  if (provider === "cloudflare" || provider === "cloudflare-workers-ai" || provider === "workers-ai") {
+    return callCloudflare({
+      ...options,
+      accountId:
+        options.accountId ||
+        options.cloudflareAccountId ||
+        process.env.CLOUDFLARE_ACCOUNT_ID,
+    });
   }
   return callOpenAI(options);
 }
@@ -472,7 +554,22 @@ async function transcribeAudio({ provider, apiKey, audioBuffer, mimeType }) {
       throw error;
     }
   }
-  return transcribeAudioOpenAI({ apiKey, audioBuffer, mimeType });
+  if (provider === "openai") {
+    return transcribeAudioOpenAI({ apiKey, audioBuffer, mimeType });
+  }
+  if (process.env.OPENAI_API_KEY) {
+    console.warn("[AI-AUDIO] Unsupported provider for remote transcription fallback, using OpenAI Whisper:", provider);
+    return transcribeAudioOpenAI({ apiKey: process.env.OPENAI_API_KEY, audioBuffer, mimeType });
+  }
+  if (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) {
+    console.warn("[AI-AUDIO] Unsupported provider for remote transcription fallback, using Gemini audio:", provider);
+    return transcribeAudioGemini({
+      apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY,
+      audioBuffer,
+      mimeType,
+    });
+  }
+  throw new Error(`Unsupported audio transcription provider fallback for bot AI provider: ${provider}`);
 }
 
 module.exports = { callAiProvider, transcribeAudio };

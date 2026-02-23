@@ -234,7 +234,18 @@ async function transcribeAudioGemini({ apiKey, audioBuffer, mimeType }) {
   console.error("=".repeat(60));
   const status = lastError?.response?.status;
   const detail = lastError?.response?.data ? JSON.stringify(lastError.response.data).slice(0, 500) : "";
-  throw new Error(`Gemini audio request failed${status ? ` (${status})` : ""}${detail ? `: ${detail}` : ""}`);
+  const wrapped = new Error(`Gemini audio request failed${status ? ` (${status})` : ""}${detail ? `: ${detail}` : ""}`);
+  wrapped.status = status;
+  wrapped.provider = "gemini";
+  wrapped.kind = "audio_transcription";
+  throw wrapped;
+}
+
+function isQuotaOrRateLimitError(error) {
+  const status = error?.status || error?.response?.status;
+  const message = String(error?.message || "").toLowerCase();
+  if (status === 429) return true;
+  return message.includes("quota exceeded") || message.includes("rate limit");
 }
 
 async function transcribeAudio({ provider, apiKey, audioBuffer, mimeType }) {
@@ -244,7 +255,16 @@ async function transcribeAudio({ provider, apiKey, audioBuffer, mimeType }) {
   }
 
   if (provider === "gemini") {
-    return transcribeAudioGemini({ apiKey, audioBuffer, mimeType });
+    try {
+      return await transcribeAudioGemini({ apiKey, audioBuffer, mimeType });
+    } catch (error) {
+      const openAiKey = process.env.OPENAI_API_KEY;
+      if (isQuotaOrRateLimitError(error) && openAiKey) {
+        console.warn("[AI-AUDIO] Gemini quota/rate-limit detected. Falling back to OpenAI Whisper.");
+        return transcribeAudioOpenAI({ apiKey: openAiKey, audioBuffer, mimeType });
+      }
+      throw error;
+    }
   }
   return transcribeAudioOpenAI({ apiKey, audioBuffer, mimeType });
 }

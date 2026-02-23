@@ -1,11 +1,11 @@
-const CACHE_NAME = "perzivalh-chats-pwa-v3";
+const CACHE_NAME = "perzivalh-chats-pwa-v6";
 const SHELL_ASSETS = [
   "/",
-  "/manifest.webmanifest?v=3",
-  "/favicon-32.png?v=3",
-  "/apple-touch-icon.png?v=3",
-  "/pwa-icon-192.png?v=3",
-  "/pwa-icon-512.png?v=3",
+  "/manifest.webmanifest?v=6",
+  "/favicon-32.png?v=6",
+  "/apple-touch-icon.png?v=6",
+  "/pwa-icon-192.png?v=6",
+  "/pwa-icon-512.png?v=6",
 ];
 
 self.addEventListener("install", (event) => {

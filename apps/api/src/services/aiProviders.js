@@ -182,7 +182,7 @@ async function transcribeAudioFasterWhisper({ audioBuffer, mimeType }) {
     throw new Error("faster-whisper disabled by FASTER_WHISPER_ENABLED");
   }
 
-  const scriptPath = path.join(__dirname, "..", "..", "scripts", "transcribe_faster_whisper.py");
+  const scriptPath = await resolveFasterWhisperScriptPath();
   const ext = pickAudioExtension(mimeType);
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "wa-audio-"));
   const audioPath = path.join(tmpDir, `input${ext}`);
@@ -226,6 +226,28 @@ async function transcribeAudioFasterWhisper({ audioBuffer, mimeType }) {
   }
 
   throw lastError || new Error("faster-whisper transcription failed");
+}
+
+async function resolveFasterWhisperScriptPath() {
+  const candidates = [
+    // Current location (script kept under src/scripts)
+    path.join(__dirname, "..", "scripts", "transcribe_faster_whisper.py"),
+    // Backward-compat fallback if moved to apps/api/scripts later
+    path.join(__dirname, "..", "..", "scripts", "transcribe_faster_whisper.py"),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      await fs.access(candidate);
+      return candidate;
+    } catch (_) {
+      // try next
+    }
+  }
+
+  throw new Error(
+    `faster-whisper script not found. Tried: ${candidates.join(", ")}`
+  );
 }
 
 function runFasterWhisperProcess({ pythonBin, scriptPath, audioPath, mimeType }) {

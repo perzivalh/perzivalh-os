@@ -375,8 +375,17 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
         return;
       }
 
-      // Send the conversational text first (if exists and not repeated)
-      if (aiText && aiText !== lastSentText) {
+      // For route actions, prefer canonical flow content over free-form AI text to avoid hallucinations
+      // (e.g. horarios/ubicaciones/precios). The node itself contains the verified content.
+      if (aiDecision.action === "route" && aiDecision.route_id) {
+        if (aiText) {
+          logger.info("flow.ai_route_skip_free_text", {
+            route_id: aiDecision.route_id,
+            textPreview: aiText.slice(0, 140),
+          });
+        }
+      } else if (aiText && aiText !== lastSentText) {
+        // Send the conversational text first (if exists and not repeated)
         await sendText(waId, aiText);
         await sessionStore.updateSession(waId, lineId, {
           data: { last_sent_text: aiText },

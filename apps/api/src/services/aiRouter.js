@@ -348,6 +348,14 @@ function fallbackKeywordRoute(text) {
     "onicomicosis": "HONGOS_TIPO_TRAT",
     "pedicure": "SVC_PEDICURE_INFO",
     "pedicura": "SVC_PEDICURE_INFO",
+    "asesor": "CONTACT_METHOD",
+    "asesora": "CONTACT_METHOD",
+    "atencion personal": "CONTACT_METHOD",
+    "atencion personalizada": "CONTACT_METHOD",
+    "atencion humana": "CONTACT_METHOD",
+    "recepcion": "CONTACT_METHOD",
+    "humano": "CONTACT_METHOD",
+    "persona real": "CONTACT_METHOD",
     "callo": "OTR_CALLOSIDAD_INFO",
     "callos": "OTR_CALLOSIDAD_INFO",
     "callosidad": "OTR_CALLOSIDAD_INFO",
@@ -361,12 +369,26 @@ function fallbackKeywordRoute(text) {
 
     // Info
     "horario": "HORARIOS_INFO",
+    "horarios": "HORARIOS_INFO",
     "ubicacion": "HORARIOS_INFO",
+    "ubicaciones": "HORARIOS_INFO",
+    "ubcacion": "HORARIOS_INFO",
+    "ubcaciones": "HORARIOS_INFO",
+    "sucursal": "HORARIOS_INFO",
+    "sucursales": "HORARIOS_INFO",
     "donde": "HORARIOS_INFO",
     "direccion": "HORARIOS_INFO",
     "precio": "PRECIOS_INFO",
     "cuanto": "PRECIOS_INFO",
     "costo": "PRECIOS_INFO",
+
+    // Dolores / sintomas generales en pies -> menú de patologías "Otros"
+    "talon": "OTROS_MENU",
+    "talones": "OTROS_MENU",
+    "dedo": "OTROS_MENU",
+    "pulgar": "OTROS_MENU",
+    "duele": "OTROS_MENU",
+    "dolor": "OTROS_MENU",
 
     // Menu
     "menu": "MAIN_MENU",

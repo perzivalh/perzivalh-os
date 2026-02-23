@@ -491,9 +491,10 @@ router.post("/webhook", async (req, res) => {
                                         continue;
                                     }
 
-                                    // Reassign incomingText and normalized for the flow to use
+                                    // incomingText for DB history keeps the prefix so operators can see it was audio.
+                                    // The flow/AI router receives only the clean transcribed text for accurate routing.
                                     incomingText = `(Audio transcrito: ${transcribedText})`;
-                                    normalized = normalizeText(incomingText);
+                                    normalized = normalizeText(transcribedText);
                                     logger.info("webhook.audio_transcribed", { waId, text: transcribedText });
 
                                     // Update the inbound audio message with the transcription (optional for history).
@@ -551,11 +552,15 @@ router.post("/webhook", async (req, res) => {
                                     textPreview: String(incomingText || "").slice(0, 120)
                                 });
                             }
+                            // For audio: use clean transcribed text for flow/AI routing (not the "(Audio transcrito: ...)" prefix)
+                            const flowText = message.type === "audio"
+                                ? String(incomingText).replace(/^\(Audio transcrito:\s*/i, "").replace(/\)\s*$/, "").trim()
+                                : incomingText;
                             if (activeFlow.flow.useLegacyHandler) {
-                                void handleIncomingText(waId, incomingText);
+                                void handleIncomingText(waId, flowText);
                             } else {
                                 // Ejecutar flow dinámico
-                                void executeDynamicFlow(waId, incomingText, activeFlow);
+                                void executeDynamicFlow(waId, flowText, activeFlow);
                             }
                             continue;
                         }

@@ -187,8 +187,17 @@ async function callCloudflare({ apiKey, accountId, model, system, user, temperat
     }));
 
     const text = extractCloudflareText(response.data);
+    const compactPreview = String(text || "").replace(/\s+/g, " ").trim().slice(0, 220);
     console.log("[CLOUDFLARE-AI] Response length:", text.length);
     console.log("[CLOUDFLARE-AI] Preview:", text.substring(0, 150));
+    console.log("[CLOUDFLARE-AI] Preview compact:", compactPreview);
+    console.log("[CLOUDFLARE-AI] Format hints", JSON.stringify({
+      startsWithBrace: String(text || "").trim().startsWith("{"),
+      hasActionLabelEs: /acci[oó]n\s*:/i.test(String(text || "")),
+      hasActionLabelEn: /action\s*:/i.test(String(text || "")),
+      hasMarkdownHeading: /(^|\n)\s*#+\s*/.test(String(text || "")),
+      hasBoldActionOnly: /\*\*\s*(respond|route|handoff|clarify|show_services)\s*\*\*/i.test(String(text || "")),
+    }));
     console.log("=".repeat(60));
     return text;
   } catch (error) {

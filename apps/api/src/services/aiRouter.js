@@ -225,12 +225,36 @@ function parseLooseRouterResponse(text) {
 
   if (!plain) return null;
 
+  const normalizeLooseKey = (value) =>
+    String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/\s+/g, "_");
+
+  const toCanonicalLooseKey = (value) => {
+    const normalized = normalizeLooseKey(value);
+    if (normalized === "accion" || normalized === "action") return "action";
+    if (normalized === "texto" || normalized === "text") return "text";
+    if (normalized === "pregunta" || normalized === "question") return "question";
+    if (normalized === "razon" || normalized === "reason") return "reason";
+    if (
+      normalized === "ruta" ||
+      normalized === "route" ||
+      normalized === "route_id" ||
+      normalized === "ruta_id"
+    ) {
+      return "route_id";
+    }
+    return normalized;
+  };
+
   const fieldMatches = [];
-  const fieldRegex = /(?:^|\n)\s*(action|text|route[_ ]?id|question|reason)\s*:\s*/gi;
+  const fieldRegex = /(?:^|\n)\s*#*\s*(action|acci[oó]n|text|texto|route[_ ]?id|ruta(?:[_ ]?id)?|pregunta|question|raz[oó]n|reason)\s*:\s*/gi;
   let match;
   while ((match = fieldRegex.exec(plain))) {
     fieldMatches.push({
-      key: String(match[1] || "").toLowerCase().replace(" ", "_"),
+      key: toCanonicalLooseKey(match[1]),
       start: match.index,
       valueStart: fieldRegex.lastIndex,
     });
@@ -243,11 +267,11 @@ function parseLooseRouterResponse(text) {
       .filter(Boolean);
     if (!lines.length) return null;
 
-    const firstLine = lines[0]
-      .toLowerCase()
-      .replace(/^[:\-\s]+/, "")
-      .replace(/[^\w\s]/g, " ")
-      .trim();
+      const firstLine = lines[0]
+        .toLowerCase()
+        .replace(/^[:\-\s]+/, "")
+        .replace(/[^\w\s]/g, " ")
+        .trim();
     const firstToken = firstLine.split(/\s+/)[0];
     const validActions = new Set(["respond", "route", "handoff", "clarify", "show_services"]);
 
@@ -324,6 +348,16 @@ function fallbackKeywordRoute(text) {
     "onicomicosis": "HONGOS_TIPO_TRAT",
     "pedicure": "SVC_PEDICURE_INFO",
     "pedicura": "SVC_PEDICURE_INFO",
+    "callo": "OTR_CALLOSIDAD_INFO",
+    "callos": "OTR_CALLOSIDAD_INFO",
+    "callosidad": "OTR_CALLOSIDAD_INFO",
+    "callosidades": "OTR_CALLOSIDAD_INFO",
+    "heloma": "OTR_HELOMA_INFO",
+    "talon": "OTROS_MENU",
+    "talón": "OTROS_MENU",
+    "talones": "OTROS_MENU",
+    "espolon": "OTROS_MENU",
+    "espolón": "OTROS_MENU",
 
     // Info
     "horario": "HORARIOS_INFO",
@@ -451,6 +485,15 @@ async function routeWithAI({ text, flow, config, session }) {
     logger.info("ai.router_raw", { provider, model, length: raw?.length || 0 });
 
     let parsed = parseRouterResponse(raw);
+    logger.info("ai.router_parse_result", {
+      provider,
+      model,
+      stage: "primary",
+      jsonParsed: Boolean(safeJsonParse(raw)),
+      parsedAction: parsed?.action || null,
+      parsedRouteId: parsed?.route_id || null,
+      rawPreview: String(raw || "").slice(0, 180),
+    });
     if (!safeJsonParse(raw) && parsed?.action) {
       logger.info("ai.router_parse_loose_success", {
         provider,
@@ -476,6 +519,15 @@ async function routeWithAI({ text, flow, config, session }) {
       });
 
       parsed = parseRouterResponse(retryRaw);
+      logger.info("ai.router_parse_result", {
+        provider,
+        model,
+        stage: "retry",
+        jsonParsed: Boolean(safeJsonParse(retryRaw)),
+        parsedAction: parsed?.action || null,
+        parsedRouteId: parsed?.route_id || null,
+        rawPreview: String(retryRaw || "").slice(0, 180),
+      });
       if (!safeJsonParse(retryRaw) && parsed?.action) {
         logger.info("ai.router_parse_loose_success", {
           provider,
@@ -506,6 +558,13 @@ async function routeWithAI({ text, flow, config, session }) {
     // This is especially useful for providers that are weaker at strict JSON/tool-style outputs.
     if (!parsed.route_id && (parsed.action === "respond" || parsed.action === "clarify")) {
       const inferredRoute = fallbackKeywordRoute(text);
+      logger.info("ai.router_route_augmentation_check", {
+        provider,
+        model,
+        action: parsed.action,
+        inferredRoute: inferredRoute || null,
+        userTextPreview: String(text || "").slice(0, 140),
+      });
       if (inferredRoute) {
         logger.info("ai.router_route_augmented_from_keywords", {
           provider,

@@ -236,7 +236,31 @@ function parseLooseRouterResponse(text) {
     });
   }
 
-  if (!fieldMatches.length) return null;
+  if (!fieldMatches.length) {
+    const lines = plain
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (!lines.length) return null;
+
+    const firstLine = lines[0]
+      .toLowerCase()
+      .replace(/^[:\-\s]+/, "")
+      .replace(/[^\w\s]/g, " ")
+      .trim();
+    const firstToken = firstLine.split(/\s+/)[0];
+    const validActions = new Set(["respond", "route", "handoff", "clarify", "show_services"]);
+
+    if (validActions.has(firstToken)) {
+      const remainingText = lines.slice(1).join("\n").trim();
+      return {
+        action: firstToken,
+        ...(remainingText ? { text: remainingText } : {}),
+      };
+    }
+
+    return null;
+  }
 
   const parsed = {};
   for (let i = 0; i < fieldMatches.length; i++) {
@@ -476,6 +500,25 @@ async function routeWithAI({ text, flow, config, session }) {
     if (parsed.action === "clarify" && (previousQuestion || summary.clarificationsAsked >= 1)) {
       logger.info("ai.router_clarify_blocked", { flowId });
       return { action: "show_services", text: "Te muestro nuestras opciones:", ai_used: true };
+    }
+
+    // If the model answered conversationally but skipped routing, recover route deterministically from keywords.
+    // This is especially useful for providers that are weaker at strict JSON/tool-style outputs.
+    if (!parsed.route_id && (parsed.action === "respond" || parsed.action === "clarify")) {
+      const inferredRoute = fallbackKeywordRoute(text);
+      if (inferredRoute) {
+        logger.info("ai.router_route_augmented_from_keywords", {
+          provider,
+          model,
+          originalAction: parsed.action,
+          inferredRoute,
+        });
+        parsed = {
+          ...parsed,
+          action: "route",
+          route_id: inferredRoute,
+        };
+      }
     }
 
     logger.info("ai.router_decision", {

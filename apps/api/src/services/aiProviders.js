@@ -186,11 +186,13 @@ async function transcribeAudioFasterWhisper({ audioBuffer, mimeType }) {
   const ext = pickAudioExtension(mimeType);
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "wa-audio-"));
   const audioPath = path.join(tmpDir, `input${ext}`);
+  const localPyDepsPath = path.join(__dirname, "..", "..", ".pydeps");
   console.log("[FASTER-WHISPER] Preparing transcription", JSON.stringify({
     mimeType: mimeType || "unknown",
     extension: ext,
     bytes: audioBuffer?.length || 0,
     scriptPath,
+    localPyDepsPath,
     tmpDir,
   }));
 
@@ -213,6 +215,7 @@ async function transcribeAudioFasterWhisper({ audioBuffer, mimeType }) {
           scriptPath,
           audioPath,
           mimeType,
+          localPyDepsPath,
         });
         console.log("[FASTER-WHISPER] Text preview:", String(result).slice(0, 180));
         return result;
@@ -250,16 +253,23 @@ async function resolveFasterWhisperScriptPath() {
   );
 }
 
-function runFasterWhisperProcess({ pythonBin, scriptPath, audioPath, mimeType }) {
+function runFasterWhisperProcess({ pythonBin, scriptPath, audioPath, mimeType, localPyDepsPath }) {
   return new Promise((resolve, reject) => {
     const args = [scriptPath, audioPath];
     const startedAt = Date.now();
     let settled = false;
+    const pythonPathParts = [];
+    if (localPyDepsPath) pythonPathParts.push(localPyDepsPath);
+    if (process.env.PYTHONPATH) pythonPathParts.push(process.env.PYTHONPATH);
+    const childPythonPath = pythonPathParts.join(path.delimiter);
+    console.log("[FASTER-WHISPER] Child PYTHONPATH:", childPythonPath || "(empty)");
     const child = spawn(pythonBin, args, {
       stdio: ["ignore", "pipe", "pipe"],
       env: {
         ...process.env,
         FASTER_WHISPER_MIME_TYPE: mimeType || "",
+        FASTER_WHISPER_PYDEPS_PATH: localPyDepsPath || "",
+        PYTHONPATH: childPythonPath,
       },
     });
 

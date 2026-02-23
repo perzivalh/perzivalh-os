@@ -10,7 +10,9 @@
       "commands": [
         "...",
         "python -m pip install --upgrade pip",
-        "python -m pip install -r apps/api/requirements-faster-whisper.txt"
+        "mkdir -p apps/api/.pydeps",
+        "python -m pip install --upgrade --target apps/api/.pydeps -r apps/api/requirements-faster-whisper.txt",
+        "python -c \"import sys; sys.path.insert(0, 'apps/api/.pydeps'); import faster_whisper; print('faster_whisper import OK')\""
       ]
     }
   },

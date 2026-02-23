@@ -2,6 +2,9 @@ import json
 import os
 import sys
 
+extra_pydeps = os.getenv("FASTER_WHISPER_PYDEPS_PATH", "").strip()
+if extra_pydeps and extra_pydeps not in sys.path:
+    sys.path.insert(0, extra_pydeps)
 
 def main():
     if len(sys.argv) < 2:

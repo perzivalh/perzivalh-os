@@ -1,0 +1,20 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "node",
+  "packages": {
+    "node": "18",
+    "python": "3.11"
+  },
+  "steps": {
+    "install": {
+      "commands": [
+        "...",
+        "python -m pip install --upgrade pip",
+        "python -m pip install -r apps/api/requirements-faster-whisper.txt"
+      ]
+    }
+  },
+  "deploy": {
+    "startCommand": "npm run start"
+  }
+}

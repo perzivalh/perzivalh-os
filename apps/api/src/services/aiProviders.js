@@ -232,6 +232,7 @@ function runFasterWhisperProcess({ pythonBin, scriptPath, audioPath, mimeType })
   return new Promise((resolve, reject) => {
     const args = [scriptPath, audioPath];
     const startedAt = Date.now();
+    let settled = false;
     const child = spawn(pythonBin, args, {
       stdio: ["ignore", "pipe", "pipe"],
       env: {
@@ -257,12 +258,16 @@ function runFasterWhisperProcess({ pythonBin, scriptPath, audioPath, mimeType })
     });
 
     child.on("error", (error) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
       console.error("[FASTER-WHISPER] Spawn error:", error.message);
       reject(error);
     });
 
     child.on("close", (code) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
       const elapsedMs = Date.now() - startedAt;
       if (timeoutHit) {

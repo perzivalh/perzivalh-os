@@ -33,6 +33,38 @@ function extractGeminiText(data) {
 
 function extractCloudflareText(data) {
   const result = data?.result;
+  const fromToolCalls = (toolCalls) => {
+    if (!Array.isArray(toolCalls) || !toolCalls.length) return "";
+    for (const call of toolCalls) {
+      const fn = call?.function || call?.tool || call;
+      const argsCandidates = [
+        fn?.arguments,
+        fn?.args,
+        call?.arguments,
+        call?.args,
+        call?.input,
+        fn?.input,
+      ];
+      for (const args of argsCandidates) {
+        if (!args) continue;
+        if (typeof args === "string") {
+          const trimmed = args.trim();
+          if (trimmed) {
+            console.log("[CLOUDFLARE-AI] Extracted text from tool_calls (string args)");
+            return trimmed;
+          }
+        }
+        if (typeof args === "object") {
+          try {
+            console.log("[CLOUDFLARE-AI] Extracted text from tool_calls (object args)");
+            return JSON.stringify(args);
+          } catch (_) {}
+        }
+      }
+    }
+    return "";
+  };
+
   const fromOpenAiStyleMessage = (message) => {
     if (!message) return "";
     if (typeof message?.content === "string") return message.content;
@@ -51,14 +83,24 @@ function extractCloudflareText(data) {
   };
 
   const fromAnyObject = (obj) => {
-    if (!obj || typeof obj !== "object") return "";
     if (typeof obj === "string") return obj;
+    if (!obj || typeof obj !== "object") return "";
     if (typeof obj.response === "string") return obj.response;
     if (typeof obj.text === "string") return obj.text;
     if (typeof obj.output_text === "string") return obj.output_text;
     if (typeof obj.content === "string") return obj.content;
+    if (Array.isArray(obj.response)) {
+      const nestedResponseText = obj.response.map((item) => fromAnyObject(item)).filter(Boolean).join("\n");
+      if (nestedResponseText) return nestedResponseText;
+    }
+    if (obj.response && typeof obj.response === "object") {
+      const nestedResponseText = fromAnyObject(obj.response);
+      if (nestedResponseText) return nestedResponseText;
+    }
     const msgText = fromOpenAiStyleMessage(obj.message);
     if (msgText) return msgText;
+    const toolCallText = fromToolCalls(obj.tool_calls || obj.toolCalls);
+    if (toolCallText) return toolCallText;
     if (Array.isArray(obj.choices)) {
       const choiceTexts = obj.choices
         .map((choice) => {
@@ -272,7 +314,31 @@ async function callCloudflare({ apiKey, accountId, model, system, user, temperat
       hasOutput: Boolean(Array.isArray(result?.output) && result.output.length),
       hasResponseField: typeof result?.response === "string",
       hasTextField: typeof result?.text === "string",
+      toolCallsCount: Array.isArray(result?.tool_calls) ? result.tool_calls.length : 0,
     }));
+    if (Array.isArray(result?.tool_calls) && result.tool_calls.length) {
+      const firstTool = result.tool_calls[0];
+      console.log("[CLOUDFLARE-AI] Tool call preview", JSON.stringify({
+        name:
+          firstTool?.function?.name ||
+          firstTool?.name ||
+          firstTool?.tool?.name ||
+          null,
+        argumentKeys:
+          firstTool?.function?.arguments && typeof firstTool.function.arguments === "object"
+            ? Object.keys(firstTool.function.arguments).slice(0, 20)
+            : firstTool?.arguments && typeof firstTool.arguments === "object"
+              ? Object.keys(firstTool.arguments).slice(0, 20)
+              : [],
+        argumentsPreview: String(
+          typeof firstTool?.function?.arguments === "string"
+            ? firstTool.function.arguments
+            : typeof firstTool?.arguments === "string"
+              ? firstTool.arguments
+              : ""
+        ).slice(0, 240),
+      }));
+    }
 
     const text = extractCloudflareText(response.data);
     const compactPreview = String(text || "").replace(/\s+/g, " ").trim().slice(0, 220);

@@ -62,6 +62,13 @@ const URGENCY_WORDS = [
   "úlcera", "ulcera", "herida abierta",
 ];
 
+const PODIATRY_CONTEXT_WORDS = [
+  "pie", "pies", "dedo del pie", "dedos del pie", "talon", "talón", "planta",
+  "uña", "uñas", "uñero", "unero", "encarnada", "juanete", "callo", "callos",
+  "heloma", "hongo", "hongos", "onicomicosis", "pedicure", "podologia", "podología",
+  "podopediatria", "podopediatría", "podogeriatria", "podogeriatría", "tobillo",
+];
+
 /**
  * Load knowledge base for a flow
  */
@@ -85,6 +92,18 @@ function loadKnowledgeBase(flowId) {
  */
 function detectUrgency(text) {
   const normalized = normalizeText(text || "").toLowerCase();
+  const hasPodiatryContext = PODIATRY_CONTEXT_WORDS.some((word) => normalized.includes(word));
+  const hasExplicitDiabeticFootContext =
+    normalized.includes("diabet") ||
+    normalized.includes("ulcera") ||
+    normalized.includes("úlcera") ||
+    normalized.includes("herida");
+
+  // Prevent false handoff for non-podiatry complaints like "me duele la oreja/panza"
+  if (!hasPodiatryContext && !hasExplicitDiabeticFootContext) {
+    return false;
+  }
+
   for (const word of URGENCY_WORDS) {
     if (normalized.includes(word)) {
       return true;
@@ -784,13 +803,17 @@ async function routeWithAI({ text, flow, config, session }) {
   }
 
   // URGENCY CHECK FIRST - bypass AI for urgent cases
-  if (detectUrgency(text)) {
+  const urgencyDetected = detectUrgency(text);
+  if (urgencyDetected) {
     logger.info("ai.router_urgency_detected", { flowId });
     return {
       action: "handoff",
       text: "Por lo que describes, lo mejor es que te valore un especialista. Te conecto con nuestro equipo. 🏥",
       ai_used: false,
     };
+  }
+  if (/dolor|duele|urgente|sangra|sangrado/i.test(String(text || ""))) {
+    logger.info("ai.router_urgency_not_podiatry_or_not_critical", { flowId });
   }
 
   // Load knowledge base
@@ -845,18 +868,19 @@ async function routeWithAI({ text, flow, config, session }) {
       if (cloudflareDecision?.action) {
         return cloudflareDecision;
       }
-      const fallbackRoute = fallbackKeywordRoute(text);
-      if (fallbackRoute) {
-        return { action: "route", route_id: fallbackRoute, ai_used: false };
-      }
-      return { action: "show_services", ai_used: false };
+      logger.warn("ai.router_cloudflare_no_decision", { flowId, model });
+      return {
+        action: "respond",
+        text: "Puedo ayudarte con temas de pies y podología. Si quieres, dime si buscas información de un servicio, horarios, precios o atención con un asesor.",
+        ai_used: false,
+      };
     } catch (error) {
       logger.error("ai.router_error", { message: error.message, provider, model, flowId });
-      const fallbackRoute = fallbackKeywordRoute(text);
-      if (fallbackRoute) {
-        return { action: "route", route_id: fallbackRoute, ai_used: false };
-      }
-      return { action: "show_services", ai_used: false };
+      return {
+        action: "respond",
+        text: "Tuve un problema procesando tu mensaje, pero puedo ayudarte con temas de pies. Si quieres, dime el servicio que buscas o si prefieres hablar con un asesor.",
+        ai_used: false,
+      };
     }
   }
 

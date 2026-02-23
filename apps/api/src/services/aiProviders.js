@@ -1,4 +1,8 @@
 const axios = require("axios");
+const fs = require("fs/promises");
+const os = require("os");
+const path = require("path");
+const { spawn } = require("child_process");
 
 const OPENAI_ENDPOINT = "https://api.openai.com/v1/responses";
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
@@ -164,6 +168,150 @@ async function transcribeAudioOpenAI({ apiKey, audioBuffer, mimeType }) {
   }
 }
 
+function pickAudioExtension(mimeType) {
+  if (mimeType?.includes("mp4")) return ".mp4";
+  if (mimeType?.includes("mpeg") || mimeType?.includes("mp3")) return ".mp3";
+  if (mimeType?.includes("wav")) return ".wav";
+  if (mimeType?.includes("webm")) return ".webm";
+  return ".ogg";
+}
+
+async function transcribeAudioFasterWhisper({ audioBuffer, mimeType }) {
+  const enabled = String(process.env.FASTER_WHISPER_ENABLED || "true").toLowerCase();
+  if (enabled === "0" || enabled === "false" || enabled === "off") {
+    throw new Error("faster-whisper disabled by FASTER_WHISPER_ENABLED");
+  }
+
+  const scriptPath = path.join(__dirname, "..", "..", "scripts", "transcribe_faster_whisper.py");
+  const ext = pickAudioExtension(mimeType);
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "wa-audio-"));
+  const audioPath = path.join(tmpDir, `input${ext}`);
+  console.log("[FASTER-WHISPER] Preparing transcription", JSON.stringify({
+    mimeType: mimeType || "unknown",
+    extension: ext,
+    bytes: audioBuffer?.length || 0,
+    scriptPath,
+    tmpDir,
+  }));
+
+  const pythonCandidates = [
+    process.env.FASTER_WHISPER_PYTHON_BIN,
+    "python",
+    "python3",
+  ].filter(Boolean);
+  console.log("[FASTER-WHISPER] Python candidates:", pythonCandidates.join(", "));
+
+  await fs.writeFile(audioPath, audioBuffer);
+
+  let lastError = null;
+  try {
+    for (const pythonBin of pythonCandidates) {
+      try {
+        console.log(`[FASTER-WHISPER] Trying python bin: ${pythonBin}`);
+        const result = await runFasterWhisperProcess({
+          pythonBin,
+          scriptPath,
+          audioPath,
+          mimeType,
+        });
+        console.log("[FASTER-WHISPER] Text preview:", String(result).slice(0, 180));
+        return result;
+      } catch (error) {
+        lastError = error;
+        console.warn(`[FASTER-WHISPER] Failed with ${pythonBin}:`, error.message);
+      }
+    }
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+
+  throw lastError || new Error("faster-whisper transcription failed");
+}
+
+function runFasterWhisperProcess({ pythonBin, scriptPath, audioPath, mimeType }) {
+  return new Promise((resolve, reject) => {
+    const args = [scriptPath, audioPath];
+    const startedAt = Date.now();
+    const child = spawn(pythonBin, args, {
+      stdio: ["ignore", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        FASTER_WHISPER_MIME_TYPE: mimeType || "",
+      },
+    });
+
+    let stdout = "";
+    let stderr = "";
+    let timeoutHit = false;
+    const timeoutMs = Number(process.env.FASTER_WHISPER_TIMEOUT_MS || 120000);
+    const timer = setTimeout(() => {
+      timeoutHit = true;
+      child.kill("SIGKILL");
+    }, timeoutMs);
+
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      console.error("[FASTER-WHISPER] Spawn error:", error.message);
+      reject(error);
+    });
+
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      const elapsedMs = Date.now() - startedAt;
+      if (timeoutHit) {
+        return reject(new Error(`faster-whisper process timeout after ${timeoutMs}ms (elapsed=${elapsedMs}ms)`));
+      }
+
+      const lines = stdout
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+      const lastLine = lines[lines.length - 1] || "";
+
+      if (code !== 0) {
+        const detail = (stderr || lastLine || "").slice(0, 1200);
+        console.error("[FASTER-WHISPER] Non-zero exit", JSON.stringify({
+          code,
+          elapsedMs,
+          stdoutTail: stdout.slice(-400),
+          stderrTail: stderr.slice(-400),
+        }));
+        return reject(new Error(`faster-whisper exit ${code}: ${detail}`));
+      }
+
+      try {
+        const parsed = JSON.parse(lastLine);
+        if (parsed?.error) {
+          return reject(new Error(parsed.error));
+        }
+        console.log("[FASTER-WHISPER] Process success", JSON.stringify({
+          code,
+          elapsedMs,
+          language: parsed?.language || null,
+          duration: parsed?.duration || null,
+          textLength: String(parsed?.text || "").length,
+        }));
+        resolve(String(parsed?.text || "").trim());
+      } catch (error) {
+        console.error("[FASTER-WHISPER] JSON parse failure", JSON.stringify({
+          code,
+          elapsedMs,
+          stdoutTail: stdout.slice(-500),
+          stderrTail: stderr.slice(-500),
+        }));
+        reject(new Error(`faster-whisper invalid JSON output: ${(lastLine || stdout).slice(0, 500)}`));
+      }
+    });
+  });
+}
+
 async function transcribeAudioGemini({ apiKey, audioBuffer, mimeType }) {
   console.log("=".repeat(60));
   console.log("[GEMINI-AUDIO] Starting transcription call");
@@ -252,6 +400,27 @@ async function transcribeAudio({ provider, apiKey, audioBuffer, mimeType }) {
   console.log("[AI-AUDIO] Provider:", provider, "| Has key:", !!apiKey);
   if (!audioBuffer) {
     throw new Error("audioBuffer is required");
+  }
+
+  const transcriptionProvider = (process.env.AUDIO_TRANSCRIPTION_PROVIDER || "faster-whisper").toLowerCase();
+
+  if (transcriptionProvider === "faster-whisper" || transcriptionProvider === "local") {
+    try {
+      console.log("[AI-AUDIO] Trying local transcription with faster-whisper", JSON.stringify({
+        model: process.env.FASTER_WHISPER_MODEL || "base",
+        device: process.env.FASTER_WHISPER_DEVICE || "cpu",
+        computeType: process.env.FASTER_WHISPER_COMPUTE_TYPE || "int8",
+        strictLocal: String(process.env.AUDIO_TRANSCRIPTION_STRICT_LOCAL || "false"),
+      }));
+      const text = await transcribeAudioFasterWhisper({ audioBuffer, mimeType });
+      console.log("[AI-AUDIO] faster-whisper SUCCESS");
+      return text;
+    } catch (error) {
+      console.warn("[AI-AUDIO] faster-whisper FAILED, fallback to configured provider:", error.message);
+      if (String(process.env.AUDIO_TRANSCRIPTION_STRICT_LOCAL || "false").toLowerCase() === "true") {
+        throw error;
+      }
+    }
   }
 
   if (provider === "gemini") {

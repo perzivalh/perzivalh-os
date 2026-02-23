@@ -33,9 +33,83 @@ function extractGeminiText(data) {
 
 function extractCloudflareText(data) {
   const result = data?.result;
+  const fromOpenAiStyleMessage = (message) => {
+    if (!message) return "";
+    if (typeof message?.content === "string") return message.content;
+    if (Array.isArray(message?.content)) {
+      return message.content
+        .map((part) => {
+          if (typeof part === "string") return part;
+          if (typeof part?.text === "string") return part.text;
+          if (typeof part?.content === "string") return part.content;
+          return "";
+        })
+        .filter(Boolean)
+        .join("\n");
+    }
+    return "";
+  };
+
+  const fromAnyObject = (obj) => {
+    if (!obj || typeof obj !== "object") return "";
+    if (typeof obj === "string") return obj;
+    if (typeof obj.response === "string") return obj.response;
+    if (typeof obj.text === "string") return obj.text;
+    if (typeof obj.output_text === "string") return obj.output_text;
+    if (typeof obj.content === "string") return obj.content;
+    const msgText = fromOpenAiStyleMessage(obj.message);
+    if (msgText) return msgText;
+    if (Array.isArray(obj.choices)) {
+      const choiceTexts = obj.choices
+        .map((choice) => {
+          if (typeof choice?.text === "string") return choice.text;
+          const choiceMsg = fromOpenAiStyleMessage(choice?.message);
+          if (choiceMsg) return choiceMsg;
+          return "";
+        })
+        .filter(Boolean)
+        .join("\n");
+      if (choiceTexts) return choiceTexts;
+    }
+    if (Array.isArray(obj.messages)) {
+      const lastAssistant = [...obj.messages].reverse().find((m) => String(m?.role || "").toLowerCase() === "assistant");
+      const assistantText = fromOpenAiStyleMessage(lastAssistant);
+      if (assistantText) return assistantText;
+      const anyMessagesText = obj.messages
+        .map((m) => fromOpenAiStyleMessage(m))
+        .filter(Boolean)
+        .join("\n");
+      if (anyMessagesText) return anyMessagesText;
+    }
+    if (Array.isArray(obj.output)) {
+      const outputText = obj.output
+        .map((item) => {
+          if (typeof item === "string") return item;
+          if (typeof item?.text === "string") return item.text;
+          if (typeof item?.content === "string") return item.content;
+          if (typeof item?.output_text === "string") return item.output_text;
+          const nestedMsg = fromOpenAiStyleMessage(item?.message);
+          if (nestedMsg) return nestedMsg;
+          if (Array.isArray(item?.content)) {
+            return item.content
+              .map((part) => (typeof part?.text === "string" ? part.text : typeof part === "string" ? part : ""))
+              .filter(Boolean)
+              .join("\n");
+          }
+          return "";
+        })
+        .filter(Boolean)
+        .join("\n");
+      if (outputText) return outputText;
+    }
+    return "";
+  };
+
   if (typeof result === "string") return result;
-  if (typeof result?.response === "string") return result.response;
-  if (typeof result?.text === "string") return result.text;
+  const resultText = fromAnyObject(result);
+  if (resultText) return resultText;
+  const rootText = fromAnyObject(data);
+  if (rootText) return rootText;
   if (Array.isArray(result)) {
     return result
       .map((item) => {
@@ -184,6 +258,20 @@ async function callCloudflare({ apiKey, accountId, model, system, user, temperat
       status: response.status,
       apiSuccess: response.data?.success !== false,
       hasResult: response.data?.result !== undefined,
+    }));
+
+    const result = response.data?.result;
+    console.log("[CLOUDFLARE-AI] Result shape", JSON.stringify({
+      topKeys: Object.keys(response.data || {}).slice(0, 20),
+      resultType: Array.isArray(result) ? "array" : typeof result,
+      resultKeys: result && typeof result === "object" && !Array.isArray(result)
+        ? Object.keys(result).slice(0, 30)
+        : [],
+      hasChoices: Boolean(Array.isArray(result?.choices) && result.choices.length),
+      hasMessages: Boolean(Array.isArray(result?.messages) && result.messages.length),
+      hasOutput: Boolean(Array.isArray(result?.output) && result.output.length),
+      hasResponseField: typeof result?.response === "string",
+      hasTextField: typeof result?.text === "string",
     }));
 
     const text = extractCloudflareText(response.data);

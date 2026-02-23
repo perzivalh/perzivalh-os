@@ -16,6 +16,8 @@ const DEFAULT_MODELS = {
   cloudflare: "@cf/meta/llama-3-8b-instruct",
 };
 
+const ROUTER_ACTIONS = ["respond", "route", "handoff", "clarify", "show_services", "menu", "out_of_scope", "services"];
+
 // Schema para respuestas de la IA
 const ROUTER_SCHEMA = {
   type: "object",
@@ -23,12 +25,27 @@ const ROUTER_SCHEMA = {
   properties: {
     action: {
       type: "string",
-      enum: ["respond", "route", "handoff", "clarify", "show_services"],
+      enum: ROUTER_ACTIONS,
     },
     text: { type: "string" },           // Respuesta conversacional
     route_id: { type: "string" },       // Nodo destino si action=route
     question: { type: "string" },       // Pregunta si action=clarify
     reason: { type: "string" },         // Razón interna (debug)
+  },
+  required: ["action"],
+};
+
+const ROUTER_DECISION_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    action: {
+      type: "string",
+      enum: ROUTER_ACTIONS,
+    },
+    route_id: { type: "string" },
+    question: { type: "string" },
+    reason: { type: "string" },
   },
   required: ["action"],
 };
@@ -326,6 +343,325 @@ function parseRouterResponse(text) {
   return safeJsonParse(text) || parseLooseRouterResponse(text);
 }
 
+function isCloudflareProvider(provider) {
+  const normalized = String(provider || "").toLowerCase();
+  return normalized === "cloudflare" || normalized === "cloudflare-workers-ai" || normalized === "workers-ai";
+}
+
+function normalizeRouterAction(action) {
+  const normalized = String(action || "").toLowerCase().trim();
+  if (!normalized) return null;
+  if (normalized === "services") return "show_services";
+  return normalized;
+}
+
+function buildRoutingNodeCatalog(flow) {
+  const nodeMap = new Map();
+  for (const node of flow?.nodes || []) {
+    if (!node?.id) continue;
+    if (!nodeMap.has(node.id)) {
+      nodeMap.set(node.id, {
+        id: node.id,
+        type: node.type || "",
+        title: (node.title || node.text || "").toString().replace(/\s+/g, " ").trim().slice(0, 90),
+        buttonLabels: [],
+      });
+    }
+    const row = nodeMap.get(node.id);
+    if (Array.isArray(node.buttons)) {
+      for (const btn of node.buttons) {
+        if (btn?.label) row.buttonLabels.push(String(btn.label).trim());
+      }
+    }
+  }
+
+  return [...nodeMap.values()]
+    .map((n) => {
+      const labels = n.buttonLabels.slice(0, 4).join(" | ");
+      return `- ${n.id}${n.type ? ` [${n.type}]` : ""}${n.title ? ` :: ${n.title}` : ""}${labels ? ` :: botones: ${labels}` : ""}`;
+    })
+    .slice(0, 140)
+    .join("\n");
+}
+
+function buildCloudflareRouteSystemPrompt({ knowledge, flow, previousQuestion, summary }) {
+  const clinica = knowledge?.clinica || {};
+  const personalidad = knowledge?.personalidad || {};
+  const nodeCatalog = buildRoutingNodeCatalog(flow);
+  const clarifyCount = Number(summary?.clarificationsAsked || 0);
+
+  return `Eres un router de flujo de WhatsApp para ${clinica.nombre || "PODOPIE"} (podologia).
+
+TU TAREA ES SOLO DECIDIR LA ACCION Y EL NODO. NO EXPLIQUES SERVICIOS, NO INVENTES HORARIOS, NO INVENTES DIRECCIONES.
+Responde SOLO JSON valido.
+
+Reglas clave:
+- Si el usuario pide informacion de un servicio/tema podologico => action="route" con route_id correcto.
+- Si pide horarios, ubicacion, sucursal, direccion => route a nodo de horarios/ubicaciones.
+- Si pide precios/costos => route a nodo de precios.
+- Si pide asesor/humano/recepcion/denuncia/reclamo => handoff o route a contacto/atencion personalizada.
+- Si el tema NO es de pies/podologia => respond (mensaje corto aclarando que solo atienden pies).
+- Si hay dolor intenso / urgencia => handoff.
+- Usa clarify SOLO si realmente falta dato y como maximo una vez.
+- Si no sabes a que nodo ir pero sigue siendo del negocio => show_services.
+
+Acciones permitidas: respond, route, handoff, clarify, show_services, menu, out_of_scope.
+${previousQuestion ? "IMPORTANTE: ya se hizo una pregunta de clarificacion antes, evita otra salvo que sea imprescindible." : ""}
+${clarifyCount >= 1 ? "IMPORTANTE: ya hubo clarificaciones previas; prioriza route/show_services/handoff." : ""}
+
+NODOS DISPONIBLES:
+${nodeCatalog || "- MAIN_MENU"}
+
+Esquema JSON:
+{"action":"route","route_id":"NODE_ID","reason":"breve"}
+Campos opcionales: route_id, question, reason.
+Si action=clarify incluye question.`;
+}
+
+function buildCloudflareCopyPrompt({ knowledge, action, userText }) {
+  const personalidad = knowledge?.personalidad || {};
+  const clinica = knowledge?.clinica || {};
+  const tone = personalidad.tono || "amable, calido y profesional";
+  const emoji = Array.isArray(personalidad.emojis_frecuentes) && personalidad.emojis_frecuentes.length
+    ? personalidad.emojis_frecuentes.slice(0, 2).join(" ")
+    : "🦶";
+  const onlyFeet = clinica.especialidad || "solo atendemos temas de pies/podologia";
+
+  if (action === "clarify") {
+    return {
+      system: `Eres un asistente de ${clinica.nombre || "PODOPIE"}. Responde SOLO con una pregunta corta (1 frase) para aclarar la necesidad del usuario. Tono ${tone}. No inventes horarios/precios. Usa español.`,
+      user: `Mensaje del usuario: "${userText}"\nDevuelve solo la pregunta, sin JSON.`,
+    };
+  }
+
+  return {
+    system: `Eres un asistente de ${clinica.nombre || "PODOPIE"}. Tono ${tone}. Maximo 2 oraciones. No inventes horarios, direcciones ni precios. Si el tema no es podologia, aclara que ${onlyFeet}. Puedes usar ${emoji}.`,
+    user: `Responde al usuario de forma breve y util.\nMensaje del usuario: "${userText}"\nDevuelve solo el texto final, sin JSON ni markdown.`,
+  };
+}
+
+async function callRouteDecisionWithRetry({
+  provider,
+  apiKey,
+  model,
+  accountId,
+  system,
+  user,
+  flowId,
+}) {
+  const tryParse = (raw, stage) => {
+    const parsed = parseRouterResponse(raw);
+    const jsonParsed = Boolean(safeJsonParse(raw));
+    logger.info("ai.router_parse_result", {
+      provider,
+      model,
+      stage,
+      jsonParsed,
+      parsedAction: normalizeRouterAction(parsed?.action) || null,
+      parsedRouteId: parsed?.route_id || null,
+      rawPreview: String(raw || "").slice(0, 180),
+    });
+    if (!jsonParsed && parsed?.action) {
+      logger.info("ai.router_parse_loose_success", {
+        provider,
+        model,
+        stage,
+        action: normalizeRouterAction(parsed.action),
+      });
+    }
+    if (parsed?.action) {
+      parsed.action = normalizeRouterAction(parsed.action);
+    }
+    return parsed;
+  };
+
+  const raw = await callAiProvider(provider, {
+    apiKey,
+    model,
+    accountId,
+    system,
+    user,
+    schema: ROUTER_DECISION_SCHEMA,
+    temperature: 0,
+    maxTokens: 180,
+  });
+  logger.info("ai.router_raw", { provider, model, length: raw?.length || 0 });
+  let parsed = tryParse(raw, "route_primary");
+  if (parsed?.action) return parsed;
+
+  logger.warn("ai.router_parse_failed", { preview: raw?.slice(0, 100) || "" });
+
+  const retryRaw = await callAiProvider(provider, {
+    apiKey,
+    model,
+    accountId,
+    system: `${system}\n\nRESPUESTA OBLIGATORIA: devuelve SOLO JSON valido. NO texto conversacional. NO markdown.`,
+    user: `${user}\n\nDevuelve SOLO JSON.`,
+    schema: ROUTER_DECISION_SCHEMA,
+    temperature: 0,
+    maxTokens: 180,
+  });
+  parsed = tryParse(retryRaw, "route_retry");
+  if (parsed?.action) return parsed;
+
+  // Repair pass: if model keeps chatting, ask ONLY for action/route without explanations.
+  const repairRaw = await callAiProvider(provider, {
+    apiKey,
+    model,
+    accountId,
+    system: `${system}\n\nMODO REPARACION: decide accion y route_id. Si el usuario pide servicio/horario/precio/contacto, NO uses respond; usa route/show_services/handoff.`,
+    user: `Usuario: ${user}\nResponde SOLO JSON con action y route_id si aplica.`,
+    schema: ROUTER_DECISION_SCHEMA,
+    temperature: 0,
+    maxTokens: 140,
+  });
+  parsed = tryParse(repairRaw, "route_repair");
+  if (parsed?.action) return parsed;
+
+  logger.warn("ai.router_fallback", { flowId });
+  return null;
+}
+
+async function routeWithCloudflareRouteFirst({
+  text,
+  flow,
+  session,
+  knowledge,
+  provider,
+  model,
+  apiKey,
+  cloudflareAccountId,
+  flowId,
+  summary,
+  previousQuestion,
+}) {
+  logger.info("ai.router_mode", { provider, model, mode: "route_first", flowId });
+
+  const routeSystem = buildCloudflareRouteSystemPrompt({
+    knowledge,
+    flow,
+    previousQuestion,
+    summary,
+  });
+  const routeUser = buildUserPrompt({
+    message: text,
+    history: getHistoryForAI(session?.data),
+    summary,
+    previousQuestion,
+  });
+
+  let parsed = await callRouteDecisionWithRetry({
+    provider,
+    apiKey,
+    model,
+    accountId: cloudflareAccountId,
+    system: routeSystem,
+    user: routeUser,
+    flowId,
+  });
+
+  if (!parsed?.action) {
+    return null;
+  }
+
+  parsed.action = normalizeRouterAction(parsed.action);
+
+  // If the model returned respond but also supplied route_id, prefer route.
+  if (parsed.action === "respond" && parsed.route_id) {
+    parsed.action = "route";
+  }
+
+  // If clarify was already used, downgrade to show_services.
+  if (parsed.action === "clarify" && (previousQuestion || summary?.clarificationsAsked >= 1)) {
+    parsed = { action: "show_services", reason: "clarify_limit" };
+  }
+
+  // Route-like actions should not send AI free text to avoid hallucinating business facts.
+  if (["route", "show_services", "handoff", "menu", "services", "out_of_scope"].includes(parsed.action)) {
+    logger.info("ai.router_decision", {
+      provider,
+      model,
+      action: parsed.action,
+      route_id: parsed.route_id || null,
+      reason: parsed.reason || null,
+      source: "cloudflare_route_model",
+    });
+    return {
+      ...parsed,
+      action: normalizeRouterAction(parsed.action),
+      text: "",
+      ai_used: true,
+      clear_pending: Boolean(previousQuestion),
+      reset_turns: parsed.action === "route" || parsed.action === "show_services" || parsed.action === "menu",
+    };
+  }
+
+  // Generate text ONLY when the final action is conversational.
+  const copyPrompt = buildCloudflareCopyPrompt({
+    knowledge,
+    action: parsed.action,
+    userText: text,
+  });
+
+  let copyRaw = "";
+  try {
+    copyRaw = await callAiProvider(provider, {
+      apiKey,
+      model,
+      accountId: cloudflareAccountId,
+      system: copyPrompt.system,
+      user: copyPrompt.user,
+      temperature: 0.2,
+      maxTokens: parsed.action === "clarify" ? 80 : 180,
+    });
+  } catch (error) {
+    logger.warn("ai.router_copy_error", { provider, model, message: error.message });
+  }
+
+  const cleanedCopy = String(copyRaw || "")
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/^\s*#+\s*/gm, "")
+    .trim();
+
+  if (parsed.action === "clarify") {
+    const question = parsed.question || cleanedCopy || "¿Podrías contarme un poco más para ayudarte mejor?";
+    logger.info("ai.router_decision", {
+      provider,
+      model,
+      action: "clarify",
+      route_id: null,
+      reason: parsed.reason || null,
+      source: "cloudflare_route_model+copy_model",
+    });
+    return {
+      action: "clarify",
+      question,
+      reason: parsed.reason || null,
+      ai_used: true,
+      clear_pending: Boolean(previousQuestion),
+      reset_turns: false,
+    };
+  }
+
+  const textReply = cleanedCopy || "Entiendo tu consulta. Te ayudo con eso.";
+  logger.info("ai.router_decision", {
+    provider,
+    model,
+    action: "respond",
+    route_id: null,
+    reason: parsed.reason || null,
+    source: "cloudflare_route_model+copy_model",
+  });
+  return {
+    action: "respond",
+    text: textReply,
+    reason: parsed.reason || null,
+    ai_used: true,
+    clear_pending: Boolean(previousQuestion),
+    reset_turns: false,
+  };
+}
+
 /**
  * Fallback keyword routing (used only if AI fails)
  */
@@ -490,6 +826,39 @@ async function routeWithAI({ text, flow, config, session }) {
         ? Boolean(cloudflareAccountId)
         : undefined,
   });
+
+  if (isCloudflareProvider(provider)) {
+    try {
+      const cloudflareDecision = await routeWithCloudflareRouteFirst({
+        text,
+        flow,
+        session,
+        knowledge,
+        provider,
+        model,
+        apiKey,
+        cloudflareAccountId,
+        flowId,
+        summary,
+        previousQuestion,
+      });
+      if (cloudflareDecision?.action) {
+        return cloudflareDecision;
+      }
+      const fallbackRoute = fallbackKeywordRoute(text);
+      if (fallbackRoute) {
+        return { action: "route", route_id: fallbackRoute, ai_used: false };
+      }
+      return { action: "show_services", ai_used: false };
+    } catch (error) {
+      logger.error("ai.router_error", { message: error.message, provider, model, flowId });
+      const fallbackRoute = fallbackKeywordRoute(text);
+      if (fallbackRoute) {
+        return { action: "route", route_id: fallbackRoute, ai_used: false };
+      }
+      return { action: "show_services", ai_used: false };
+    }
+  }
 
   try {
     // Call AI

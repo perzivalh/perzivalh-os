@@ -7,6 +7,7 @@ const { spawn } = require("child_process");
 const OPENAI_ENDPOINT = "https://api.openai.com/v1/responses";
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 const CLOUDFLARE_AI_BASE = "https://api.cloudflare.com/client/v4/accounts";
+const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 
 function extractOpenAIText(data) {
   if (!data) return "";
@@ -365,6 +366,51 @@ async function callCloudflare({ apiKey, accountId, model, system, user, temperat
   }
 }
 
+async function callGroq({ apiKey, model, system, user, temperature = 0, maxTokens = 220 }) {
+  console.log("=".repeat(60));
+  console.log("[GROQ] Starting call");
+  console.log("[GROQ] Model:", model || "MISSING");
+  console.log("[GROQ] API Key prefix:", apiKey ? apiKey.substring(0, 12) + "..." : "MISSING");
+
+  const payload = {
+    model: model || "llama-3.1-8b-instant",
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    temperature,
+    max_tokens: maxTokens,
+    response_format: { type: "json_object" },
+  };
+
+  try {
+    const response = await axios.post(GROQ_ENDPOINT, payload, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      timeout: 20000,
+    });
+
+    const text = response.data?.choices?.[0]?.message?.content || "";
+    console.log("[GROQ] SUCCESS");
+    console.log("[GROQ] Response length:", text.length);
+    console.log("[GROQ] Preview:", text.substring(0, 150));
+    console.log("=".repeat(60));
+    return text;
+  } catch (error) {
+    const status = error?.response?.status;
+    const detail = error?.response?.data
+      ? JSON.stringify(error.response.data).slice(0, 500)
+      : "";
+    console.error("[GROQ] FAILED:", status, detail);
+    console.error("=".repeat(60));
+    throw new Error(
+      `Groq request failed${status ? ` (${status})` : ""}${detail ? `: ${detail}` : ""}`
+    );
+  }
+}
+
 async function callAiProvider(provider, options) {
   console.log("[AI] Provider:", provider, "| Model:", options.model, "| Has key:", !!options.apiKey);
   if (provider === "gemini") {
@@ -378,6 +424,9 @@ async function callAiProvider(provider, options) {
         options.cloudflareAccountId ||
         process.env.CLOUDFLARE_ACCOUNT_ID,
     });
+  }
+  if (provider === "groq") {
+    return callGroq(options);
   }
   return callOpenAI(options);
 }

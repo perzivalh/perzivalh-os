@@ -36,7 +36,7 @@ function BotSection({
   onUpdateBotConfig,
 }) {
   const [selectedFlow, setSelectedFlow] = useState("");
-  const [selectedAiProvider, setSelectedAiProvider] = useState("openai");
+  const [selectedAiProvider, setSelectedAiProvider] = useState("groq");
   const [selectedAiKey, setSelectedAiKey] = useState("");
   const [selectedAiAccountId, setSelectedAiAccountId] = useState("");
   const [selectedAiModel, setSelectedAiModel] = useState(CLOUDFLARE_DEFAULT_MODEL);
@@ -174,8 +174,9 @@ function BotSection({
                             })
                           }
                         >
-                          <option value="openai">OpenAI</option>
+                          <option value="groq">Groq (Llama 3.1 - Gratis)</option>
                           <option value="gemini">Gemini</option>
+                          <option value="openai">OpenAI</option>
                           <option value="cloudflare">Cloudflare Workers AI</option>
                         </select>
                       </div>
@@ -301,8 +302,9 @@ function BotSection({
                 value={selectedAiProvider}
               onChange={(event) => setSelectedAiProvider(event.target.value)}
             >
-              <option value="openai">OpenAI</option>
+              <option value="groq">Groq (Llama 3.1 - Gratis)</option>
               <option value="gemini">Gemini</option>
+              <option value="openai">OpenAI</option>
               <option value="cloudflare">Cloudflare Workers AI</option>
             </select>
           </div>

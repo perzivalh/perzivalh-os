@@ -14,6 +14,7 @@ const DEFAULT_MODELS = {
   openai: "gpt-4o-mini",
   gemini: "gemini-2.5-flash",
   cloudflare: "@cf/meta/llama-3-8b-instruct",
+  groq: "llama-3.1-8b-instant",
 };
 
 const ROUTER_ACTIONS = ["respond", "route", "handoff", "clarify", "show_services", "menu", "out_of_scope", "services"];
@@ -910,13 +911,15 @@ async function routeWithAI({ text, flow, config, session }) {
   }
 
   // Get API configuration
-  const provider = String(aiConfig.provider || aiFlow.provider || "gemini").toLowerCase();
+  const provider = String(aiConfig.provider || aiFlow.provider || process.env.AI_PROVIDER || "gemini").toLowerCase();
   const rawKey = aiConfig.key || aiConfig.api_key ||
     (provider === "gemini"
       ? process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
       : (provider === "cloudflare" || provider === "cloudflare-workers-ai" || provider === "workers-ai")
         ? process.env.CLOUDFLARE_AI_API_TOKEN || process.env.CLOUDFLARE_API_TOKEN
-        : process.env.OPENAI_API_KEY);
+        : provider === "groq"
+          ? process.env.GROQ_API_KEY
+          : process.env.OPENAI_API_KEY);
   const apiKey = rawKey ? String(rawKey).trim() : "";
   const cloudflareAccountId = aiConfig.account_id || aiConfig.accountId ||
     aiConfig.cloudflare_account_id || aiConfig.cloudflareAccountId ||

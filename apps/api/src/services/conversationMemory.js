@@ -8,7 +8,7 @@
  * - clearHistory(session) - Reset history
  */
 
-const MAX_HISTORY_LENGTH = 15;
+const MAX_HISTORY_LENGTH = 6;
 
 /**
  * Add a message to conversation history
@@ -22,7 +22,7 @@ function addMessage(sessionData, role, content) {
 
     history.push({
         role,
-        content: content?.substring(0, 500) || "", // Limit message length
+        content: content?.substring(0, 200) || "", // Limit message length
         ts: Date.now(),
     });
 

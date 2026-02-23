@@ -326,31 +326,35 @@ function normalizeRouterAction(action) {
 }
 
 function buildRoutingNodeCatalog(flow) {
-  const nodeMap = new Map();
-  for (const node of flow?.nodes || []) {
-    if (!node?.id) continue;
-    if (!nodeMap.has(node.id)) {
-      nodeMap.set(node.id, {
-        id: node.id,
-        type: node.type || "",
-        title: (node.title || node.text || "").toString().replace(/\s+/g, " ").trim().slice(0, 90),
-        buttonLabels: [],
-      });
-    }
-    const row = nodeMap.get(node.id);
+  const nodes = flow?.nodes || [];
+
+  // Only include nodes that are valid routing targets (reachable via button clicks)
+  const buttonTargets = new Set();
+  for (const node of nodes) {
     if (Array.isArray(node.buttons)) {
       for (const btn of node.buttons) {
-        if (btn?.label) row.buttonLabels.push(String(btn.label).trim());
+        if (btn?.next) buttonTargets.add(btn.next);
       }
     }
   }
 
+  // Also include special AI config nodes and the start node
+  const ai = flow?.ai || {};
+  [ai.handoff_node_id, ai.services_node_id, ai.out_of_scope_node_id, flow?.start_node_id]
+    .filter(Boolean)
+    .forEach((id) => buttonTargets.add(id));
+
+  const nodeMap = new Map();
+  for (const node of nodes) {
+    if (!node?.id || !buttonTargets.has(node.id)) continue;
+    nodeMap.set(node.id, {
+      id: node.id,
+      title: (node.title || node.text || "").toString().replace(/\s+/g, " ").trim().slice(0, 50),
+    });
+  }
+
   return [...nodeMap.values()]
-    .map((n) => {
-      const labels = n.buttonLabels.slice(0, 4).join(" | ");
-      return `- ${n.id}${n.type ? ` [${n.type}]` : ""}${n.title ? ` :: ${n.title}` : ""}${labels ? ` :: botones: ${labels}` : ""}`;
-    })
-    .slice(0, 140)
+    .map((n) => `- ${n.id}${n.title ? ` :: ${n.title}` : ""}`)
     .join("\n");
 }
 

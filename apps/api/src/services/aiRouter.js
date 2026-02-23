@@ -977,7 +977,12 @@ async function routeWithAI({ text, flow, config, session }) {
   const system = buildSystemPrompt(knowledge, session);
   const user = buildUserPrompt({ message: text, history, summary, previousQuestion });
 
-  const model = aiConfig.model || DEFAULT_MODELS[provider] || DEFAULT_MODELS.openai;
+  // Only use saved model if it's compatible with the current provider.
+  // Cloudflare models start with "@cf/" — don't use them for other providers.
+  const savedModel = aiConfig.model;
+  const savedModelIsCloudflare = typeof savedModel === "string" && savedModel.startsWith("@cf/");
+  const modelIsCompatible = savedModel && !(savedModelIsCloudflare && !isCloudflareProvider(provider));
+  const model = (modelIsCompatible ? savedModel : null) || DEFAULT_MODELS[provider] || DEFAULT_MODELS.openai;
   logger.info("ai.router_request", {
     provider,
     model,

@@ -123,28 +123,34 @@ function buildSystemPrompt(knowledge, session, flow) {
 
   const nodeCatalog = flow ? buildRoutingNodeCatalog(flow) : `MAIN_MENU, SERVICIOS_MENU, HORARIOS_INFO, PRECIOS_INFO, CONTACT_METHOD, UNERO_TIPO_TRAT, HONGOS_TIPO_TRAT, SVC_PEDICURE_INFO, SVC_PODOPEDIATRIA_INFO, SVC_PODOGERIATRIA_INFO, OTR_PIE_DIABETICO_INFO, OTR_CALLOSIDAD_INFO, OTR_HELOMA_INFO, OTR_VERRUGA_PLANTAR_INFO, OTR_EXTRACCION_UNA_INFO, OTR_PIE_ATLETA_INFO, OTROS_MENU`;
 
-  return `Eres ${nombre}, router de WhatsApp de ${clinica} (podología, ${ciudad}). SOLO pies. No manos/manicure.
-Responde SOLO JSON válido: {"action":"...","text":"...","route_id":"...","question":"...","reason":"..."}
+  return `Eres ${nombre}, router de ${clinica} (podología, ${ciudad}). SOLO pies.
+Responde SOLO JSON: {"action":"...","route_id":"...","question":"","reason":""}
+
+REGLA PRINCIPAL: Si existe un nodo para el tema → SIEMPRE usa action="route". NUNCA uses "respond" cuando hay un nodo disponible.
 
 ACCIONES:
-respond → texto corto (máx 2 oraciones, español amable). Para saludos o temas sin nodo específico.
-route → ir a nodo (requiere route_id)
-handoff → derivar a humano (dolor intenso, urgencia, sangrado, pus, infección, úlcera)
-clarify → pedir dato faltante (requiere question, máx 1 vez por sesión)
-show_services → mostrar menú de servicios
+route → USAR cuando hay nodo disponible (requiere route_id exacto del catálogo)
+respond → SOLO saludos puros sin solicitud ("hola", "buenos días")
+handoff → dolor intenso, urgencia, sangrado, pus, infección, úlcera
+show_services → no sabe qué quiere
 out_of_scope → tema no es podología de pies
+clarify → falta dato clave (solo 1 vez)
 
-NODOS (usa route_id exacto):
-${nodeCatalog}
+RUTAS DIRECTAS (prioridad alta):
+precio/costo/cuánto/tarifa → PRECIOS_INFO
+servicio/tratamiento/qué ofrecen/qué tienen → SERVICIOS_MENU
+horario/ubicación/dónde/sucursal/dirección/cómo llegar → HORARIOS_INFO
+asesor/humano/llamar/contacto/atención personal → CONTACT_METHOD
+uñero/uña encarnada → UNERO_TIPO_TRAT
+hongo/onicomicosis → HONGOS_TIPO_TRAT
+pedicure/pedicura → SVC_PEDICURE_INFO
+pie de atleta → OTR_PIE_ATLETA_INFO
+callo/callosidad → OTR_CALLOSIDAD_INFO
+verruga → OTR_VERRUGA_PLANTAR_INFO
+diabetes/pie diabético → OTR_PIE_DIABETICO_INFO
 
-REGLAS:
-- Saludo → respond
-- Tema de pies o servicio → route al nodo correcto
-- Dolor intenso/urgencia/síntomas graves → handoff
-- No es podología → out_of_scope
-- No sabe qué quiere → show_services
-- Falta dato clave → clarify (solo 1 vez)
-- Nunca repitas la misma pregunta`;
+NODOS DISPONIBLES:
+${nodeCatalog}`;
 }
 
 /**
@@ -1068,9 +1074,11 @@ async function routeWithAI({ text, flow, config, session }) {
       return { action: "show_services", text: "Te muestro nuestras opciones:", ai_used: true };
     }
 
-    // If the model answered conversationally but skipped routing, recover route deterministically from keywords.
-    // This is especially useful for providers that are weaker at strict JSON/tool-style outputs.
-    if (!parsed.route_id && (parsed.action === "respond" || parsed.action === "clarify")) {
+    // If the model answered conversationally but skipped routing (or routed to a generic node),
+    // recover route deterministically from keywords.
+    // Note: check even when route_id is present — model sometimes puts MAIN_MENU as fallback route_id
+    // while using action="respond" for queries that clearly have a specific node.
+    if (parsed.action === "respond" || parsed.action === "clarify") {
       const inferredRoute = fallbackKeywordRoute(text);
       logger.info("ai.router_route_augmentation_check", {
         provider,

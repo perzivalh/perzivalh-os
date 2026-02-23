@@ -379,15 +379,15 @@ module.exports = {
       "buttons": [
         {
           "label": "🧴 Tópico",
-          "next": "TRAT_Tópico_INFO"
+          "next": "TRAT_TOPICO_INFO"
         },
         {
           "label": "🔦 Láser",
-          "next": "TRAT_Láser_INFO"
+          "next": "TRAT_LASER_INFO"
         },
         {
           "label": "💊 Sistémico",
-          "next": "TRAT_Sistémico_INFO"
+          "next": "TRAT_SISTEMICO_INFO"
         }
       ]
     },
@@ -493,27 +493,27 @@ module.exports = {
       ]
     },
     {
-      "id": "TRAT_Tópico_INFO",
+      "id": "TRAT_TOPICO_INFO",
       "type": "text",
       "text": "Información de tratamiento: Tópico",
-      "next": "TRAT_Tópico_STEP_1"
+      "next": "TRAT_TOPICO_STEP_1"
     },
     {
-      "id": "TRAT_Tópico_STEP_1",
+      "id": "TRAT_TOPICO_STEP_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/T%C3%B3pico/IMAGEN%202.jpg",
       "text": "TRATAMIENTO TÓPICO:\n* Costo: 150 Bs (Incluye diagnóstico, revisión y limpieza).\n* Este tratamiento se sugiere realizarlo con una LACA ANTIMICÓTICA cuyo costo varía según la laca. Es importante seguir las indicaciones para obtener los mejores resultados, el costo de la laca antimicótica es aparte. 💧",
-      "next": "TRAT_Tópico_STEP_2"
+      "next": "TRAT_TOPICO_STEP_2"
     },
     {
-      "id": "TRAT_Tópico_STEP_2",
+      "id": "TRAT_TOPICO_STEP_2",
       "type": "video",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/T%C3%B3pico/topico.mp4",
       "text": "👨‍⚕️ Te comparto este video explicativo sobre el tratamiento tópico para hongos.",
-      "next": "TRAT_Tópico_ACTIONS"
+      "next": "TRAT_TOPICO_ACTIONS"
     },
     {
-      "id": "TRAT_Tópico_ACTIONS",
+      "id": "TRAT_TOPICO_ACTIONS",
       "type": "text",
       "text": "¿Tienes alguna otra duda?",
       "delayMs": 1500,
@@ -537,47 +537,47 @@ module.exports = {
       ]
     },
     {
-      "id": "TRAT_Láser_INFO",
+      "id": "TRAT_LASER_INFO",
       "type": "text",
       "text": "Información de tratamiento: Láser",
-      "next": "TRAT_Láser_STEP_1"
+      "next": "TRAT_LASER_STEP_1"
     },
     {
-      "id": "TRAT_Láser_STEP_1",
+      "id": "TRAT_LASER_STEP_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/L%C3%A1ser/1.jpg",
       "text": "El TRATAMIENTO LÁSER es una opción eficaz y moderna para eliminar los hongos en las uñas. Utilizamos equipos podológicos con LUZ LÁSER INDOLORA, garantizando que no existan efectos secundarios, con resultados que no dañan la uña en su crecimiento, en algunos casos sin necesidad de medicación oral. 🩹",
-      "next": "TRAT_Láser_STEP_2"
+      "next": "TRAT_LASER_STEP_2"
     },
     {
-      "id": "TRAT_Láser_STEP_2",
+      "id": "TRAT_LASER_STEP_2",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/L%C3%A1ser/2.jpg",
       "text": "TRATAMIENTO LÁSER: ⚡\n⚡🦶 Tratamiento rápido y efectivo, con resultados visibles en menos tiempo.\nLas sesiones se programan según tu disponibilidad semanal 📅\nAmbas opciones son efectivas, pero el láser actúa más rápido 🛑✨",
-      "next": "TRAT_Láser_STEP_3"
+      "next": "TRAT_LASER_STEP_3"
     },
     {
-      "id": "TRAT_Láser_STEP_3",
+      "id": "TRAT_LASER_STEP_3",
       "type": "text",
       "text": "Recuerda que cada caso es único, por eso te invitamos a una evaluación personalizada con nuestros especialistas 🎯👩‍⚕️👨‍⚕️",
-      "next": "TRAT_Láser_STEP_4"
+      "next": "TRAT_LASER_STEP_4"
     },
     {
-      "id": "TRAT_Láser_STEP_4",
+      "id": "TRAT_LASER_STEP_4",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/L%C3%A1ser/3.jpg",
       "text": "¿CUÁNTAS SESIONES LÁSER NECESITO? 🤔\nEl podólogo EVALÚA TU CASO y te recomienda un ESTIMADO DE SESIONES, las mismas pueden son programadas de manera semanal o con intervalos de 5 a 7 días. Con este tratamiento Láser en 10, 20, 30 SESIÓNES o más según sea tu caso específico SE VERÁN LOS RESULTADOS, el tiempo PUEDE VARIAR SEGÚN EL ESTADO DE LAS UÑAS DE TUS PIES, esto se ajusta a tu disponibilidad económica y tu tiempo, asegurando que recibas el tratamiento que mejor se adapte a tus necesidades. 🥼",
-      "next": "TRAT_Láser_STEP_5"
+      "next": "TRAT_LASER_STEP_5"
     },
     {
-      "id": "TRAT_Láser_STEP_5",
+      "id": "TRAT_LASER_STEP_5",
       "type": "video",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/L%C3%A1ser/laser.mp4",
       "text": "👩‍⚕️ Te comparto este video sobre el tratamiento con láser.",
-      "next": "TRAT_Láser_ACTIONS"
+      "next": "TRAT_LASER_ACTIONS"
     },
     {
-      "id": "TRAT_Láser_ACTIONS",
+      "id": "TRAT_LASER_ACTIONS",
       "type": "text",
       "text": "¿Tienes alguna otra duda?",
       "delayMs": 1500,
@@ -601,27 +601,27 @@ module.exports = {
       ]
     },
     {
-      "id": "TRAT_Sistémico_INFO",
+      "id": "TRAT_SISTEMICO_INFO",
       "type": "text",
       "text": "Información de tratamiento: Sistémico",
-      "next": "TRAT_Sistémico_STEP_1"
+      "next": "TRAT_SISTEMICO_STEP_1"
     },
     {
-      "id": "TRAT_Sistémico_STEP_1",
+      "id": "TRAT_SISTEMICO_STEP_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/Sist%C3%A9mico/1.jpg",
       "text": "También te ofrecemos un TRATAMIENTO SISTÉMICO eficaz para combatir los hongos desde la raíz. 🔝",
-      "next": "TRAT_Sistémico_STEP_2"
+      "next": "TRAT_SISTEMICO_STEP_2"
     },
     {
-      "id": "TRAT_Sistémico_STEP_2",
+      "id": "TRAT_SISTEMICO_STEP_2",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/Sist%C3%A9mico/2.jpg",
       "text": "Nuestro enfoque combina tecnología podológica avanzada, diagnóstico preciso y seguimiento profesional para lograr resultados visibles y duraderos. 💪\n- Evaluación personalizada.\n- Tratamiento médico supervisado.\n- Resultados progresivos y seguros",
-      "next": "TRAT_Sistémico_ACTIONS"
+      "next": "TRAT_SISTEMICO_ACTIONS"
     },
     {
-      "id": "TRAT_Sistémico_ACTIONS",
+      "id": "TRAT_SISTEMICO_ACTIONS",
       "type": "text",
       "text": "¿Tienes alguna otra duda?",
       "delayMs": 1500,

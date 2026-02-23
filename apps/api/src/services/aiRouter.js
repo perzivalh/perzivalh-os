@@ -58,7 +58,6 @@ const URGENCY_WORDS = [
   "fiebre", "calentura",
   "hinchado", "muy inflamado",
   "no puedo caminar", "urgente", "emergencia",
-  "diabético", "diabetes", "diabetica",
   "úlcera", "ulcera", "herida abierta",
 ];
 
@@ -595,6 +594,20 @@ async function routeWithCloudflareRouteFirst({
     parsed = { action: "show_services", reason: "clarify_limit" };
   }
 
+  // If model returned respond/show_services without a specific route, augment with keyword routing.
+  if (!parsed.route_id && (parsed.action === "respond" || parsed.action === "show_services" || parsed.action === "clarify")) {
+    const inferredRoute = fallbackKeywordRoute(text);
+    if (inferredRoute) {
+      logger.info("ai.router_cf_keyword_augmented", {
+        provider,
+        model,
+        originalAction: parsed.action,
+        inferredRoute,
+      });
+      parsed = { action: "route", route_id: inferredRoute, reason: "keyword_augmented" };
+    }
+  }
+
   // Route-like actions should not send AI free text to avoid hallucinating business facts.
   if (["route", "show_services", "handoff", "menu", "services", "out_of_scope"].includes(parsed.action)) {
     logger.info("ai.router_decision", {
@@ -687,67 +700,190 @@ async function routeWithCloudflareRouteFirst({
 function fallbackKeywordRoute(text) {
   const normalized = normalizeText(text || "").toLowerCase();
 
+  // IMPORTANT: all keys must be accent-free (normalizeText strips accents from input
+  // but does NOT normalize the key strings, so accented keys never match).
   const keywords = {
-    // Saludos
+    // === SALUDOS → MAIN_MENU ===
     "hola": "MAIN_MENU",
     "buenas": "MAIN_MENU",
     "buenos dias": "MAIN_MENU",
     "buenas tardes": "MAIN_MENU",
+    "buenas noches": "MAIN_MENU",
+    "buen dia": "MAIN_MENU",
+    "inicio": "MAIN_MENU",
+    "menu": "MAIN_MENU",
+    "volver": "MAIN_MENU",
 
-    // Servicios
+    // === SERVICIOS (listado) → SERVICIOS_MENU ===
+    "servicios": "SERVICIOS_MENU",
+    "que servicios": "SERVICIOS_MENU",
+    "que ofrecen": "SERVICIOS_MENU",
+    "que tienen": "SERVICIOS_MENU",
+    "que hacen": "SERVICIOS_MENU",
+    "tratamientos disponibles": "SERVICIOS_MENU",
+
+    // === UNERO (entrada principal) → UNERO_TIPO_TRAT ===
     "unero": "UNERO_TIPO_TRAT",
+    "uneros": "UNERO_TIPO_TRAT",
     "una encarnada": "UNERO_TIPO_TRAT",
-    "uñero": "UNERO_TIPO_TRAT",
+    "unas encarnadas": "UNERO_TIPO_TRAT",
+    "una clavada": "UNERO_TIPO_TRAT",
+    "una que se encarna": "UNERO_TIPO_TRAT",
+
+    // === TRATAMIENTOS DE UNERO (especificos) ===
+    "matricectomia": "TRAT_MATRICECTOMIA_INFO",
+    "matricetomia": "TRAT_MATRICECTOMIA_INFO",
+    "cirugia de unero": "TRAT_MATRICECTOMIA_INFO",
+    "cirugia unero": "TRAT_MATRICECTOMIA_INFO",
+    "operacion unero": "TRAT_MATRICECTOMIA_INFO",
+    "ortesis": "TRAT_ORTESIS_INFO",
+    "ortesis ungueal": "TRAT_ORTESIS_INFO",
+    "corrector de una": "TRAT_ORTESIS_INFO",
+
+    // === HONGOS (entrada principal) → HONGOS_TIPO_TRAT ===
     "hongo": "HONGOS_TIPO_TRAT",
     "hongos": "HONGOS_TIPO_TRAT",
     "onicomicosis": "HONGOS_TIPO_TRAT",
+    "hongo en la una": "HONGOS_TIPO_TRAT",
+    "hongos en las unas": "HONGOS_TIPO_TRAT",
+    "unas con hongo": "HONGOS_TIPO_TRAT",
+    "unas amarillas": "HONGOS_TIPO_TRAT",
+    "unas negras": "HONGOS_TIPO_TRAT",
+    "unas manchadas": "HONGOS_TIPO_TRAT",
+
+    // === TRATAMIENTOS DE HONGOS (especificos) ===
+    "topico": "TRAT_TOPICO_INFO",
+    "tratamiento topico": "TRAT_TOPICO_INFO",
+    "laca antifungica": "TRAT_TOPICO_INFO",
+    "laca antimicotica": "TRAT_TOPICO_INFO",
+    "laser": "TRAT_LASER_INFO",
+    "laser hongos": "TRAT_LASER_INFO",
+    "tratamiento laser": "TRAT_LASER_INFO",
+    "laser para hongos": "TRAT_LASER_INFO",
+    "sistemico": "TRAT_SISTEMICO_INFO",
+    "tratamiento sistemico": "TRAT_SISTEMICO_INFO",
+    "pastillas para hongos": "TRAT_SISTEMICO_INFO",
+
+    // === PEDICURE CLINICO ===
     "pedicure": "SVC_PEDICURE_INFO",
     "pedicura": "SVC_PEDICURE_INFO",
+    "pedicure clinico": "SVC_PEDICURE_INFO",
+    "pedicura clinica": "SVC_PEDICURE_INFO",
+    "limpieza de pies": "SVC_PEDICURE_INFO",
+    "limpieza podal": "SVC_PEDICURE_INFO",
+    "corte de unas": "SVC_PEDICURE_INFO",
+
+    // === PODOPEDIATRIA ===
+    "podopediatria": "SVC_PODOPEDIATRIA_INFO",
+    "pies de nino": "SVC_PODOPEDIATRIA_INFO",
+    "pies de mi hijo": "SVC_PODOPEDIATRIA_INFO",
+    "pies de bebe": "SVC_PODOPEDIATRIA_INFO",
+    "pies infantiles": "SVC_PODOPEDIATRIA_INFO",
+    "unero de nino": "SVC_PODOPEDIATRIA_INFO",
+    "unero en nino": "SVC_PODOPEDIATRIA_INFO",
+    "podopediatrik": "SVC_PODOPEDIATRIA_INFO",
+
+    // === PODOGERIATRIA ===
+    "podogeriatria": "SVC_PODOGERIATRIA_INFO",
+    "adulto mayor": "SVC_PODOGERIATRIA_INFO",
+    "tercera edad": "SVC_PODOGERIATRIA_INFO",
+    "personas mayores": "SVC_PODOGERIATRIA_INFO",
+    "abuelo": "SVC_PODOGERIATRIA_INFO",
+    "abuela": "SVC_PODOGERIATRIA_INFO",
+    "podogeriatrik": "SVC_PODOGERIATRIA_INFO",
+
+    // === CALLOSIDAD ===
+    "callo": "OTR_CALLOSIDAD_INFO",
+    "callos": "OTR_CALLOSIDAD_INFO",
+    "callosidad": "OTR_CALLOSIDAD_INFO",
+    "callosidades": "OTR_CALLOSIDAD_INFO",
+    "dureza en el pie": "OTR_CALLOSIDAD_INFO",
+    "piel dura en el pie": "OTR_CALLOSIDAD_INFO",
+    "piel engrosada": "OTR_CALLOSIDAD_INFO",
+    "podocallos": "OTR_CALLOSIDAD_INFO",
+
+    // === HELOMA ===
+    "heloma": "OTR_HELOMA_INFO",
+    "helomas": "OTR_HELOMA_INFO",
+
+    // === VERRUGA PLANTAR ===
+    "verruga": "OTR_VERRUGA_PLANTAR_INFO",
+    "verrugas": "OTR_VERRUGA_PLANTAR_INFO",
+    "verruga plantar": "OTR_VERRUGA_PLANTAR_INFO",
+    "verrugas plantares": "OTR_VERRUGA_PLANTAR_INFO",
+    "vph": "OTR_VERRUGA_PLANTAR_INFO",
+    "virus del papiloma": "OTR_VERRUGA_PLANTAR_INFO",
+
+    // === EXTRACCION DE UNA ===
+    "extraccion de una": "OTR_EXTRACCION_UNA_INFO",
+    "extraccion una": "OTR_EXTRACCION_UNA_INFO",
+    "sacar la una": "OTR_EXTRACCION_UNA_INFO",
+    "quitar la una": "OTR_EXTRACCION_UNA_INFO",
+    "una golpeada": "OTR_EXTRACCION_UNA_INFO",
+    "una negra": "OTR_EXTRACCION_UNA_INFO",
+    "una suelta": "OTR_EXTRACCION_UNA_INFO",
+
+    // === PIE DE ATLETA ===
+    "pie de atleta": "OTR_PIE_ATLETA_INFO",
+    "hongo entre los dedos": "OTR_PIE_ATLETA_INFO",
+    "picazon entre los dedos": "OTR_PIE_ATLETA_INFO",
+    "picazon en los pies": "OTR_PIE_ATLETA_INFO",
+    "hongos entre los dedos": "OTR_PIE_ATLETA_INFO",
+
+    // === PIE DIABETICO ===
+    "pie diabetico": "OTR_PIE_DIABETICO_INFO",
+    "diabetico": "OTR_PIE_DIABETICO_INFO",
+    "diabetes": "OTR_PIE_DIABETICO_INFO",
+    "paciente diabetico": "OTR_PIE_DIABETICO_INFO",
+    "tengo diabetes": "OTR_PIE_DIABETICO_INFO",
+    "pododiabetik": "OTR_PIE_DIABETICO_INFO",
+
+    // === CONTACTO / ATENCION HUMANA ===
     "asesor": "CONTACT_METHOD",
     "asesora": "CONTACT_METHOD",
     "atencion personal": "CONTACT_METHOD",
     "atencion personalizada": "CONTACT_METHOD",
     "atencion humana": "CONTACT_METHOD",
     "recepcion": "CONTACT_METHOD",
+    "hablar con alguien": "CONTACT_METHOD",
+    "hablar con una persona": "CONTACT_METHOD",
+    "quiero llamar": "CONTACT_METHOD",
     "humano": "CONTACT_METHOD",
     "persona real": "CONTACT_METHOD",
-    "callo": "OTR_CALLOSIDAD_INFO",
-    "callos": "OTR_CALLOSIDAD_INFO",
-    "callosidad": "OTR_CALLOSIDAD_INFO",
-    "callosidades": "OTR_CALLOSIDAD_INFO",
-    "heloma": "OTR_HELOMA_INFO",
-    "talon": "OTROS_MENU",
-    "talón": "OTROS_MENU",
-    "talones": "OTROS_MENU",
-    "espolon": "OTROS_MENU",
-    "espolón": "OTROS_MENU",
 
-    // Info
+    // === HORARIOS Y UBICACION ===
     "horario": "HORARIOS_INFO",
     "horarios": "HORARIOS_INFO",
     "ubicacion": "HORARIOS_INFO",
     "ubicaciones": "HORARIOS_INFO",
-    "ubcacion": "HORARIOS_INFO",
-    "ubcaciones": "HORARIOS_INFO",
     "sucursal": "HORARIOS_INFO",
     "sucursales": "HORARIOS_INFO",
-    "donde": "HORARIOS_INFO",
+    "donde estan": "HORARIOS_INFO",
+    "como llegar": "HORARIOS_INFO",
     "direccion": "HORARIOS_INFO",
-    "precio": "PRECIOS_INFO",
-    "cuanto": "PRECIOS_INFO",
-    "costo": "PRECIOS_INFO",
+    "donde queda": "HORARIOS_INFO",
 
-    // Dolores / sintomas generales en pies -> menú de patologías "Otros"
+    // === PRECIOS ===
+    "precio": "PRECIOS_INFO",
+    "precios": "PRECIOS_INFO",
+    "cuanto cuesta": "PRECIOS_INFO",
+    "cuanto vale": "PRECIOS_INFO",
+    "cuanto cobran": "PRECIOS_INFO",
+    "costo": "PRECIOS_INFO",
+    "costos": "PRECIOS_INFO",
+    "tarifa": "PRECIOS_INFO",
+    "tarifas": "PRECIOS_INFO",
+    "cuanto": "PRECIOS_INFO",
+
+    // === SINTOMAS GENERALES → OTROS_MENU ===
     "talon": "OTROS_MENU",
     "talones": "OTROS_MENU",
-    "dedo": "OTROS_MENU",
-    "pulgar": "OTROS_MENU",
-    "duele": "OTROS_MENU",
-    "dolor": "OTROS_MENU",
-
-    // Menu
-    "menu": "MAIN_MENU",
-    "servicios": "SERVICIOS_MENU",
+    "espolon": "OTROS_MENU",
+    "dedo del pie": "OTROS_MENU",
+    "dedos del pie": "OTROS_MENU",
+    "dolor en el pie": "OTROS_MENU",
+    "me duele el pie": "OTROS_MENU",
+    "problema en el pie": "OTROS_MENU",
   };
 
   for (const [keyword, nodeId] of Object.entries(keywords)) {

@@ -213,6 +213,71 @@ function safeJsonParse(text) {
   return null;
 }
 
+function parseLooseRouterResponse(text) {
+  if (!text || typeof text !== "string") return null;
+
+  const plain = String(text)
+    .replace(/```json\s*/gi, "")
+    .replace(/```\s*/g, "")
+    .replace(/\*\*/g, "")
+    .replace(/\r/g, "")
+    .trim();
+
+  if (!plain) return null;
+
+  const fieldMatches = [];
+  const fieldRegex = /(?:^|\n)\s*(action|text|route[_ ]?id|question|reason)\s*:\s*/gi;
+  let match;
+  while ((match = fieldRegex.exec(plain))) {
+    fieldMatches.push({
+      key: String(match[1] || "").toLowerCase().replace(" ", "_"),
+      start: match.index,
+      valueStart: fieldRegex.lastIndex,
+    });
+  }
+
+  if (!fieldMatches.length) return null;
+
+  const parsed = {};
+  for (let i = 0; i < fieldMatches.length; i++) {
+    const current = fieldMatches[i];
+    const next = fieldMatches[i + 1];
+    const rawValue = plain
+      .slice(current.valueStart, next ? next.start : plain.length)
+      .trim()
+      .replace(/^[-–—]\s*/, "")
+      .replace(/^["'`]+/, "")
+      .replace(/["'`]+$/, "")
+      .trim();
+
+    const key = current.key === "route_id" ? "route_id" : current.key;
+    if (!rawValue) continue;
+
+    if (key === "action") {
+      parsed.action = rawValue
+        .toLowerCase()
+        .replace(/[^a-z_]/g, " ")
+        .trim()
+        .split(/\s+/)[0];
+      continue;
+    }
+
+    if (key === "route_id") {
+      parsed.route_id = rawValue.split(/\s+/)[0].replace(/[^A-Za-z0-9_-]/g, "");
+      continue;
+    }
+
+    parsed[key] = rawValue;
+  }
+
+  if (!parsed.action) return null;
+  return parsed;
+}
+
+function parseRouterResponse(text) {
+  return safeJsonParse(text) || parseLooseRouterResponse(text);
+}
+
 /**
  * Fallback keyword routing (used only if AI fails)
  */
@@ -361,7 +426,15 @@ async function routeWithAI({ text, flow, config, session }) {
 
     logger.info("ai.router_raw", { provider, model, length: raw?.length || 0 });
 
-    let parsed = safeJsonParse(raw);
+    let parsed = parseRouterResponse(raw);
+    if (!safeJsonParse(raw) && parsed?.action) {
+      logger.info("ai.router_parse_loose_success", {
+        provider,
+        model,
+        stage: "primary",
+        action: parsed.action,
+      });
+    }
 
     // Retry if parse failed
     if (!parsed?.action) {
@@ -378,7 +451,15 @@ async function routeWithAI({ text, flow, config, session }) {
         maxTokens: 300,
       });
 
-      parsed = safeJsonParse(retryRaw);
+      parsed = parseRouterResponse(retryRaw);
+      if (!safeJsonParse(retryRaw) && parsed?.action) {
+        logger.info("ai.router_parse_loose_success", {
+          provider,
+          model,
+          stage: "retry",
+          action: parsed.action,
+        });
+      }
     }
 
     // If still no valid response, fallback

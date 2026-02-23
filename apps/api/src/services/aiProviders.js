@@ -180,6 +180,12 @@ async function callCloudflare({ apiKey, accountId, model, system, user, temperat
       throw new Error(`Cloudflare Workers AI request failed: ${detail}`);
     }
 
+    console.log("[CLOUDFLARE-AI] HTTP success", JSON.stringify({
+      status: response.status,
+      apiSuccess: response.data?.success !== false,
+      hasResult: response.data?.result !== undefined,
+    }));
+
     const text = extractCloudflareText(response.data);
     console.log("[CLOUDFLARE-AI] Response length:", text.length);
     console.log("[CLOUDFLARE-AI] Preview:", text.substring(0, 150));

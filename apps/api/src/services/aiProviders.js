@@ -185,6 +185,79 @@ function extractGeminiText(data) {
     .join("\n");
 }
 
+function extractOpenAICompatibleChatText(data) {
+  if (!data || typeof data !== "object") return "";
+
+  const fromMessageContent = (message) => {
+    if (!message || typeof message !== "object") return "";
+    if (typeof message.content === "string") return message.content;
+    if (Array.isArray(message.content)) {
+      return message.content
+        .map((part) => {
+          if (typeof part === "string") return part;
+          if (!part || typeof part !== "object") return "";
+          if (typeof part.text === "string") return part.text;
+          if (typeof part.output_text === "string") return part.output_text;
+          if (typeof part.content === "string") return part.content;
+          if (typeof part.value === "string") return part.value;
+          return "";
+        })
+        .filter(Boolean)
+        .join("\n");
+    }
+    if (typeof message.output_text === "string") return message.output_text;
+    if (typeof message.reasoning_content === "string") return message.reasoning_content;
+    if (Array.isArray(message.tool_calls)) {
+      for (const call of message.tool_calls) {
+        const args = call?.function?.arguments ?? call?.arguments;
+        if (typeof args === "string" && args.trim()) return args.trim();
+      }
+    }
+    return "";
+  };
+
+  if (typeof data.text === "string" && data.text.trim()) return data.text;
+  if (typeof data.output_text === "string" && data.output_text.trim()) return data.output_text;
+  if (typeof data.response === "string" && data.response.trim()) return data.response;
+
+  if (Array.isArray(data.choices)) {
+    const joined = data.choices
+      .map((choice) => {
+        if (typeof choice?.text === "string") return choice.text;
+        const msgText = fromMessageContent(choice?.message);
+        if (msgText) return msgText;
+        if (typeof choice?.message?.reasoning_content === "string") return choice.message.reasoning_content;
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n");
+    if (joined) return joined;
+  }
+
+  if (Array.isArray(data.output)) {
+    const outText = data.output
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (typeof item?.text === "string") return item.text;
+        if (typeof item?.output_text === "string") return item.output_text;
+        const msgText = fromMessageContent(item?.message);
+        if (msgText) return msgText;
+        if (Array.isArray(item?.content)) {
+          return item.content
+            .map((part) => (typeof part?.text === "string" ? part.text : typeof part === "string" ? part : ""))
+            .filter(Boolean)
+            .join("\n");
+        }
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n");
+    if (outText) return outText;
+  }
+
+  return "";
+}
+
 function extractCloudflareText(data) {
   const result = data?.result;
   const fromToolCalls = (toolCalls) => {
@@ -626,7 +699,7 @@ async function callGroq({ apiKey, model, system, user, temperature = 0, maxToken
         },
       });
     }
-    const text = response.data?.choices?.[0]?.message?.content || "";
+    const text = extractOpenAICompatibleChatText(response.data);
     console.log("[GROQ] SUCCESS");
     console.log("[GROQ] Response length:", text.length);
     console.log("[GROQ] Preview:", text.substring(0, 150));
@@ -686,7 +759,20 @@ async function callCerebras({ apiKey, model, system, user, temperature = 0, maxT
         },
       });
     }
-    const text = response.data?.choices?.[0]?.message?.content || "";
+    const text = extractOpenAICompatibleChatText(response.data);
+    if (!String(text || "").trim()) {
+      const firstChoice = response.data?.choices?.[0];
+      console.warn("[CEREBRAS] Empty extracted text; response shape:", JSON.stringify({
+        topKeys: Object.keys(response.data || {}).slice(0, 20),
+        hasChoices: Array.isArray(response.data?.choices),
+        choicesLen: Array.isArray(response.data?.choices) ? response.data.choices.length : 0,
+        firstChoiceKeys: firstChoice && typeof firstChoice === "object" ? Object.keys(firstChoice).slice(0, 20) : [],
+        messageKeys: firstChoice?.message && typeof firstChoice.message === "object"
+          ? Object.keys(firstChoice.message).slice(0, 20)
+          : [],
+        contentType: Array.isArray(firstChoice?.message?.content) ? "array" : typeof firstChoice?.message?.content,
+      }));
+    }
     console.log("[CEREBRAS] SUCCESS");
     console.log("[CEREBRAS] Response length:", text.length);
     console.log("[CEREBRAS] Preview:", text.substring(0, 150));

@@ -90,6 +90,17 @@ const DOMAIN_NEUTRAL_WORDS = new Set([
   "informacion", "info", "ayuda", "servicio", "servicios", "tratamiento", "tratamientos",
   "entiendo", "entender", "explica", "explicame", "muestrame", "mostrar", "muestro",
 ]);
+const DOMAIN_WEAK_SIGNAL_TERMS = new Set([
+  "limpieza",
+  "consulta",
+  "evaluacion",
+  "valoracion",
+  "atencion",
+  "servicio",
+  "servicios",
+  "tratamiento",
+  "tratamientos",
+]);
 const KNOWLEDGE_DOMAIN_LEXICON_CACHE = new WeakMap();
 
 /**
@@ -539,6 +550,7 @@ async function callRouteDecisionWithRetry({
   user,
   flowId,
 }) {
+  const isBlankRaw = (value) => !String(value || "").trim();
   const tryParse = (raw, stage) => {
     const parsed = parseRouterResponse(raw);
     const jsonParsed = Boolean(safeJsonParse(raw));
@@ -584,6 +596,9 @@ async function callRouteDecisionWithRetry({
   logger.info("ai.router_raw", { provider, model, length: raw?.length || 0 });
   let parsed = tryParse(raw, "route_primary");
   if (parsed?.action) return parsed;
+  if (isBlankRaw(raw)) {
+    logger.warn("ai.router_empty_primary", { provider, model, flowId });
+  }
 
   logger.warn("ai.router_parse_failed", { preview: raw?.slice(0, 100) || "" });
 
@@ -600,6 +615,11 @@ async function callRouteDecisionWithRetry({
   });
   parsed = tryParse(retryRaw, "route_retry");
   if (parsed?.action) return parsed;
+  if (isBlankRaw(retryRaw)) {
+    logger.warn("ai.router_empty_retry_skip_repair", { provider, model, flowId });
+    logger.warn("ai.router_fallback", { flowId, reason: "empty_retry_response" });
+    return null;
+  }
 
   // Repair pass: if model keeps chatting, ask ONLY for action/route without explanations.
   const repairRaw = await callAiProvider(provider, {
@@ -1724,6 +1744,22 @@ function tokenizeDomainText(text) {
     .filter(Boolean);
 }
 
+function escapeRegexLiteral(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function includesWholePhrase(normalizedText, phrase) {
+  const text = String(normalizedText || "").trim();
+  const p = normalizeText(phrase || "").toLowerCase().trim();
+  if (!text || !p) return false;
+  const pattern = "(^|\\b)" + escapeRegexLiteral(p).replace(/\s+/g, "\\s+") + "(\\b|$)";
+  try {
+    return new RegExp(pattern, "i").test(text);
+  } catch (_) {
+    return text.includes(p);
+  }
+}
+
 function addTermsToDomainLexicon(targetSet, sourceText) {
   const normalized = normalizeText(sourceText || "").toLowerCase().trim();
   if (!normalized) return;
@@ -1782,20 +1818,33 @@ function evaluateDomainGate({ text, knowledge }) {
   const { terms: domainTerms, serviceNames } = getKnowledgeDomainLexicon(knowledge);
 
   const phraseHits = [];
+  const metaPhraseHits = [];
+  const podiatryPhraseHits = [];
+  const servicePhraseHits = [];
   for (const phrase of DOMAIN_META_PHRASES) {
     const p = normalizeText(phrase).toLowerCase();
-    if (p && normalized.includes(p)) phraseHits.push(p);
+    if (p && includesWholePhrase(normalized, p)) {
+      phraseHits.push(p);
+      metaPhraseHits.push(p);
+    }
   }
   for (const phrase of PODIATRY_CONTEXT_WORDS) {
     const p = normalizeText(phrase).toLowerCase();
-    if (p && normalized.includes(p)) phraseHits.push(p);
+    if (p && includesWholePhrase(normalized, p)) {
+      phraseHits.push(p);
+      podiatryPhraseHits.push(p);
+    }
   }
   for (const serviceName of serviceNames) {
-    if (serviceName && normalized.includes(serviceName)) phraseHits.push(serviceName);
+    if (serviceName && includesWholePhrase(normalized, serviceName)) {
+      phraseHits.push(serviceName);
+      servicePhraseHits.push(serviceName);
+    }
   }
 
   const uniquePhraseHits = [...new Set(phraseHits)];
   const tokenHits = contentTokens.filter((token) => domainTerms.has(token));
+  const strongTokenHits = tokenHits.filter((token) => !DOMAIN_WEAK_SIGNAL_TERMS.has(token));
   const unknownTokens = contentTokens.filter((token) => !domainTerms.has(token));
   const hasAmbiguousHealthSignal = DOMAIN_AMBIGUOUS_HEALTH_WORDS.some((w) =>
     normalized.includes(normalizeText(w).toLowerCase())
@@ -1813,8 +1862,15 @@ function evaluateDomainGate({ text, knowledge }) {
     };
   }
 
-  if (uniquePhraseHits.length || tokenHits.length) {
-    const signalScore = (uniquePhraseHits.length * 2) + tokenHits.length;
+  const strongPhraseSignalCount =
+    new Set([...metaPhraseHits, ...podiatryPhraseHits, ...servicePhraseHits]).size;
+  const weakOnlySignal =
+    strongPhraseSignalCount === 0 &&
+    strongTokenHits.length === 0 &&
+    tokenHits.length > 0;
+
+  if ((strongPhraseSignalCount > 0) || strongTokenHits.length > 0 || (tokenHits.length >= 2 && !weakOnlySignal)) {
+    const signalScore = (strongPhraseSignalCount * 2) + strongTokenHits.length + Math.min(1, tokenHits.length);
     const confidence = Math.min(0.99, 0.55 + (signalScore * 0.1));
     return {
       classification: "in_domain",

@@ -117,6 +117,12 @@ const DOMAIN_WEAK_SIGNAL_TERMS = new Set([
   "tratamiento",
   "tratamientos",
 ]);
+const DOMAIN_GENERIC_NON_TOPIC_WORDS = new Set([
+  "tiene", "tienen", "saber", "se", "ser", "estar", "estas", "esta",
+  "atender", "atendido", "atendida", "atienda", "atencion", "atendido",
+  "ir", "voy", "puedo", "podria", "hacer", "haria", "quisiera",
+  "necesito", "quiero", "busco", "donde", "como", "cuando",
+]);
 const KNOWLEDGE_DOMAIN_LEXICON_CACHE = new WeakMap();
 
 /**
@@ -1912,6 +1918,24 @@ function evaluateDomainGate({ text, knowledge }) {
     };
   }
 
+  const genericUnknownTokens = unknownTokens.filter((t) => DOMAIN_GENERIC_NON_TOPIC_WORDS.has(t));
+  const unknownLooksMostlyGeneric =
+    unknownTokens.length > 0 &&
+    genericUnknownTokens.length === unknownTokens.length;
+  const genericQuestionPattern = /\b(como|donde|cuando|puedo|quiero|necesito|saber|ayuda|atendid[oa]|atender)\b/.test(normalized);
+
+  if (unknownLooksMostlyGeneric && genericQuestionPattern) {
+    return {
+      classification: "ambiguous",
+      confidence: 0.42,
+      normalized,
+      phraseHits: [],
+      tokenHits: [],
+      unknownTokens: [...new Set(unknownTokens)].slice(0, 8),
+      reason: "generic_request_without_clear_topic",
+    };
+  }
+
   const requestPattern = /\b(quiero|busco|necesito|hacen|ofrecen|servicio|servicios|tratamiento|tratamientos)\b/.test(normalized);
   const hasRequestWithUnknownObject = requestPattern && unknownTokens.length >= 1;
   const confidence =
@@ -1990,6 +2014,7 @@ function extractOutOfDomainTopicHint(text) {
     .map((t) => t.trim())
     .filter(Boolean)
     .filter((t) => !DOMAIN_NEUTRAL_WORDS.has(t))
+    .filter((t) => !DOMAIN_GENERIC_NON_TOPIC_WORDS.has(t))
     .filter((t) => !["servicio", "servicios", "tratamiento", "tratamientos", "informacion", "info", "sobre", "tiene", "tienen", "hacen", "ofrecen"].includes(t));
 
   return tokens.slice(0, 5).join(" ");

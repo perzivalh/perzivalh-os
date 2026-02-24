@@ -70,6 +70,22 @@ const PODIATRY_CONTEXT_WORDS = [
   "podopediatria", "podopediatría", "podogeriatria", "podogeriatría", "tobillo",
 ];
 
+const PODIATRY_EXTRA_DOMAIN_WORDS = [
+  "matricectomia", "matricetomia", "onicocriptosis", "onicocriptosis ungueal",
+];
+
+const DETERMINISTIC_DOMAIN_INTENTS = [
+  { routeId: "PRECIOS_INFO", intent: "prices", phrases: ["precio", "precios", "costo", "costos", "tarifa", "tarifas", "cuanto cuesta", "cuanto vale", "cuanto cobran"] },
+  { routeId: "HORARIOS_INFO", intent: "hours", phrases: ["horario", "horarios", "hora", "horas", "rango de hora", "rango de horas", "atienden"] },
+  { routeId: "HORARIOS_INFO", intent: "location", phrases: ["ubicacion", "ubicaciones", "direccion", "sucursal", "sucursales", "como llegar", "donde estan", "donde queda", "clinica"] },
+  { routeId: "CONTACT_METHOD", intent: "contact", phrases: ["asesor", "asesora", "humano", "recepcion", "hablar con alguien", "hablar con una persona", "llamar"] },
+  { routeId: "SERVICIOS_MENU", intent: "services_menu", phrases: ["servicios", "que servicios", "que ofrecen", "que tienen", "que hacen", "tratamientos disponibles", "ver opciones"] },
+  { routeId: "UNERO_TIPO_TRAT", intent: "unero", phrases: ["unero", "uneros", "una encarnada", "unas encarnadas", "una clavada"] },
+  { routeId: "TRAT_MATRICECTOMIA_INFO", intent: "matricectomia", phrases: ["matricectomia", "matricetomia", "cirugia de unero", "operacion unero"] },
+  { routeId: "HONGOS_TIPO_TRAT", intent: "hongos", phrases: ["hongo", "hongos", "onicomicosis"] },
+  { routeId: "SVC_PEDICURE_INFO", intent: "pedicure", phrases: ["pedicure", "pedicura", "pedicure clinico", "pedicura clinica", "limpieza de pies", "limpieza podal"] },
+];
+
 const DOMAIN_META_PHRASES = [
   "precio", "precios", "costo", "costos", "tarifa", "tarifas", "cuanto cuesta", "cuanto vale",
   "horario", "horarios", "hora", "horas", "rango de hora", "rango de horas",
@@ -1783,6 +1799,7 @@ function getKnowledgeDomainLexicon(knowledge) {
   const serviceNames = [];
 
   for (const term of PODIATRY_CONTEXT_WORDS) addTermsToDomainLexicon(terms, term);
+  for (const term of PODIATRY_EXTRA_DOMAIN_WORDS) addTermsToDomainLexicon(terms, term);
   for (const term of DOMAIN_META_PHRASES) addTermsToDomainLexicon(terms, term);
 
   addTermsToDomainLexicon(terms, knowledge?.clinica?.nombre);
@@ -1927,14 +1944,96 @@ function evaluateDomainGate({ text, knowledge }) {
   };
 }
 
+function extractOutOfDomainTopicHint(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return "";
+  const normalized = normalizeText(raw).toLowerCase().replace(/\s+/g, " ").trim();
+  if (!normalized) return "";
+
+  const stripPrefixes = [
+    /^(hola|buenas|buenos dias|buenas tardes|buenas noches)\s*/i,
+    /^(por favor|porfa|xfa)\s*/i,
+    /^(tiene(n)?|hacen|ofrecen)\s*/i,
+    /^(quiero|necesito|busco)\s*/i,
+    /^(me interesa|quisiera)\s*/i,
+    /^(informacion|info)\s+(sobre|de)\s*/i,
+    /^(sobre)\s*/i,
+  ];
+
+  let candidate = normalized;
+  for (const rx of stripPrefixes) {
+    candidate = candidate.replace(rx, "");
+  }
+
+  candidate = candidate
+    .replace(/\b(alg(o|una)?|mas|porfa|por favor|ahora)\b/g, " ")
+    .replace(/[?!.,"':;()[\]]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const phrasePatterns = [
+    /\b(servicio|servicios|tratamiento|tratamientos)\s+de\s+(.+)$/i,
+    /\b(info|informacion)\s+(de|sobre)\s+(.+)$/i,
+    /\bsobre\s+(.+)$/i,
+  ];
+  for (const rx of phrasePatterns) {
+    const m = candidate.match(rx);
+    if (!m) continue;
+    const tail = String(m[m.length - 1] || "").trim();
+    if (tail && tail.length >= 3) {
+      return tail.split(/\s+/).slice(0, 5).join(" ");
+    }
+  }
+
+  const tokens = candidate
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .filter((t) => !DOMAIN_NEUTRAL_WORDS.has(t))
+    .filter((t) => !["servicio", "servicios", "tratamiento", "tratamientos", "informacion", "info", "sobre", "tiene", "tienen", "hacen", "ofrecen"].includes(t));
+
+  return tokens.slice(0, 5).join(" ");
+}
+
 function buildOutOfDomainResponseText({ text, knowledge }) {
   const clinicName = knowledge?.clinica?.nombre || "PODOPIE";
-  const requestedTopic = String(text || "").replace(/\s+/g, " ").trim().slice(0, 80);
-  return (
-    `Te ayudo con gusto, pero en ${clinicName} solo atendemos temas de pies/podologia` +
-    `${requestedTopic ? ` (tu mensaje fue: "${requestedTopic}")` : ""}. ` +
-    `Si quieres, te muestro los servicios que si tenemos.`
-  );
+  const topic = extractOutOfDomainTopicHint(text);
+
+  if (topic) {
+    return `Gracias por escribirnos 😊 No trabajamos ${topic}. En ${clinicName} atendemos solo salud podologica 🦶. Si quieres, te muestro servicios, horarios o precios.`;
+  }
+
+  return `Gracias por escribirnos 😊 En ${clinicName} atendemos solo salud podologica 🦶. Si quieres, te muestro servicios, horarios o precios.`;
+}
+
+function detectDeterministicDomainIntentRoute(text) {
+  const normalized = normalizeText(text || "").toLowerCase().trim();
+  if (!normalized) return null;
+
+  let best = null;
+  for (const intent of DETERMINISTIC_DOMAIN_INTENTS) {
+    const phrases = Array.isArray(intent?.phrases) ? intent.phrases : [];
+    for (const phrase of phrases) {
+      if (!includesWholePhrase(normalized, phrase)) continue;
+      const p = normalizeText(phrase).toLowerCase().trim();
+      const routePriority =
+        intent.routeId === "PRECIOS_INFO" || intent.routeId === "HORARIOS_INFO" || intent.routeId === "CONTACT_METHOD"
+          ? 40
+          : intent.routeId === "SERVICIOS_MENU"
+            ? 30
+            : 20;
+      const score = (p.length * 10) + routePriority;
+      if (!best || score > best.score) {
+        best = {
+          routeId: intent.routeId,
+          intent: intent.intent || null,
+          matchedPhrase: p,
+          score,
+        };
+      }
+    }
+  }
+  return best;
 }
 
 function buildDeterministicDecision({ text, previousQuestion, summary, knowledge }) {
@@ -1944,19 +2043,8 @@ function buildDeterministicDecision({ text, previousQuestion, summary, knowledge
   if (!normalized) return null;
 
   const domainGate = evaluateDomainGate({ text: raw, knowledge });
-  if (domainGate.classification === "out_of_domain" && Number(domainGate.confidence || 0) >= 0.86) {
-    return {
-      action: "respond",
-      text: buildOutOfDomainResponseText({ text: raw, knowledge }),
-      reason: `domain_gate_out_of_scope:${domainGate.reason || "no_allowlist_match"}`,
-      ai_used: false,
-      clear_pending: Boolean(previousQuestion),
-      reset_turns: false,
-    };
-  }
-
-  const inferredRoute = fallbackKeywordRoute(raw);
-  if (!inferredRoute) return null;
+  const deterministicIntent = detectDeterministicDomainIntentRoute(raw);
+  const inferredRoute = deterministicIntent?.routeId || fallbackKeywordRoute(raw);
 
   const tokenCount = normalized.split(/\s+/).filter(Boolean).length;
   const shortMessage = tokenCount <= 9;
@@ -1969,15 +2057,28 @@ function buildDeterministicDecision({ text, previousQuestion, summary, knowledge
   const looksMultiIntent = /\b(y|ademas|tambien|pero)\b/.test(normalized);
   const inClarifyFlow = Boolean(previousQuestion) || Number(summary?.clarificationsAsked || 0) > 0;
 
-  if ((shortMessage || hasHighSignalPrefix) && !looksMultiIntent && !inClarifyFlow) {
+  if (inferredRoute && (deterministicIntent || (shortMessage || hasHighSignalPrefix)) && !looksMultiIntent && !inClarifyFlow) {
     return {
       action: "route",
       route_id: inferredRoute,
       text: "",
-      reason: "deterministic_keyword_route",
+      reason: deterministicIntent
+        ? `deterministic_domain_intent:${deterministicIntent.intent || deterministicIntent.matchedPhrase || "match"}`
+        : "deterministic_keyword_route",
       ai_used: false,
       clear_pending: Boolean(previousQuestion),
       reset_turns: true,
+    };
+  }
+
+  if (domainGate.classification === "out_of_domain" && Number(domainGate.confidence || 0) >= 0.86) {
+    return {
+      action: "respond",
+      text: buildOutOfDomainResponseText({ text: raw, knowledge }),
+      reason: `domain_gate_out_of_scope:${domainGate.reason || "no_allowlist_match"}`,
+      ai_used: false,
+      clear_pending: Boolean(previousQuestion),
+      reset_turns: false,
     };
   }
 

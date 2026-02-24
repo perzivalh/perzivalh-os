@@ -38,19 +38,19 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "🕒 Horarios y ubicacion",
+          "label": "🕒 HORARIOS Y UBICACION",
           "next": "HORARIOS_INFO"
         },
         {
-          "label": "💰 Precios",
+          "label": "💰 PRECIOS",
           "next": "PRECIOS_INFO"
         },
         {
-          "label": "🧼 Servicios",
+          "label": "🧼 SERVICIOS",
           "next": "SERVICIOS_MENU"
         },
         {
-          "label": "👨‍💻 Atención personal",
+          "label": "👨‍💻 ATENCIÓN PERSONAL",
           "next": "CONTACT_METHOD"
         }
       ]
@@ -68,11 +68,11 @@ module.exports = {
       "text": "¿Te derivamos con un operador?",
       "buttons": [
         {
-          "label": "✅ Sí",
+          "label": "✅ SÍ",
           "next": "CONTACT_METHOD"
         },
         {
-          "label": "❌ No, ver menú",
+          "label": "❌ NO, VER MENÚ",
           "next": "MAIN_MENU"
         }
       ]
@@ -153,11 +153,11 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "⬅️ Volver al menu",
+          "label": "⬅️ VOLVER AL MENU",
           "next": "MAIN_MENU"
         },
         {
-          "label": "✅ Finalizar",
+          "label": "✅ FINALIZAR",
           "next": "CIERRE_PRECIOS_SERVICIOS"
         }
       ]
@@ -196,15 +196,15 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "👨‍💻 Atención personal",
+          "label": "👨‍💻 ATENCIÓN PERSONAL",
           "next": "CONTACT_METHOD"
         },
         {
-          "label": "? No",
+          "label": "? NO",
           "next": "PRECIOS_MAS"
         },
         {
-          "label": "? Si",
+          "label": "? SI",
           "next": "SERVICIOS_MENU"
         }
       ]
@@ -216,11 +216,11 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "⬅️ Volver al menu",
+          "label": "⬅️ VOLVER AL MENU",
           "next": "MAIN_MENU"
         },
         {
-          "label": "✅ Finalizar",
+          "label": "✅ FINALIZAR",
           "next": "CIERRE_HORARIO_UBICACION"
         }
       ]
@@ -232,27 +232,27 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "🦶 Uñero",
+          "label": "🦶 UÑERO",
           "next": "UNERO_TIPO_TRAT"
         },
         {
-          "label": "🦠 Hongos",
+          "label": "🦠 HONGOS",
           "next": "HONGOS_TIPO_TRAT"
         },
         {
-          "label": "💅 Pedicure",
+          "label": "💅 PEDICURE",
           "next": "SVC_PEDICURE_INFO"
         },
         {
-          "label": "🧒 Podopediatria",
+          "label": "🧒 PODOPEDIATRIA",
           "next": "SVC_PODOPEDIATRIA_INFO"
         },
         {
-          "label": "🧓 Podogeriatria",
+          "label": "🧓 PODOGERIATRIA",
           "next": "SVC_PODOGERIATRIA_INFO"
         },
         {
-          "label": "🧰 Otros",
+          "label": "🧰 OTROS",
           "next": "OTROS_MENU"
         }
       ]
@@ -305,15 +305,15 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "✂️ Matricectomia",
+          "label": "✂️ MATRICECTOMIA",
           "next": "TRAT_MATRICECTOMIA_INFO"
         },
         {
-          "label": "🦴 Ortesis",
+          "label": "🦴 ORTESIS",
           "next": "TRAT_ORTESIS_INFO"
         },
         {
-          "label": "🧼 Volver a servicios",
+          "label": "🧼 VOLVER A SERVICIOS",
           "next": "SERVICIOS_MENU"
         }
       ]
@@ -378,15 +378,15 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "🧴 Tópico",
+          "label": "🧴 TÓPICO",
           "next": "TRAT_TOPICO_INFO"
         },
         {
-          "label": "🔦 Láser",
+          "label": "🔦 LÁSER",
           "next": "TRAT_LASER_INFO"
         },
         {
-          "label": "💊 Sistémico",
+          "label": "💊 SISTÉMICO",
           "next": "TRAT_SISTEMICO_INFO"
         }
       ]
@@ -431,19 +431,19 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "👨‍💻 Atención personal",
+          "label": "👨‍💻 ATENCIÓN PERSONAL",
           "next": "CONTACT_METHOD"
         },
         {
-          "label": "⬅️ Volver al menu",
+          "label": "⬅️ VOLVER AL MENU",
           "next": "MAIN_MENU"
         },
         {
-          "label": "🧼 Volver a servicios",
+          "label": "🧼 VOLVER A SERVICIOS",
           "next": "SERVICIOS_MENU"
         },
         {
-          "label": "✅ Finalizar",
+          "label": "✅ FINALIZAR",
           "next": "CIERRE_HORARIO_UBICACION"
         }
       ]
@@ -475,19 +475,19 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "👨‍💻 Atención personal",
+          "label": "👨‍💻 ATENCIÓN PERSONAL",
           "next": "CONTACT_METHOD"
         },
         {
-          "label": "⬅️ Volver al menu",
+          "label": "⬅️ VOLVER AL MENU",
           "next": "MAIN_MENU"
         },
         {
-          "label": "🧼 Volver a servicios",
+          "label": "🧼 VOLVER A SERVICIOS",
           "next": "SERVICIOS_MENU"
         },
         {
-          "label": "✅ Finalizar",
+          "label": "✅ FINALIZAR",
           "next": "CIERRE_HORARIO_UBICACION"
         }
       ]
@@ -519,19 +519,19 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "👨‍💻 Atención personal",
+          "label": "👨‍💻 ATENCIÓN PERSONAL",
           "next": "CONTACT_METHOD"
         },
         {
-          "label": "⬅️ Volver al menu",
+          "label": "⬅️ VOLVER AL MENU",
           "next": "MAIN_MENU"
         },
         {
-          "label": "🧼 Volver a servicios",
+          "label": "🧼 VOLVER A SERVICIOS",
           "next": "SERVICIOS_MENU"
         },
         {
-          "label": "✅ Finalizar",
+          "label": "✅ FINALIZAR",
           "next": "CIERRE_HORARIO_UBICACION"
         }
       ]
@@ -583,19 +583,19 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "👨‍💻 Atención personal",
+          "label": "👨‍💻 ATENCIÓN PERSONAL",
           "next": "CONTACT_METHOD"
         },
         {
-          "label": "⬅️ Volver al menu",
+          "label": "⬅️ VOLVER AL MENU",
           "next": "MAIN_MENU"
         },
         {
-          "label": "🧼 Volver a servicios",
+          "label": "🧼 VOLVER A SERVICIOS",
           "next": "SERVICIOS_MENU"
         },
         {
-          "label": "✅ Finalizar",
+          "label": "✅ FINALIZAR",
           "next": "CIERRE_HORARIO_UBICACION"
         }
       ]
@@ -627,19 +627,19 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "👨‍💻 Atención personal",
+          "label": "👨‍💻 ATENCIÓN PERSONAL",
           "next": "CONTACT_METHOD"
         },
         {
-          "label": "⬅️ Volver al menu",
+          "label": "⬅️ VOLVER AL MENU",
           "next": "MAIN_MENU"
         },
         {
-          "label": "🧼 Volver a servicios",
+          "label": "🧼 VOLVER A SERVICIOS",
           "next": "SERVICIOS_MENU"
         },
         {
-          "label": "✅ Finalizar",
+          "label": "✅ FINALIZAR",
           "next": "CIERRE_HORARIO_UBICACION"
         }
       ]
@@ -699,19 +699,19 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "👨‍💻 Atención personal",
+          "label": "👨‍💻 ATENCIÓN PERSONAL",
           "next": "CONTACT_METHOD"
         },
         {
-          "label": "⬅️ Volver al menu",
+          "label": "⬅️ VOLVER AL MENU",
           "next": "MAIN_MENU"
         },
         {
-          "label": "🧼 Volver a servicios",
+          "label": "🧼 VOLVER A SERVICIOS",
           "next": "SERVICIOS_MENU"
         },
         {
-          "label": "✅ Finalizar",
+          "label": "✅ FINALIZAR",
           "next": "CIERRE_HORARIO_UBICACION"
         }
       ]
@@ -770,19 +770,19 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "👨‍💻 Atención personal",
+          "label": "👨‍💻 ATENCIÓN PERSONAL",
           "next": "CONTACT_METHOD"
         },
         {
-          "label": "⬅️ Volver al menu",
+          "label": "⬅️ VOLVER AL MENU",
           "next": "MAIN_MENU"
         },
         {
-          "label": "🧼 Volver a servicios",
+          "label": "🧼 VOLVER A SERVICIOS",
           "next": "SERVICIOS_MENU"
         },
         {
-          "label": "✅ Finalizar",
+          "label": "✅ FINALIZAR",
           "next": "CIERRE_HORARIO_UBICACION"
         }
       ]
@@ -828,19 +828,19 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "👨‍💻 Atención personal",
+          "label": "👨‍💻 ATENCIÓN PERSONAL",
           "next": "CONTACT_METHOD"
         },
         {
-          "label": "⬅️ Volver al menu",
+          "label": "⬅️ VOLVER AL MENU",
           "next": "MAIN_MENU"
         },
         {
-          "label": "🧼 Volver a servicios",
+          "label": "🧼 VOLVER A SERVICIOS",
           "next": "SERVICIOS_MENU"
         },
         {
-          "label": "✅ Finalizar",
+          "label": "✅ FINALIZAR",
           "next": "CIERRE_HORARIO_UBICACION"
         }
       ]
@@ -852,31 +852,31 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "🦶 Callosidad",
+          "label": "🦶 CALLOSIDAD",
           "next": "OTR_CALLOSIDAD_INFO"
         },
         {
-          "label": "🦠 Verruga plantar",
+          "label": "🦠 VERRUGA PLANTAR",
           "next": "OTR_VERRUGA_PLANTAR_INFO"
         },
         {
-          "label": "💧 Heloma",
+          "label": "💧 HELOMA",
           "next": "OTR_HELOMA_INFO"
         },
         {
-          "label": "✂️ Extraccion de uña",
+          "label": "✂️ EXTRACCION DE UÑA",
           "next": "OTR_EXTRACCION_UNA_INFO"
         },
         {
-          "label": "🏃 Pie de atleta",
+          "label": "🏃 PIE DE ATLETA",
           "next": "OTR_PIE_ATLETA_INFO"
         },
         {
-          "label": "🧪 Pie diabetico",
+          "label": "🧪 PIE DIABETICO",
           "next": "OTR_PIE_DIABETICO_INFO"
         },
         {
-          "label": "👨‍💻 Atención personal",
+          "label": "👨‍💻 ATENCIÓN PERSONAL",
           "next": "CONTACT_METHOD"
         }
       ]
@@ -922,19 +922,19 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "👨‍💻 Atención personal",
+          "label": "👨‍💻 ATENCIÓN PERSONAL",
           "next": "CONTACT_METHOD"
         },
         {
-          "label": "⬅️ Volver al menu",
+          "label": "⬅️ VOLVER AL MENU",
           "next": "MAIN_MENU"
         },
         {
-          "label": "🧼 Volver a servicios",
+          "label": "🧼 VOLVER A SERVICIOS",
           "next": "OTROS_MENU"
         },
         {
-          "label": "✅ Finalizar",
+          "label": "✅ FINALIZAR",
           "next": "CIERRE_HORARIO_UBICACION"
         }
       ]
@@ -979,19 +979,19 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "👨‍💻 Atención personal",
+          "label": "👨‍💻 ATENCIÓN PERSONAL",
           "next": "CONTACT_METHOD"
         },
         {
-          "label": "⬅️ Volver al menu",
+          "label": "⬅️ VOLVER AL MENU",
           "next": "MAIN_MENU"
         },
         {
-          "label": "🧼 Volver a servicios",
+          "label": "🧼 VOLVER A SERVICIOS",
           "next": "OTROS_MENU"
         },
         {
-          "label": "✅ Finalizar",
+          "label": "✅ FINALIZAR",
           "next": "CIERRE_HORARIO_UBICACION"
         }
       ]
@@ -1016,19 +1016,19 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "👨‍💻 Atención personal",
+          "label": "👨‍💻 ATENCIÓN PERSONAL",
           "next": "CONTACT_METHOD"
         },
         {
-          "label": "⬅️ Volver al menu",
+          "label": "⬅️ VOLVER AL MENU",
           "next": "MAIN_MENU"
         },
         {
-          "label": "🧼 Volver a servicios",
+          "label": "🧼 VOLVER A SERVICIOS",
           "next": "OTROS_MENU"
         },
         {
-          "label": "✅ Finalizar",
+          "label": "✅ FINALIZAR",
           "next": "CIERRE_HORARIO_UBICACION"
         }
       ]
@@ -1072,19 +1072,19 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "👨‍💻 Atención personal",
+          "label": "👨‍💻 ATENCIÓN PERSONAL",
           "next": "CONTACT_METHOD"
         },
         {
-          "label": "⬅️ Volver al menu",
+          "label": "⬅️ VOLVER AL MENU",
           "next": "MAIN_MENU"
         },
         {
-          "label": "🧼 Volver a servicios",
+          "label": "🧼 VOLVER A SERVICIOS",
           "next": "OTROS_MENU"
         },
         {
-          "label": "✅ Finalizar",
+          "label": "✅ FINALIZAR",
           "next": "CIERRE_HORARIO_UBICACION"
         }
       ]
@@ -1116,19 +1116,19 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "👨‍💻 Atención personal",
+          "label": "👨‍💻 ATENCIÓN PERSONAL",
           "next": "CONTACT_METHOD"
         },
         {
-          "label": "⬅️ Volver al menu",
+          "label": "⬅️ VOLVER AL MENU",
           "next": "MAIN_MENU"
         },
         {
-          "label": "🧼 Volver a servicios",
+          "label": "🧼 VOLVER A SERVICIOS",
           "next": "OTROS_MENU"
         },
         {
-          "label": "✅ Finalizar",
+          "label": "✅ FINALIZAR",
           "next": "CIERRE_HORARIO_UBICACION"
         }
       ]
@@ -1174,19 +1174,19 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "👨‍💻 Atención personal",
+          "label": "👨‍💻 ATENCIÓN PERSONAL",
           "next": "CONTACT_METHOD"
         },
         {
-          "label": "⬅️ Volver al menu",
+          "label": "⬅️ VOLVER AL MENU",
           "next": "MAIN_MENU"
         },
         {
-          "label": "🧼 Volver a servicios",
+          "label": "🧼 VOLVER A SERVICIOS",
           "next": "OTROS_MENU"
         },
         {
-          "label": "✅ Finalizar",
+          "label": "✅ FINALIZAR",
           "next": "CIERRE_HORARIO_UBICACION"
         }
       ]
@@ -1198,11 +1198,11 @@ module.exports = {
       "delayMs": 1500,
       "buttons": [
         {
-          "label": "📞 Llamada",
+          "label": "📞 LLAMADA",
           "next": "ACTION_CALL"
         },
         {
-          "label": "💬 Mensaje",
+          "label": "💬 MENSAJE",
           "next": "ACTION_MESSAGE"
         }
       ]

@@ -5,6 +5,20 @@
 import React, { useMemo, useState } from "react";
 
 const CLOUDFLARE_DEFAULT_MODEL = "@cf/meta/llama-3-8b-instruct";
+const DEFAULT_MODELS_BY_PROVIDER = {
+  groq: "llama-3.1-8b-instant",
+  cerebras: "llama3.1-8b",
+  gemini: "gemini-2.5-flash",
+  openai: "gpt-4o-mini",
+  cloudflare: CLOUDFLARE_DEFAULT_MODEL,
+};
+const AI_PROVIDER_OPTIONS = [
+  { value: "groq", label: "Groq (Llama 3.1 - Gratis)" },
+  { value: "cerebras", label: "Cerebras" },
+  { value: "gemini", label: "Gemini" },
+  { value: "openai", label: "OpenAI" },
+  { value: "cloudflare", label: "Cloudflare Workers AI" },
+];
 
 function isCloudflareProvider(value) {
   const provider = String(value || "").toLowerCase();
@@ -13,6 +27,21 @@ function isCloudflareProvider(value) {
     provider === "cloudflare-workers-ai" ||
     provider === "workers-ai"
   );
+}
+
+function getDefaultModelForProvider(provider) {
+  return (
+    DEFAULT_MODELS_BY_PROVIDER[String(provider || "").toLowerCase()] ||
+    DEFAULT_MODELS_BY_PROVIDER.openai
+  );
+}
+
+function getAiKeyPlaceholder(provider) {
+  if (isCloudflareProvider(provider)) return "Pegue el API token de Cloudflare";
+  if (String(provider || "").toLowerCase() === "cerebras") {
+    return "Pegue la API key de Cerebras";
+  }
+  return "Pegue la API key";
 }
 
 function BotIcon() {
@@ -39,7 +68,9 @@ function BotSection({
   const [selectedAiProvider, setSelectedAiProvider] = useState("groq");
   const [selectedAiKey, setSelectedAiKey] = useState("");
   const [selectedAiAccountId, setSelectedAiAccountId] = useState("");
-  const [selectedAiModel, setSelectedAiModel] = useState(CLOUDFLARE_DEFAULT_MODEL);
+  const [selectedAiModel, setSelectedAiModel] = useState(
+    getDefaultModelForProvider("groq")
+  );
   const [botDrafts, setBotDrafts] = useState({});
 
   const usedFlowIds = new Set(tenantBots.map((tb) => tb.flow_id));
@@ -59,10 +90,10 @@ function BotSection({
           ai: {
             provider: selectedAiProvider,
             key: selectedAiKey || undefined,
+            model: selectedAiModel || getDefaultModelForProvider(selectedAiProvider),
             ...(isCloudflareProvider(selectedAiProvider)
               ? {
                   account_id: selectedAiAccountId || undefined,
-                  model: selectedAiModel || CLOUDFLARE_DEFAULT_MODEL,
                 }
               : {}),
           },
@@ -71,6 +102,8 @@ function BotSection({
     onAddBot(selectedFlow, config);
     setSelectedFlow("");
     setSelectedAiKey("");
+    setSelectedAiAccountId("");
+    setSelectedAiModel(getDefaultModelForProvider(selectedAiProvider));
   }
 
   function updateDraft(botId, updates) {
@@ -94,17 +127,17 @@ function BotSection({
       bot.config?.ai?.accountId ||
       "";
     const modelValue =
-      draft.model ||
-      bot.config?.ai?.model ||
-      CLOUDFLARE_DEFAULT_MODEL;
+      draft.model !== undefined
+        ? draft.model
+        : bot.config?.ai?.model || getDefaultModelForProvider(provider);
     const config = {
       ai: {
         provider,
         ...(keyValue ? { key: keyValue } : {}),
+        ...(modelValue ? { model: modelValue } : {}),
         ...(isCloudflareProvider(provider)
           ? {
               ...(accountIdValue ? { account_id: accountIdValue } : {}),
-              model: modelValue,
             }
           : {}),
       },
@@ -167,17 +200,15 @@ function BotSection({
                           onChange={(event) =>
                             updateDraft(bot.id, {
                               provider: event.target.value,
-                              ...(isCloudflareProvider(event.target.value) &&
-                              !(botDrafts[bot.id]?.model || bot.config?.ai?.model)
-                                ? { model: CLOUDFLARE_DEFAULT_MODEL }
-                                : {}),
+                              model: getDefaultModelForProvider(event.target.value),
                             })
                           }
                         >
-                          <option value="groq">Groq (Llama 3.1 - Gratis)</option>
-                          <option value="gemini">Gemini</option>
-                          <option value="openai">OpenAI</option>
-                          <option value="cloudflare">Cloudflare Workers AI</option>
+                          {AI_PROVIDER_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
                         </select>
                       </div>
                       <div className="sa-ai-field">
@@ -196,11 +227,40 @@ function BotSection({
                           placeholder={
                             bot.config?.ai?.key_present
                               ? "******** (configurada)"
-                              : "Pegue la API key"
+                              : getAiKeyPlaceholder(
+                                  botDrafts[bot.id]?.provider ||
+                                    bot.config?.ai?.provider ||
+                                    "openai"
+                                )
                           }
                           value={botDrafts[bot.id]?.key || ""}
                           onChange={(event) =>
                             updateDraft(bot.id, { key: event.target.value })
+                          }
+                        />
+                      </div>
+                      <div className="sa-ai-field">
+                        <label className="sa-select-label">Modelo</label>
+                        <input
+                          type="text"
+                          className="sa-input"
+                          placeholder={getDefaultModelForProvider(
+                            botDrafts[bot.id]?.provider ||
+                              bot.config?.ai?.provider ||
+                              "openai"
+                          )}
+                          value={
+                            botDrafts[bot.id]?.model !== undefined
+                              ? botDrafts[bot.id]?.model
+                              : bot.config?.ai?.model ||
+                                getDefaultModelForProvider(
+                                  botDrafts[bot.id]?.provider ||
+                                    bot.config?.ai?.provider ||
+                                    "openai"
+                                )
+                          }
+                          onChange={(event) =>
+                            updateDraft(bot.id, { model: event.target.value })
                           }
                         />
                       </div>
@@ -227,22 +287,6 @@ function BotSection({
                                 updateDraft(bot.id, {
                                   account_id: event.target.value,
                                 })
-                              }
-                            />
-                          </div>
-                          <div className="sa-ai-field">
-                            <label className="sa-select-label">Modelo</label>
-                            <input
-                              type="text"
-                              className="sa-input"
-                              placeholder={CLOUDFLARE_DEFAULT_MODEL}
-                              value={
-                                botDrafts[bot.id]?.model ||
-                                bot.config?.ai?.model ||
-                                CLOUDFLARE_DEFAULT_MODEL
-                              }
-                              onChange={(event) =>
-                                updateDraft(bot.id, { model: event.target.value })
                               }
                             />
                           </div>
@@ -300,32 +344,45 @@ function BotSection({
               <select
                 className="sa-select-styled"
                 value={selectedAiProvider}
-              onChange={(event) => setSelectedAiProvider(event.target.value)}
-            >
-              <option value="groq">Groq (Llama 3.1 - Gratis)</option>
-              <option value="gemini">Gemini</option>
-              <option value="openai">OpenAI</option>
-              <option value="cloudflare">Cloudflare Workers AI</option>
-            </select>
-          </div>
-          <div className="sa-ai-field">
-            <label className="sa-select-label">
-              {isCloudflareProvider(selectedAiProvider) ? "API Token" : "API Key"}
-            </label>
-            <input
-              type="password"
-              className="sa-input"
-              placeholder={
-                isCloudflareProvider(selectedAiProvider)
-                  ? "Pegue el API token de Cloudflare"
-                  : "Pegue la API key"
-              }
-              value={selectedAiKey}
-              onChange={(event) => setSelectedAiKey(event.target.value)}
-            />
-          </div>
-          {isCloudflareProvider(selectedAiProvider) && (
-            <>
+                onChange={(event) => {
+                  const nextProvider = event.target.value;
+                  setSelectedAiProvider(nextProvider);
+                  setSelectedAiModel(getDefaultModelForProvider(nextProvider));
+                  if (!isCloudflareProvider(nextProvider)) {
+                    setSelectedAiAccountId("");
+                  }
+                }}
+              >
+                {AI_PROVIDER_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="sa-ai-field">
+              <label className="sa-select-label">
+                {isCloudflareProvider(selectedAiProvider) ? "API Token" : "API Key"}
+              </label>
+              <input
+                type="password"
+                className="sa-input"
+                placeholder={getAiKeyPlaceholder(selectedAiProvider)}
+                value={selectedAiKey}
+                onChange={(event) => setSelectedAiKey(event.target.value)}
+              />
+            </div>
+            <div className="sa-ai-field">
+              <label className="sa-select-label">Modelo</label>
+              <input
+                type="text"
+                className="sa-input"
+                placeholder={getDefaultModelForProvider(selectedAiProvider)}
+                value={selectedAiModel}
+                onChange={(event) => setSelectedAiModel(event.target.value)}
+              />
+            </div>
+            {isCloudflareProvider(selectedAiProvider) && (
               <div className="sa-ai-field">
                 <label className="sa-select-label">Account ID</label>
                 <input
@@ -336,19 +393,8 @@ function BotSection({
                   onChange={(event) => setSelectedAiAccountId(event.target.value)}
                 />
               </div>
-              <div className="sa-ai-field">
-                <label className="sa-select-label">Modelo</label>
-                <input
-                  type="text"
-                  className="sa-input"
-                  placeholder={CLOUDFLARE_DEFAULT_MODEL}
-                  value={selectedAiModel}
-                  onChange={(event) => setSelectedAiModel(event.target.value)}
-                />
-              </div>
-            </>
-          )}
-        </div>
+            )}
+          </div>
         )}
         <button
           type="button"

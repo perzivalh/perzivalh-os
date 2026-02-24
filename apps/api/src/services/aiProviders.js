@@ -9,6 +9,14 @@ const OPENAI_ENDPOINT = "https://api.openai.com/v1/responses";
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 const CLOUDFLARE_AI_BASE = "https://api.cloudflare.com/client/v4/accounts";
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
+const CEREBRAS_ENDPOINT = "https://api.cerebras.ai/v1/chat/completions";
+const PROVIDER_DEFAULT_MODELS = {
+  openai: process.env.OPENAI_MODEL || "gpt-4o-mini",
+  gemini: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+  cloudflare: process.env.CLOUDFLARE_AI_MODEL || "@cf/meta/llama-3-8b-instruct",
+  groq: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
+  cerebras: process.env.CEREBRAS_MODEL || "llama3.1-8b",
+};
 
 function estimateTokenCount(text) {
   const str = String(text || "");
@@ -28,6 +36,7 @@ function sanitizeTrace(trace) {
     "attempt",
     "providerFallbackFrom",
     "providerFallbackTo",
+    "fallbackAttemptIndex",
     "tenantId",
   ];
   const out = {};
@@ -35,6 +44,107 @@ function sanitizeTrace(trace) {
     if (trace[key] !== undefined) out[key] = trace[key];
   }
   return out;
+}
+
+function normalizeProviderName(provider) {
+  const normalized = String(provider || "").toLowerCase().trim();
+  if (normalized === "cloudflare-workers-ai" || normalized === "workers-ai") return "cloudflare";
+  return normalized || "openai";
+}
+
+function resolveProviderApiKey(provider, options = {}) {
+  const normalized = normalizeProviderName(provider);
+  const originalProvider = normalizeProviderName(options.originalProvider || options.provider || normalized);
+  if (options.apiKey && originalProvider === normalized) {
+    return options.apiKey;
+  }
+  if (normalized === "gemini") {
+    return options.geminiApiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
+  }
+  if (normalized === "cloudflare") {
+    return options.cloudflareApiKey ||
+      options.cloudflareToken ||
+      process.env.CLOUDFLARE_AI_API_TOKEN ||
+      process.env.CLOUDFLARE_API_TOKEN ||
+      "";
+  }
+  if (normalized === "groq") {
+    return options.groqApiKey || process.env.GROQ_API_KEY || "";
+  }
+  if (normalized === "cerebras") {
+    return options.cerebrasApiKey || process.env.CEREBRAS_API_KEY || "";
+  }
+  return options.openaiApiKey || process.env.OPENAI_API_KEY || "";
+}
+
+function resolveProviderModel(provider, model) {
+  return model || PROVIDER_DEFAULT_MODELS[normalizeProviderName(provider)] || PROVIDER_DEFAULT_MODELS.openai;
+}
+
+function resolveCloudflareAccountId(options = {}) {
+  return (
+    options.accountId ||
+    options.cloudflareAccountId ||
+    process.env.CLOUDFLARE_ACCOUNT_ID ||
+    ""
+  );
+}
+
+function parseFallbackCandidates(value) {
+  return String(value || "")
+    .split(/[,\n;]/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const [providerPart, ...modelParts] = entry.includes(":")
+        ? entry.split(":")
+        : entry.includes("/")
+          ? entry.split("/")
+          : [entry];
+      const provider = normalizeProviderName(providerPart);
+      const model = modelParts.join(":").trim() || null;
+      return provider ? { provider, model } : null;
+    })
+    .filter(Boolean);
+}
+
+function getConfiguredFallbackCandidates(primaryProvider, primaryModel, options = {}) {
+  const normalizedPrimary = normalizeProviderName(primaryProvider);
+  const direct = Array.isArray(options.providerFallbacks)
+    ? options.providerFallbacks
+    : parseFallbackCandidates(options.providerFallbacks);
+  const envSpecific = parseFallbackCandidates(process.env[`AI_PROVIDER_FALLBACKS_${normalizedPrimary.toUpperCase()}`]);
+  const envGlobal = parseFallbackCandidates(process.env.AI_PROVIDER_FALLBACKS);
+  const configured = [...direct, ...envSpecific, ...envGlobal];
+  const seen = new Set();
+  const out = [];
+  for (const item of configured) {
+    const provider = normalizeProviderName(item?.provider);
+    if (!provider) continue;
+    const model = item?.model ? String(item.model).trim() : null;
+    const key = `${provider}:${model || ""}`;
+    if (provider === normalizedPrimary && (!model || model === primaryModel)) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ provider, model });
+  }
+  return out;
+}
+
+function shouldFallbackToAnotherProvider(error) {
+  const msg = String(error?.message || error || "").toLowerCase();
+  if (!msg) return false;
+  return (
+    /\b401\b|\b403\b|\b408\b|\b409\b|\b429\b|\b500\b|\b502\b|\b503\b|\b504\b/.test(msg) ||
+    msg.includes("timeout") ||
+    msg.includes("timed out") ||
+    msg.includes("rate limit") ||
+    msg.includes("permission") ||
+    msg.includes("model_permission_blocked_org") ||
+    msg.includes("network error") ||
+    msg.includes("econnreset") ||
+    msg.includes("socket hang up")
+  );
 }
 
 function logProviderUsage({ provider, model, usage, trace, rawUsage }) {
@@ -534,11 +644,73 @@ async function callGroq({ apiKey, model, system, user, temperature = 0, maxToken
   }
 }
 
-async function callAiProvider(provider, options) {
-  console.log("[AI] Provider:", provider, "| Model:", options.model, "| Has key:", !!options.apiKey);
-  const normalizedProvider = String(provider || "").toLowerCase();
-  const model = options?.model || null;
+async function callCerebras({ apiKey, model, system, user, temperature = 0, maxTokens = 220, schema, trace }) {
+  console.log("=".repeat(60));
+  console.log("[CEREBRAS] Starting call");
+  console.log("[CEREBRAS] Model:", model || "MISSING");
+  console.log("[CEREBRAS] API Key prefix:", apiKey ? apiKey.substring(0, 12) + "..." : "MISSING");
+
+  const payload = {
+    model,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    temperature,
+    max_tokens: maxTokens,
+    ...(schema ? { response_format: { type: "json_object" } } : {}),
+  };
+
+  try {
+    const response = await axios.post(CEREBRAS_ENDPOINT, payload, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      timeout: 20000,
+    });
+
+    const usage = response.data?.usage || null;
+    if (usage) {
+      logProviderUsage({
+        provider: "cerebras",
+        model: payload.model,
+        trace,
+        rawUsage: usage,
+        usage: {
+          prompt_tokens: usage.prompt_tokens ?? usage.input_tokens ?? null,
+          completion_tokens: usage.completion_tokens ?? usage.output_tokens ?? null,
+          total_tokens: usage.total_tokens ?? null,
+          cached_tokens: usage.cached_tokens ?? null,
+        },
+      });
+    }
+    const text = response.data?.choices?.[0]?.message?.content || "";
+    console.log("[CEREBRAS] SUCCESS");
+    console.log("[CEREBRAS] Response length:", text.length);
+    console.log("[CEREBRAS] Preview:", text.substring(0, 150));
+    console.log("=".repeat(60));
+    return text;
+  } catch (error) {
+    const status = error?.response?.status;
+    const detail = error?.response?.data
+      ? JSON.stringify(error.response.data).slice(0, 500)
+      : "";
+    console.error("[CEREBRAS] FAILED:", status, detail);
+    console.error("=".repeat(60));
+    throw new Error(
+      `Cerebras request failed${status ? ` (${status})` : ""}${detail ? `: ${detail}` : ""}`
+    );
+  }
+}
+
+async function callAiProviderSingle(provider, options) {
+  const normalizedProvider = normalizeProviderName(provider);
   const trace = sanitizeTrace(options?.trace);
+  const model = resolveProviderModel(normalizedProvider, options?.model || null);
+  const apiKey = resolveProviderApiKey(normalizedProvider, { ...options, provider });
+  const resolvedOptions = { ...options, apiKey, trace, model };
+  console.log("[AI] Provider:", normalizedProvider, "| Model:", model, "| Has key:", !!apiKey);
   const startedAt = Date.now();
   const systemChars = String(options?.system || "").length;
   const userChars = String(options?.user || "").length;
@@ -562,23 +734,20 @@ async function callAiProvider(provider, options) {
   try {
     let text = "";
     if (normalizedProvider === "gemini") {
-      text = await callGemini(options);
+      text = await callGemini(resolvedOptions);
     } else if (
-      normalizedProvider === "cloudflare" ||
-      normalizedProvider === "cloudflare-workers-ai" ||
-      normalizedProvider === "workers-ai"
+      normalizedProvider === "cloudflare"
     ) {
       text = await callCloudflare({
-        ...options,
-        accountId:
-          options.accountId ||
-          options.cloudflareAccountId ||
-          process.env.CLOUDFLARE_ACCOUNT_ID,
+        ...resolvedOptions,
+        accountId: resolveCloudflareAccountId(options),
       });
     } else if (normalizedProvider === "groq") {
-      text = await callGroq(options);
+      text = await callGroq(resolvedOptions);
+    } else if (normalizedProvider === "cerebras") {
+      text = await callCerebras(resolvedOptions);
     } else {
-      text = await callOpenAI(options);
+      text = await callOpenAI(resolvedOptions);
     }
 
     const outputChars = String(text || "").length;
@@ -602,6 +771,75 @@ async function callAiProvider(provider, options) {
     });
     throw error;
   }
+}
+
+async function callAiProvider(provider, options) {
+  const normalizedPrimary = normalizeProviderName(provider);
+  const primaryModel = options?.model || null;
+  const fallbackCandidates = getConfiguredFallbackCandidates(normalizedPrimary, primaryModel, options);
+  const attempts = [{ provider: normalizedPrimary, model: primaryModel }, ...fallbackCandidates];
+  let lastError = null;
+
+  for (let idx = 0; idx < attempts.length; idx++) {
+    const candidate = attempts[idx];
+    const attemptTrace = {
+      ...sanitizeTrace(options?.trace),
+      providerFallbackFrom: normalizedPrimary !== candidate.provider ? normalizedPrimary : undefined,
+      providerFallbackTo: normalizedPrimary !== candidate.provider ? candidate.provider : undefined,
+      fallbackAttemptIndex: idx + 1,
+    };
+    try {
+      if (idx > 0) {
+        logger.warn("ai.provider_fallback_attempt", {
+          fromProvider: normalizedPrimary,
+          fromModel: primaryModel,
+          toProvider: candidate.provider,
+          toModel: candidate.model || null,
+          ...attemptTrace,
+          previousError: lastError?.message || String(lastError || ""),
+        });
+      }
+
+      const text = await callAiProviderSingle(candidate.provider, {
+        ...options,
+        apiKey: candidate.provider === normalizedPrimary ? options?.apiKey : undefined,
+        originalProvider: normalizedPrimary,
+        provider: candidate.provider,
+        model: candidate.model || (candidate.provider === normalizedPrimary ? options?.model : undefined),
+        trace: attemptTrace,
+      });
+
+      if (idx > 0) {
+        logger.info("ai.provider_fallback_success", {
+          fromProvider: normalizedPrimary,
+          fromModel: primaryModel,
+          toProvider: candidate.provider,
+          toModel: candidate.model || options?.model || null,
+          attemptsTried: idx + 1,
+          ...attemptTrace,
+        });
+      }
+      return text;
+    } catch (error) {
+      lastError = error;
+      const canFallback = idx < attempts.length - 1 && shouldFallbackToAnotherProvider(error);
+      if (!canFallback) {
+        if (idx > 0) {
+          logger.warn("ai.provider_fallback_exhausted", {
+            fromProvider: normalizedPrimary,
+            fromModel: primaryModel,
+            attemptsTried: idx + 1,
+            finalProvider: candidate.provider,
+            finalModel: candidate.model || options?.model || null,
+            message: error?.message || String(error),
+          });
+        }
+        throw error;
+      }
+    }
+  }
+
+  throw lastError || new Error("AI provider call failed");
 }
 
 // ----------------------------------------------------------------------------

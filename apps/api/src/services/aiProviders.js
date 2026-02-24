@@ -4,6 +4,7 @@ const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
 const logger = require("../lib/logger");
+const { reserveAiBudget } = require("./aiBudgetManager");
 
 const OPENAI_ENDPOINT = "https://api.openai.com/v1/responses";
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
@@ -729,6 +730,14 @@ async function callAiProviderSingle(provider, options) {
     inputTokensEst: systemTokensEst + userTokensEst,
     systemTokensEst,
     userTokensEst,
+  });
+
+  reserveAiBudget({
+    provider: normalizedProvider || "openai",
+    model,
+    inputTokensEst: systemTokensEst + userTokensEst,
+    maxTokens: options?.maxTokens ?? null,
+    trace,
   });
 
   try {

@@ -70,6 +70,28 @@ const PODIATRY_CONTEXT_WORDS = [
   "podopediatria", "podopediatría", "podogeriatria", "podogeriatría", "tobillo",
 ];
 
+const DOMAIN_META_PHRASES = [
+  "precio", "precios", "costo", "costos", "tarifa", "tarifas", "cuanto cuesta", "cuanto vale",
+  "horario", "horarios", "hora", "horas", "rango de hora", "rango de horas",
+  "ubicacion", "ubicaciones", "sucursal", "direccion", "como llegar", "clinica",
+  "que servicios", "que ofrecen", "lista de servicios", "servicios disponibles",
+  "consulta", "evaluacion", "valoracion", "cita", "agendar", "agenda", "turno", "reservar",
+  "asesor", "asesora", "recepcion", "humano", "contacto", "whatsapp",
+];
+const DOMAIN_AMBIGUOUS_HEALTH_WORDS = [
+  "dolor", "duele", "sangra", "sangrado", "hinchado", "inflamado", "pus", "supura", "infeccion",
+  "ardor", "picazon", "fiebre", "herida",
+];
+const DOMAIN_NEUTRAL_WORDS = new Set([
+  "hola", "buenas", "buenos", "dias", "tardes", "noches", "buen", "dia", "hey", "ola",
+  "por", "favor", "porfa", "xfa", "gracias", "ok", "oki", "bueno", "quiero", "necesito",
+  "me", "mi", "mis", "de", "del", "la", "el", "los", "las", "un", "una", "unos", "unas",
+  "que", "como", "donde", "cuando", "si", "y", "o", "con", "sin", "para", "ahora", "puedo", "ir",
+  "informacion", "info", "ayuda", "servicio", "servicios", "tratamiento", "tratamientos",
+  "entiendo", "entender", "explica", "explicame", "muestrame", "mostrar", "muestro",
+]);
+const KNOWLEDGE_DOMAIN_LEXICON_CACHE = new WeakMap();
+
 /**
  * Load knowledge base for a flow
  */
@@ -228,20 +250,37 @@ ${nodeCatalog}
  */
 function buildUserPrompt({ message, history, summary, previousQuestion }) {
   const contextParts = [];
+  const historyMaxChars = Number(process.env.AI_ROUTER_FULL_FALLBACK_HISTORY_CHARS || 420);
 
-  if (history && history !== "(Primera interacción)") {
-    contextParts.push(`[historial]\n${history}`);
+  if (history && !String(history).startsWith("(Primera interacci")) {
+    const historyStr = String(history);
+    const trimmedHistory = historyStr.length > historyMaxChars
+      ? "..." + historyStr.slice(-historyMaxChars)
+      : historyStr;
+    contextParts.push("[historial_reciente]\n" + trimmedHistory);
+  }
+
+  if (summary?.currentNode) {
+    contextParts.push("[nodo_actual]: " + summary.currentNode);
+  }
+
+  if (summary?.lastRouteId) {
+    contextParts.push("[ultima_ruta]: " + summary.lastRouteId);
+  }
+
+  if (Array.isArray(summary?.servicesDiscussed) && summary.servicesDiscussed.length) {
+    contextParts.push("[servicios_mencionados]: " + summary.servicesDiscussed.slice(-3).join(", "));
   }
 
   if (previousQuestion) {
-    contextParts.push(`[pregunta anterior, no repetir]: ${previousQuestion}`);
+    contextParts.push("[pregunta_anterior_no_repetir]: " + previousQuestion);
   }
 
   if (summary?.clarificationsAsked > 0) {
-    contextParts.push(`[ya se pidió clarificación ${summary.clarificationsAsked} vez/veces, no pedir más]`);
+    contextParts.push("[clarificaciones_previas]: " + summary.clarificationsAsked);
   }
 
-  contextParts.push(`[mensaje]: ${message}`);
+  contextParts.push("[mensaje]: " + message);
 
   return contextParts.join("\n");
 }
@@ -734,7 +773,11 @@ async function routeWithCloudflareRouteFirst({
     };
   }
 
-  const textReply = cleanedCopy || "Entiendo tu consulta. Te ayudo con eso.";
+  const textReply =
+    cleanedCopy ||
+    (evaluateDomainGate({ text, knowledge }).classification === "out_of_domain"
+      ? buildOutOfDomainResponseText({ text, knowledge })
+      : "Entiendo tu consulta. Te ayudo con eso.");
   logger.info("ai.router_decision", {
     provider,
     model,
@@ -945,13 +988,21 @@ function fallbackKeywordRoute(text) {
     "problema en el pie": "OTROS_MENU",
   };
 
+  let best = null;
   for (const [keyword, nodeId] of Object.entries(keywords)) {
-    if (normalized.includes(keyword)) {
-      return nodeId;
+    if (!normalized.includes(keyword)) continue;
+    const routePriority =
+      nodeId === "MAIN_MENU" ? 0 :
+      nodeId === "SERVICIOS_MENU" ? 20 :
+      nodeId === "PRECIOS_INFO" || nodeId === "HORARIOS_INFO" || nodeId === "CONTACT_METHOD" ? 30 :
+      40;
+    const score = (keyword.length * 10) + routePriority;
+    if (!best || score > best.score) {
+      best = { nodeId, keyword, score };
     }
   }
 
-  return null;
+  return best?.nodeId || null;
 }
 
 async function routeWithStandardProviderRouteFirst({
@@ -1111,13 +1162,8 @@ async function routeWithStandardProviderRouteFirst({
     };
   }
 
-  const requestedTopic = String(text || "").replace(/\s+/g, " ").trim().slice(0, 80);
-  const fallbackOutOfScopeText =
-    `Te ayudo con gusto, pero en ${knowledge?.clinica?.nombre || "PODOPIE"} solo atendemos temas de pies/podologia` +
-    `${requestedTopic ? ` (tu mensaje fue: "${requestedTopic}")` : ""}. ` +
-    `Si quieres, te cuento los servicios que si tenemos.`;
-  const fallbackText = detectOutOfScopeBusinessIntent(text)
-    ? fallbackOutOfScopeText
+  const fallbackText = evaluateDomainGate({ text, knowledge }).classification === "out_of_domain"
+    ? buildOutOfDomainResponseText({ text, knowledge })
     : "Entiendo tu consulta. Te ayudo con eso.";
 
   return {
@@ -1198,6 +1244,17 @@ async function routeWithAI({ text, flow, config, session }) {
   const history = getHistoryForAI(session?.data);
   const summary = getConversationSummary(session?.data);
   const previousQuestion = session?.data?.ai_pending?.question || null;
+  const domainGate = evaluateDomainGate({ text, knowledge });
+
+  logger.info("ai.domain_gate", {
+    flowId,
+    classification: domainGate.classification,
+    confidence: Number(domainGate.confidence || 0).toFixed(2),
+    reason: domainGate.reason || null,
+    phraseHits: Array.isArray(domainGate.phraseHits) ? domainGate.phraseHits.slice(0, 4) : [],
+    tokenHits: Array.isArray(domainGate.tokenHits) ? domainGate.tokenHits.slice(0, 4) : [],
+    unknownTokens: Array.isArray(domainGate.unknownTokens) ? domainGate.unknownTokens.slice(0, 4) : [],
+  });
 
   const deterministicDecision = buildDeterministicDecision({
     text,
@@ -1213,6 +1270,24 @@ async function routeWithAI({ text, flow, config, session }) {
       reason: deterministicDecision.reason || null,
     });
     return deterministicDecision;
+  }
+
+  if (domainGate.classification === "out_of_domain" && Number(domainGate.confidence || 0) >= 0.9) {
+    const decision = {
+      action: "respond",
+      text: buildOutOfDomainResponseText({ text, knowledge }),
+      reason: `domain_gate_pre_ai:${domainGate.reason || "no_allowlist_match"}`,
+      ai_used: false,
+      clear_pending: Boolean(previousQuestion),
+      reset_turns: false,
+    };
+    logger.info("ai.router_domain_gate_short_circuit", {
+      flowId,
+      action: decision.action,
+      reason: decision.reason,
+      confidence: domainGate.confidence,
+    });
+    return decision;
   }
 
   // If no API key, use fallback
@@ -1298,6 +1373,8 @@ async function routeWithAI({ text, flow, config, session }) {
   }
 
   let compactProviderModelBlocked = false;
+  let compactErrorInfo = null;
+  let compactResultState = "unknown";
   try {
     const compactDecision = await routeWithStandardProviderRouteFirst({
       text,
@@ -1315,9 +1392,12 @@ async function routeWithAI({ text, flow, config, session }) {
     if (compactDecision?.action) {
       return cacheAndReturn(compactDecision);
     }
+    compactResultState = "no_decision";
     logger.warn("ai.router_compact_no_decision", { flowId, provider, model });
   } catch (error) {
-    compactProviderModelBlocked = /model_permission_blocked_org|blocked at the organization level/i.test(String(error?.message || ""));
+    compactErrorInfo = classifyCompactRouterError(error);
+    compactProviderModelBlocked = Boolean(compactErrorInfo.modelBlocked);
+    compactResultState = "error";
     logger.warn("ai.router_compact_error", { flowId, provider, model, message: error.message });
   }
 
@@ -1333,6 +1413,41 @@ async function routeWithAI({ text, flow, config, session }) {
   // Full prompt fallback (kept for hard/edge cases)
   const system = buildSystemPrompt(knowledge, session, flow);
   const user = buildUserPrompt({ message: text, history, summary, previousQuestion });
+  const fullFallbackInputTokensEst = estimateTokensApproxFromText(system) + estimateTokensApproxFromText(user);
+  const fullFallbackPolicy = shouldAttemptFullFallback({
+    text,
+    previousQuestion,
+    summary,
+    domainGate,
+    compactResultState,
+    compactErrorInfo,
+    fullFallbackInputTokensEst,
+  });
+
+  if (!fullFallbackPolicy.allow) {
+    logger.warn("ai.router_full_fallback_governor_skip", {
+      flowId,
+      provider,
+      model,
+      reason: fullFallbackPolicy.reason,
+      compactResultState,
+      compactError: compactErrorInfo?.message || null,
+      fullFallbackInputTokensEst,
+      domainClassification: domainGate.classification,
+      domainConfidence: domainGate.confidence,
+    });
+    return cacheAndReturn(
+      buildLowCostRecoveryDecision({
+        text,
+        previousQuestion,
+        summary,
+        knowledge,
+        domainGate,
+        reason: `low_cost_recovery:${fullFallbackPolicy.reason}`,
+      })
+    );
+  }
+
   logger.info("ai.router_prompt_profile", {
     provider,
     model,
@@ -1340,6 +1455,7 @@ async function routeWithAI({ text, flow, config, session }) {
     strategy: "full_fallback",
     systemChars: system.length,
     userChars: user.length,
+    inputTokensEst: fullFallbackInputTokensEst,
   });
 
   try {
@@ -1442,15 +1558,10 @@ async function routeWithAI({ text, flow, config, session }) {
 
     // Avoid generic repeated out-of-scope node copy; answer conversationally instead.
     if (parsed.action === "out_of_scope") {
-      const requestedTopic = String(text || "").replace(/\s+/g, " ").trim().slice(0, 80);
-      const fallbackOutOfScopeText =
-        `Te ayudo con gusto, pero en ${knowledge?.clinica?.nombre || "PODOPIE"} solo atendemos temas de pies/podologia` +
-        `${requestedTopic ? ` (tu mensaje fue: "${requestedTopic}")` : ""}. ` +
-        `Si quieres, te cuento los servicios que si tenemos.`;
       parsed = {
         ...parsed,
         action: "respond",
-        text: String(parsed.text || "").trim() || fallbackOutOfScopeText,
+        text: String(parsed.text || "").trim() || buildOutOfDomainResponseText({ text, knowledge }),
       };
     }
 
@@ -1502,6 +1613,29 @@ async function routeWithAI({ text, flow, config, session }) {
   } catch (error) {
     logger.error("ai.router_error", { message: error.message, provider, model, flowId });
 
+    const fullFallbackErrorInfo = classifyCompactRouterError(error);
+    if (fullFallbackErrorInfo.budgetOrRateLimited || fullFallbackErrorInfo.timeoutOrTransient) {
+      logger.warn("ai.router_full_fallback_low_cost_recovery", {
+        flowId,
+        provider,
+        model,
+        reason: fullFallbackErrorInfo.budgetOrRateLimited ? "budget_or_rate_limit" : "timeout_or_transient",
+        message: fullFallbackErrorInfo.message,
+      });
+      return cacheAndReturn(
+        buildLowCostRecoveryDecision({
+          text,
+          previousQuestion,
+          summary,
+          knowledge,
+          domainGate,
+          reason: fullFallbackErrorInfo.budgetOrRateLimited
+            ? "low_cost_recovery:full_fallback_rate_limit"
+            : "low_cost_recovery:full_fallback_transient_error",
+        })
+      );
+    }
+
     // Fallback on error
     const fallbackRoute = fallbackKeywordRoute(text);
     if (fallbackRoute) {
@@ -1515,14 +1649,6 @@ async function routeWithAI({ text, flow, config, session }) {
 const ROUTER_DECISION_CACHE = new Map();
 const ROUTER_CACHE_TTL_MS = Number(process.env.AI_ROUTER_CACHE_TTL_MS || 10 * 60 * 1000);
 const ROUTER_CACHE_MAX_ENTRIES = Number(process.env.AI_ROUTER_CACHE_MAX_ENTRIES || 500);
-
-const OUT_OF_SCOPE_BUSINESS_WORDS = [
-  "peluqueria", "barberia", "barbero",
-  "reposteria", "pasteleria", "torta", "pastel",
-  "maquillaje", "cejas", "pestanas", "manicure", "unas de manos",
-  "pedicure estetico", "pedicura estetica", "spa facial", "facial", "depilacion",
-  "masaje", "masajes", "cabello", "corte de cabello", "coloracion",
-];
 
 function cloneAiDecision(decision) {
   if (!decision || typeof decision !== "object") return null;
@@ -1589,20 +1715,170 @@ function setRouterDecisionCache(cacheKey, decision) {
   });
 }
 
-function detectOutOfScopeBusinessIntent(text) {
-  const raw = String(text || "");
-  if (!raw.trim()) return null;
-  const normalized = normalizeText(raw).toLowerCase();
-  const hasPodiatryContext = PODIATRY_CONTEXT_WORDS.some((word) =>
-    normalized.includes(normalizeText(word).toLowerCase())
-  );
-  if (hasPodiatryContext) return null;
+function tokenizeDomainText(text) {
+  return normalizeText(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
 
-  for (const term of OUT_OF_SCOPE_BUSINESS_WORDS) {
-    const termNorm = normalizeText(term).toLowerCase();
-    if (normalized.includes(termNorm)) return termNorm;
+function addTermsToDomainLexicon(targetSet, sourceText) {
+  const normalized = normalizeText(sourceText || "").toLowerCase().trim();
+  if (!normalized) return;
+  targetSet.add(normalized);
+  for (const token of tokenizeDomainText(normalized)) {
+    if (token.length < 3) continue;
+    if (DOMAIN_NEUTRAL_WORDS.has(token)) continue;
+    targetSet.add(token);
   }
-  return null;
+}
+
+function getKnowledgeDomainLexicon(knowledge) {
+  if (!knowledge || typeof knowledge !== "object") {
+    return { terms: new Set(), serviceNames: [] };
+  }
+  if (KNOWLEDGE_DOMAIN_LEXICON_CACHE.has(knowledge)) {
+    return KNOWLEDGE_DOMAIN_LEXICON_CACHE.get(knowledge);
+  }
+
+  const terms = new Set();
+  const serviceNames = [];
+
+  for (const term of PODIATRY_CONTEXT_WORDS) addTermsToDomainLexicon(terms, term);
+  for (const term of DOMAIN_META_PHRASES) addTermsToDomainLexicon(terms, term);
+
+  addTermsToDomainLexicon(terms, knowledge?.clinica?.nombre);
+  addTermsToDomainLexicon(terms, knowledge?.clinica?.especialidad);
+
+  for (const svc of Object.values(knowledge?.servicios || {})) {
+    if (!svc) continue;
+    const name = String(svc.nombre || "").trim();
+    const desc = String(svc.descripcion || "").trim();
+    if (name) {
+      serviceNames.push(normalizeText(name).toLowerCase());
+      addTermsToDomainLexicon(terms, name);
+    }
+    if (desc) addTermsToDomainLexicon(terms, desc);
+  }
+
+  const result = { terms, serviceNames };
+  KNOWLEDGE_DOMAIN_LEXICON_CACHE.set(knowledge, result);
+  return result;
+}
+
+function evaluateDomainGate({ text, knowledge }) {
+  const raw = String(text || "").trim();
+  if (!raw) {
+    return { classification: "ambiguous", confidence: 0, normalized: "", reason: "empty" };
+  }
+
+  const normalized = normalizeText(raw).toLowerCase().replace(/\s+/g, " ").trim();
+  const tokens = [...new Set(tokenizeDomainText(normalized))];
+  const contentTokens = tokens.filter((token) => token.length >= 3 && !DOMAIN_NEUTRAL_WORDS.has(token));
+  const greetingOnly = contentTokens.length === 0;
+
+  const { terms: domainTerms, serviceNames } = getKnowledgeDomainLexicon(knowledge);
+
+  const phraseHits = [];
+  for (const phrase of DOMAIN_META_PHRASES) {
+    const p = normalizeText(phrase).toLowerCase();
+    if (p && normalized.includes(p)) phraseHits.push(p);
+  }
+  for (const phrase of PODIATRY_CONTEXT_WORDS) {
+    const p = normalizeText(phrase).toLowerCase();
+    if (p && normalized.includes(p)) phraseHits.push(p);
+  }
+  for (const serviceName of serviceNames) {
+    if (serviceName && normalized.includes(serviceName)) phraseHits.push(serviceName);
+  }
+
+  const uniquePhraseHits = [...new Set(phraseHits)];
+  const tokenHits = contentTokens.filter((token) => domainTerms.has(token));
+  const unknownTokens = contentTokens.filter((token) => !domainTerms.has(token));
+  const hasAmbiguousHealthSignal = DOMAIN_AMBIGUOUS_HEALTH_WORDS.some((w) =>
+    normalized.includes(normalizeText(w).toLowerCase())
+  );
+
+  if (greetingOnly) {
+    return {
+      classification: "ambiguous",
+      confidence: 0.15,
+      normalized,
+      phraseHits: uniquePhraseHits.slice(0, 5),
+      tokenHits: [],
+      unknownTokens: [],
+      reason: "neutral_greeting_or_smalltalk",
+    };
+  }
+
+  if (uniquePhraseHits.length || tokenHits.length) {
+    const signalScore = (uniquePhraseHits.length * 2) + tokenHits.length;
+    const confidence = Math.min(0.99, 0.55 + (signalScore * 0.1));
+    return {
+      classification: "in_domain",
+      confidence,
+      normalized,
+      phraseHits: uniquePhraseHits.slice(0, 8),
+      tokenHits: [...new Set(tokenHits)].slice(0, 8),
+      unknownTokens: [...new Set(unknownTokens)].slice(0, 8),
+      reason: "allowlist_domain_match",
+    };
+  }
+
+  if (hasAmbiguousHealthSignal) {
+    return {
+      classification: "ambiguous",
+      confidence: 0.45,
+      normalized,
+      phraseHits: [],
+      tokenHits: [],
+      unknownTokens: [...new Set(unknownTokens)].slice(0, 8),
+      reason: "generic_health_signal_without_foot_context",
+    };
+  }
+
+  const requestPattern = /\b(quiero|busco|necesito|hacen|ofrecen|servicio|servicios|tratamiento|tratamientos)\b/.test(normalized);
+  const hasRequestWithUnknownObject = requestPattern && unknownTokens.length >= 1;
+  const confidence =
+    hasRequestWithUnknownObject ? 0.92 :
+    contentTokens.length >= 4 ? 0.95 :
+    contentTokens.length === 3 ? 0.9 :
+    contentTokens.length === 2 ? (requestPattern ? 0.86 : 0.78) :
+    0.6;
+
+  if (contentTokens.length >= 2 || hasRequestWithUnknownObject) {
+    return {
+      classification: "out_of_domain",
+      confidence,
+      normalized,
+      phraseHits: [],
+      tokenHits: [],
+      unknownTokens: [...new Set(unknownTokens.length ? unknownTokens : contentTokens)].slice(0, 8),
+      reason: "no_allowlist_domain_signal",
+    };
+  }
+
+  return {
+    classification: "ambiguous",
+    confidence: 0.35,
+    normalized,
+    phraseHits: [],
+    tokenHits: [],
+    unknownTokens: [...new Set(contentTokens)].slice(0, 8),
+    reason: "low_information",
+  };
+}
+
+function buildOutOfDomainResponseText({ text, knowledge }) {
+  const clinicName = knowledge?.clinica?.nombre || "PODOPIE";
+  const requestedTopic = String(text || "").replace(/\s+/g, " ").trim().slice(0, 80);
+  return (
+    `Te ayudo con gusto, pero en ${clinicName} solo atendemos temas de pies/podologia` +
+    `${requestedTopic ? ` (tu mensaje fue: "${requestedTopic}")` : ""}. ` +
+    `Si quieres, te muestro los servicios que si tenemos.`
+  );
 }
 
 function buildDeterministicDecision({ text, previousQuestion, summary, knowledge }) {
@@ -1611,13 +1887,12 @@ function buildDeterministicDecision({ text, previousQuestion, summary, knowledge
   const normalized = normalizeText(raw).toLowerCase().trim();
   if (!normalized) return null;
 
-  const outOfScopeTerm = detectOutOfScopeBusinessIntent(raw);
-  if (outOfScopeTerm) {
-    const clinicName = knowledge?.clinica?.nombre || "PODOPIE";
+  const domainGate = evaluateDomainGate({ text: raw, knowledge });
+  if (domainGate.classification === "out_of_domain" && Number(domainGate.confidence || 0) >= 0.86) {
     return {
       action: "respond",
-      text: `Te ayudo con gusto, pero en ${clinicName} solo atendemos temas de pies/podologia. Si quieres, te muestro los servicios que si tenemos.`,
-      reason: `deterministic_out_of_scope:${outOfScopeTerm}`,
+      text: buildOutOfDomainResponseText({ text: raw, knowledge }),
+      reason: `domain_gate_out_of_scope:${domainGate.reason || "no_allowlist_match"}`,
       ai_used: false,
       clear_pending: Boolean(previousQuestion),
       reset_turns: false,
@@ -1651,6 +1926,138 @@ function buildDeterministicDecision({ text, previousQuestion, summary, knowledge
   }
 
   return null;
+}
+
+function estimateTokensApproxFromText(text) {
+  const str = String(text || "");
+  if (!str) return 0;
+  return Math.max(1, Math.ceil(str.length / 4));
+}
+
+function classifyCompactRouterError(error) {
+  const message = String(error?.message || error || "");
+  const lower = message.toLowerCase();
+  return {
+    message,
+    modelBlocked: /model_permission_blocked_org|blocked at the organization level/i.test(message),
+    budgetOrRateLimited:
+      error?.code === "AI_BUDGET_EXCEEDED" ||
+      /\b429\b/.test(lower) ||
+      lower.includes("rate limit") ||
+      lower.includes("quota") ||
+      lower.includes("too many requests"),
+    timeoutOrTransient:
+      lower.includes("timeout") ||
+      lower.includes("timed out") ||
+      lower.includes("network") ||
+      lower.includes("econnreset") ||
+      lower.includes("socket hang up") ||
+      /\b502\b|\b503\b|\b504\b/.test(lower),
+  };
+}
+
+function buildLowCostRecoveryDecision({ text, previousQuestion, summary, knowledge, domainGate, reason }) {
+  const fallbackRoute = fallbackKeywordRoute(text);
+  if (fallbackRoute) {
+    return {
+      action: "route",
+      route_id: fallbackRoute,
+      ai_used: false,
+      clear_pending: Boolean(previousQuestion),
+      reset_turns: true,
+      reason,
+    };
+  }
+
+  if (domainGate?.classification === "out_of_domain") {
+    return {
+      action: "respond",
+      text: buildOutOfDomainResponseText({ text, knowledge }),
+      ai_used: false,
+      clear_pending: Boolean(previousQuestion),
+      reset_turns: false,
+      reason,
+    };
+  }
+
+  if (Boolean(previousQuestion) || Number(summary?.clarificationsAsked || 0) > 0) {
+    return {
+      action: "show_services",
+      text: "Te muestro nuestras opciones para ayudarte mejor.",
+      ai_used: false,
+      clear_pending: Boolean(previousQuestion),
+      reset_turns: true,
+      reason,
+    };
+  }
+
+  if (domainGate?.classification === "ambiguous") {
+    return {
+      action: "clarify",
+      question: "¿Buscas precios, horarios o información de un tratamiento para pies?",
+      ai_used: false,
+      clear_pending: Boolean(previousQuestion),
+      reset_turns: false,
+      reason,
+    };
+  }
+
+  return {
+    action: "show_services",
+    text: "Te muestro nuestros servicios para que elijas lo que necesitas.",
+    ai_used: false,
+    clear_pending: Boolean(previousQuestion),
+    reset_turns: true,
+    reason,
+  };
+}
+
+function shouldAttemptFullFallback({
+  text,
+  previousQuestion,
+  summary,
+  domainGate,
+  compactResultState,
+  compactErrorInfo,
+  fullFallbackInputTokensEst,
+}) {
+  const enabled = String(process.env.AI_ROUTER_ENABLE_FULL_FALLBACK || "true").toLowerCase();
+  if (enabled === "0" || enabled === "false" || enabled === "off") {
+    return { allow: false, reason: "disabled_by_env" };
+  }
+
+  if (compactErrorInfo?.modelBlocked) {
+    return { allow: false, reason: "compact_model_blocked" };
+  }
+  if (compactErrorInfo?.budgetOrRateLimited) {
+    return { allow: false, reason: "compact_rate_or_budget_limited" };
+  }
+
+  const rawMaxInputTokens = process.env.AI_ROUTER_FULL_FALLBACK_MAX_INPUT_TOKENS;
+  const maxInputTokens =
+    rawMaxInputTokens == null || String(rawMaxInputTokens).trim() === ""
+      ? null
+      : Number(rawMaxInputTokens);
+  if (Number.isFinite(maxInputTokens) && maxInputTokens > 0 && fullFallbackInputTokensEst > maxInputTokens) {
+    // Keep the expensive fallback for true ambiguity only.
+    if (domainGate?.classification !== "ambiguous") {
+      return { allow: false, reason: "full_fallback_prompt_too_large" };
+    }
+  }
+
+  const tokenCount = normalizeText(text || "").trim().split(/\s+/).filter(Boolean).length;
+  const inClarifyFlow = Boolean(previousQuestion) || Number(summary?.clarificationsAsked || 0) > 0;
+
+  if (compactResultState === "no_decision") {
+    if (domainGate?.classification === "out_of_domain") {
+      return { allow: false, reason: "out_of_domain_skip_full_fallback" };
+    }
+    if (domainGate?.classification === "in_domain" && tokenCount <= 8 && !inClarifyFlow) {
+      return { allow: false, reason: "simple_in_domain_skip_full_fallback" };
+    }
+  }
+
+  return { allow: true, reason: "full_fallback_allowed" };
 }
 
 function buildCompactRouteUserPrompt({ message, summary, previousQuestion, session }) {

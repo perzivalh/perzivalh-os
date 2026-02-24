@@ -524,6 +524,11 @@ async function callRouteDecisionWithRetry({
     }
     return parsed;
   };
+  const traceBase = {
+    feature: "ai_router",
+    operation: "route_decision",
+    flowId,
+  };
 
   const raw = await callAiProvider(provider, {
     apiKey,
@@ -534,6 +539,7 @@ async function callRouteDecisionWithRetry({
     schema: ROUTER_DECISION_SCHEMA,
     temperature: 0,
     maxTokens: 180,
+    trace: { ...traceBase, stage: "route_decision_primary", attempt: 1 },
   });
   logger.info("ai.router_raw", { provider, model, length: raw?.length || 0 });
   let parsed = tryParse(raw, "route_primary");
@@ -550,6 +556,7 @@ async function callRouteDecisionWithRetry({
     schema: ROUTER_DECISION_SCHEMA,
     temperature: 0,
     maxTokens: 180,
+    trace: { ...traceBase, stage: "route_decision_retry", attempt: 2 },
   });
   parsed = tryParse(retryRaw, "route_retry");
   if (parsed?.action) return parsed;
@@ -564,6 +571,7 @@ async function callRouteDecisionWithRetry({
     schema: ROUTER_DECISION_SCHEMA,
     temperature: 0,
     maxTokens: 140,
+    trace: { ...traceBase, stage: "route_decision_repair", attempt: 3 },
   });
   parsed = tryParse(repairRaw, "route_repair");
   if (parsed?.action) return parsed;
@@ -688,6 +696,13 @@ async function routeWithCloudflareRouteFirst({
       user: copyPrompt.user,
       temperature: 0.2,
       maxTokens: parsed.action === "clarify" ? 80 : 180,
+      trace: {
+        feature: "ai_router",
+        operation: "copy",
+        stage: parsed.action === "clarify" ? "copy_clarify" : "copy_respond",
+        mode: "cloudflare_route_first",
+        flowId,
+      },
     });
   } catch (error) {
     logger.warn("ai.router_copy_error", { provider, model, message: error.message });
@@ -1066,6 +1081,13 @@ async function routeWithStandardProviderRouteFirst({
       user: copyPrompt.user,
       temperature: 0.2,
       maxTokens: parsed.action === "clarify" ? 80 : 180,
+      trace: {
+        feature: "ai_router",
+        operation: "copy",
+        stage: parsed.action === "clarify" ? "copy_clarify" : "copy_respond",
+        mode: "route_first_compact",
+        flowId,
+      },
     });
   } catch (error) {
     logger.warn("ai.router_copy_error", { provider, model, message: error.message, source: "route_first_compact" });
@@ -1272,6 +1294,7 @@ async function routeWithAI({ text, flow, config, session }) {
     }
   }
 
+  let compactProviderModelBlocked = false;
   try {
     const compactDecision = await routeWithStandardProviderRouteFirst({
       text,
@@ -1291,7 +1314,17 @@ async function routeWithAI({ text, flow, config, session }) {
     }
     logger.warn("ai.router_compact_no_decision", { flowId, provider, model });
   } catch (error) {
+    compactProviderModelBlocked = /model_permission_blocked_org|blocked at the organization level/i.test(String(error?.message || ""));
     logger.warn("ai.router_compact_error", { flowId, provider, model, message: error.message });
+  }
+
+  if (compactProviderModelBlocked) {
+    logger.warn("ai.router_model_blocked_skip_full_fallback", { flowId, provider, model });
+    const fallbackRoute = fallbackKeywordRoute(text);
+    if (fallbackRoute) {
+      return cacheAndReturn({ action: "route", route_id: fallbackRoute, ai_used: false });
+    }
+    return cacheAndReturn({ action: "show_services", ai_used: false });
   }
 
   // Full prompt fallback (kept for hard/edge cases)
@@ -1317,6 +1350,12 @@ async function routeWithAI({ text, flow, config, session }) {
       schema: ROUTER_SCHEMA,
       temperature: 0.3,
       maxTokens: 300,
+      trace: {
+        feature: "ai_router",
+        operation: "full_fallback",
+        stage: "full_fallback_primary",
+        flowId,
+      },
     });
 
     logger.info("ai.router_raw", { provider, model, length: raw?.length || 0 });
@@ -1353,6 +1392,13 @@ async function routeWithAI({ text, flow, config, session }) {
         schema: ROUTER_SCHEMA,
         temperature: 0,
         maxTokens: 300,
+        trace: {
+          feature: "ai_router",
+          operation: "full_fallback",
+          stage: "full_fallback_retry",
+          attempt: 2,
+          flowId,
+        },
       });
 
       parsed = parseRouterResponse(retryRaw);

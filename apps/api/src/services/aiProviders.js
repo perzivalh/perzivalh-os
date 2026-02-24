@@ -3,11 +3,53 @@ const fs = require("fs/promises");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const logger = require("../lib/logger");
 
 const OPENAI_ENDPOINT = "https://api.openai.com/v1/responses";
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
 const CLOUDFLARE_AI_BASE = "https://api.cloudflare.com/client/v4/accounts";
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
+
+function estimateTokenCount(text) {
+  const str = String(text || "");
+  if (!str) return 0;
+  // Rough estimate for Spanish/English prompts; enough for observability and TPM budgeting.
+  return Math.max(1, Math.ceil(str.length / 4));
+}
+
+function sanitizeTrace(trace) {
+  if (!trace || typeof trace !== "object") return {};
+  const allowed = [
+    "feature",
+    "stage",
+    "mode",
+    "flowId",
+    "operation",
+    "attempt",
+    "providerFallbackFrom",
+    "providerFallbackTo",
+    "tenantId",
+  ];
+  const out = {};
+  for (const key of allowed) {
+    if (trace[key] !== undefined) out[key] = trace[key];
+  }
+  return out;
+}
+
+function logProviderUsage({ provider, model, usage, trace, rawUsage }) {
+  if (!usage || typeof usage !== "object") return;
+  logger.info("ai.provider_usage", {
+    provider,
+    model,
+    ...sanitizeTrace(trace),
+    prompt_tokens: usage.prompt_tokens ?? null,
+    completion_tokens: usage.completion_tokens ?? null,
+    total_tokens: usage.total_tokens ?? null,
+    cached_tokens: usage.cached_tokens ?? null,
+    rawUsage: rawUsage && typeof rawUsage === "object" ? rawUsage : undefined,
+  });
+}
 
 function extractOpenAIText(data) {
   if (!data) return "";
@@ -167,7 +209,7 @@ function extractCloudflareText(data) {
   return "";
 }
 
-async function callOpenAI({ apiKey, model, system, user, schema, temperature = 0, maxTokens = 220 }) {
+async function callOpenAI({ apiKey, model, system, user, schema, temperature = 0, maxTokens = 220, trace }) {
   const payload = {
     model,
     input: [
@@ -183,10 +225,26 @@ async function callOpenAI({ apiKey, model, system, user, schema, temperature = 0
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     timeout: 20000,
   });
+  const usage = response.data?.usage || {};
+  logProviderUsage({
+    provider: "openai",
+    model,
+    trace,
+    rawUsage: usage,
+    usage: {
+      prompt_tokens: usage.input_tokens,
+      completion_tokens: usage.output_tokens,
+      total_tokens: usage.total_tokens,
+      cached_tokens:
+        usage.input_tokens_details?.cached_tokens ??
+        usage.cache_read_input_tokens ??
+        null,
+    },
+  });
   return extractOpenAIText(response.data);
 }
 
-async function callGemini({ apiKey, model, system, user, schema, temperature = 0, maxTokens = 220 }) {
+async function callGemini({ apiKey, model, system, user, schema, temperature = 0, maxTokens = 220, trace }) {
   console.log("=".repeat(60));
   console.log("[GEMINI] Starting call");
   console.log("[GEMINI] API Key prefix:", apiKey ? apiKey.substring(0, 12) + "..." : "MISSING");
@@ -240,6 +298,34 @@ async function callGemini({ apiKey, model, system, user, schema, temperature = 0
       });
 
       console.log("[GEMINI] SUCCESS with model:", candidate);
+      const usageMetadata = response.data?.usageMetadata || null;
+      logProviderUsage({
+        provider: "gemini",
+        model: candidate,
+        trace,
+        rawUsage: usageMetadata || undefined,
+        usage: usageMetadata
+          ? {
+              prompt_tokens:
+                usageMetadata.promptTokenCount ??
+                usageMetadata.prompt_token_count ??
+                null,
+              completion_tokens:
+                usageMetadata.candidatesTokenCount ??
+                usageMetadata.candidates_token_count ??
+                usageMetadata.outputTokenCount ??
+                null,
+              total_tokens:
+                usageMetadata.totalTokenCount ??
+                usageMetadata.total_token_count ??
+                null,
+              cached_tokens:
+                usageMetadata.cachedContentTokenCount ??
+                usageMetadata.cacheTokensDetails?.totalCachedTokens ??
+                null,
+            }
+          : null,
+      });
       const resultText = extractGeminiText(response.data);
       console.log("[GEMINI] Response length:", resultText.length);
       console.log("[GEMINI] Preview:", resultText.substring(0, 150));
@@ -260,7 +346,7 @@ async function callGemini({ apiKey, model, system, user, schema, temperature = 0
   throw new Error(`Gemini request failed${status ? ` (${status})` : ""}${detail ? `: ${detail}` : ""}`);
 }
 
-async function callCloudflare({ apiKey, accountId, model, system, user, temperature = 0, maxTokens = 220 }) {
+async function callCloudflare({ apiKey, accountId, model, system, user, temperature = 0, maxTokens = 220, trace }) {
   console.log("=".repeat(60));
   console.log("[CLOUDFLARE-AI] Starting call");
   console.log("[CLOUDFLARE-AI] Account:", accountId || "MISSING");
@@ -342,6 +428,25 @@ async function callCloudflare({ apiKey, accountId, model, system, user, temperat
     }
 
     const text = extractCloudflareText(response.data);
+    const cfUsage =
+      response.data?.usage ||
+      response.data?.result?.usage ||
+      response.data?.result?.metrics ||
+      null;
+    if (cfUsage) {
+      logProviderUsage({
+        provider: "cloudflare",
+        model,
+        trace,
+        rawUsage: cfUsage,
+        usage: {
+          prompt_tokens: cfUsage.prompt_tokens ?? cfUsage.input_tokens ?? cfUsage.inputTokens ?? null,
+          completion_tokens: cfUsage.completion_tokens ?? cfUsage.output_tokens ?? cfUsage.outputTokens ?? null,
+          total_tokens: cfUsage.total_tokens ?? cfUsage.totalTokens ?? null,
+          cached_tokens: cfUsage.cached_tokens ?? cfUsage.cachedTokens ?? null,
+        },
+      });
+    }
     const compactPreview = String(text || "").replace(/\s+/g, " ").trim().slice(0, 220);
     console.log("[CLOUDFLARE-AI] Response length:", text.length);
     console.log("[CLOUDFLARE-AI] Preview:", text.substring(0, 150));
@@ -366,7 +471,7 @@ async function callCloudflare({ apiKey, accountId, model, system, user, temperat
   }
 }
 
-async function callGroq({ apiKey, model, system, user, temperature = 0, maxTokens = 220 }) {
+async function callGroq({ apiKey, model, system, user, temperature = 0, maxTokens = 220, trace }) {
   console.log("=".repeat(60));
   console.log("[GROQ] Starting call");
   console.log("[GROQ] Model:", model || "MISSING");
@@ -392,6 +497,24 @@ async function callGroq({ apiKey, model, system, user, temperature = 0, maxToken
       timeout: 20000,
     });
 
+    const usage = response.data?.usage || null;
+    if (usage) {
+      logProviderUsage({
+        provider: "groq",
+        model: payload.model,
+        trace,
+        rawUsage: usage,
+        usage: {
+          prompt_tokens: usage.prompt_tokens,
+          completion_tokens: usage.completion_tokens,
+          total_tokens: usage.total_tokens,
+          cached_tokens:
+            usage.prompt_tokens_details?.cached_tokens ??
+            usage.cached_tokens ??
+            null,
+        },
+      });
+    }
     const text = response.data?.choices?.[0]?.message?.content || "";
     console.log("[GROQ] SUCCESS");
     console.log("[GROQ] Response length:", text.length);
@@ -413,22 +536,72 @@ async function callGroq({ apiKey, model, system, user, temperature = 0, maxToken
 
 async function callAiProvider(provider, options) {
   console.log("[AI] Provider:", provider, "| Model:", options.model, "| Has key:", !!options.apiKey);
-  if (provider === "gemini") {
-    return callGemini(options);
-  }
-  if (provider === "cloudflare" || provider === "cloudflare-workers-ai" || provider === "workers-ai") {
-    return callCloudflare({
-      ...options,
-      accountId:
-        options.accountId ||
-        options.cloudflareAccountId ||
-        process.env.CLOUDFLARE_ACCOUNT_ID,
+  const normalizedProvider = String(provider || "").toLowerCase();
+  const model = options?.model || null;
+  const trace = sanitizeTrace(options?.trace);
+  const startedAt = Date.now();
+  const systemChars = String(options?.system || "").length;
+  const userChars = String(options?.user || "").length;
+  const systemTokensEst = estimateTokenCount(options?.system || "");
+  const userTokensEst = estimateTokenCount(options?.user || "");
+
+  logger.info("ai.provider_request", {
+    provider: normalizedProvider || "openai",
+    model,
+    ...trace,
+    maxTokens: options?.maxTokens ?? null,
+    temperature: options?.temperature ?? null,
+    hasSchema: Boolean(options?.schema),
+    systemChars,
+    userChars,
+    inputTokensEst: systemTokensEst + userTokensEst,
+    systemTokensEst,
+    userTokensEst,
+  });
+
+  try {
+    let text = "";
+    if (normalizedProvider === "gemini") {
+      text = await callGemini(options);
+    } else if (
+      normalizedProvider === "cloudflare" ||
+      normalizedProvider === "cloudflare-workers-ai" ||
+      normalizedProvider === "workers-ai"
+    ) {
+      text = await callCloudflare({
+        ...options,
+        accountId:
+          options.accountId ||
+          options.cloudflareAccountId ||
+          process.env.CLOUDFLARE_ACCOUNT_ID,
+      });
+    } else if (normalizedProvider === "groq") {
+      text = await callGroq(options);
+    } else {
+      text = await callOpenAI(options);
+    }
+
+    const outputChars = String(text || "").length;
+    const outputTokensEst = estimateTokenCount(text || "");
+    logger.info("ai.provider_result", {
+      provider: normalizedProvider || "openai",
+      model,
+      ...trace,
+      durationMs: Date.now() - startedAt,
+      outputChars,
+      outputTokensEst,
     });
+    return text;
+  } catch (error) {
+    logger.warn("ai.provider_error", {
+      provider: normalizedProvider || "openai",
+      model,
+      ...trace,
+      durationMs: Date.now() - startedAt,
+      message: error?.message || String(error),
+    });
+    throw error;
   }
-  if (provider === "groq") {
-    return callGroq(options);
-  }
-  return callOpenAI(options);
 }
 
 // ----------------------------------------------------------------------------

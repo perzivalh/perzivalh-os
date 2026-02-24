@@ -117,40 +117,109 @@ function detectUrgency(text) {
  */
 function buildSystemPrompt(knowledge, session, flow) {
   const kb = knowledge || {};
-  const nombre = kb.personalidad?.nombre || "PODITO";
-  const clinica = kb.clinica?.nombre || "PODOPIE";
-  const ciudad = kb.clinica?.ciudad || "Santa Cruz, Bolivia";
+  const personalidad = kb.personalidad || {};
+  const clinica = kb.clinica || {};
+  const servicios = kb.servicios || {};
+  const ubicaciones = kb.ubicaciones || {};
+  const nombre = personalidad.nombre || "PODITO";
+  const clinicaNombre = clinica.nombre || "PODOPIE";
+  const ciudad = clinica.ciudad || "Santa Cruz, Bolivia";
+
+  // Resume core business data so the model can personalize without sending the full KB.
+  const serviciosList = Object.values(servicios)
+    .slice(0, 16)
+    .map((svc) => {
+      const serviceName = String(svc?.nombre || "").trim();
+      const serviceDesc = String(svc?.descripcion || "").replace(/\s+/g, " ").trim();
+      if (!serviceName) return null;
+      return `- ${serviceName}${serviceDesc ? `: ${serviceDesc.slice(0, 90)}` : ""}`;
+    })
+    .filter(Boolean)
+    .join("\n");
+
+  const ubicacionesList = Object.values(ubicaciones)
+    .slice(0, 8)
+    .map((loc) => {
+      const locName = String(loc?.nombre || "").trim();
+      const locHours = String(loc?.horario || "").replace(/\s+/g, " ").trim();
+      if (!locName) return null;
+      return `- ${locName}${locHours ? `: ${locHours.slice(0, 90)}` : ""}`;
+    })
+    .filter(Boolean)
+    .join("\n");
 
   const nodeCatalog = flow ? buildRoutingNodeCatalog(flow) : `MAIN_MENU, SERVICIOS_MENU, HORARIOS_INFO, PRECIOS_INFO, CONTACT_METHOD, UNERO_TIPO_TRAT, HONGOS_TIPO_TRAT, SVC_PEDICURE_INFO, SVC_PODOPEDIATRIA_INFO, SVC_PODOGERIATRIA_INFO, OTR_PIE_DIABETICO_INFO, OTR_CALLOSIDAD_INFO, OTR_HELOMA_INFO, OTR_VERRUGA_PLANTAR_INFO, OTR_EXTRACCION_UNA_INFO, OTR_PIE_ATLETA_INFO, OTROS_MENU`;
 
-  return `Eres ${nombre}, router de ${clinica} (podología, ${ciudad}). SOLO pies.
-Responde SOLO JSON: {"action":"...","route_id":"...","question":"","reason":""}
+  return `# ${nombre} - Asistente Virtual de ${clinicaNombre}
 
-REGLA PRINCIPAL: Si existe un nodo para el tema → SIEMPRE usa action="route". NUNCA uses "respond" cuando hay un nodo disponible.
+## Tu Identidad
+Eres ${nombre} ${personalidad.emoji || "??"}, el asistente virtual de ${clinicaNombre}, una clinica de podologia en ${ciudad}.
 
-ACCIONES:
-route → USAR cuando hay nodo disponible (requiere route_id exacto del catálogo)
-respond → SOLO saludos puros sin solicitud ("hola", "buenos días")
-handoff → dolor intenso, urgencia, sangrado, pus, infección, úlcera
-show_services → no sabe qué quiere
-out_of_scope → tema no es podología de pies
-clarify → falta dato clave (solo 1 vez)
+## Tu Personalidad
+- Tono: ${personalidad.tono || "amable, calido, profesional"}
+- Idioma: ${personalidad.idioma || "espanol boliviano casual"}
+- Emojis moderados: ${(personalidad.emojis_frecuentes || ["??", "?"]).slice(0, 4).join(" ")}
+- Maximo ${personalidad.maximo_oraciones || 2} oraciones por respuesta conversacional
+- Se conversacional, NO robotico
 
-RUTAS DIRECTAS (prioridad alta):
-precio/costo/cuánto/tarifa → PRECIOS_INFO
-servicio/tratamiento/qué ofrecen/qué tienen → SERVICIOS_MENU
-horario/ubicación/dónde/sucursal/dirección/cómo llegar → HORARIOS_INFO
-asesor/humano/llamar/contacto/atención personal → CONTACT_METHOD
-uñero/uña encarnada → UNERO_TIPO_TRAT
-hongo/onicomicosis → HONGOS_TIPO_TRAT
-pedicure/pedicura → SVC_PEDICURE_INFO
-pie de atleta → OTR_PIE_ATLETA_INFO
-callo/callosidad → OTR_CALLOSIDAD_INFO
-verruga → OTR_VERRUGA_PLANTAR_INFO
-diabetes/pie diabético → OTR_PIE_DIABETICO_INFO
+## Importante
+- ${clinica.especialidad || "SOLO trabajamos con pies"}
+- NO hacemos: ${(clinica.no_hacemos || ["manos", "manicure"]).join(", ")}
 
-NODOS DISPONIBLES:
-${nodeCatalog}`;
+## Servicios Disponibles (resumen)
+${serviciosList || "- Consultar en menu"}
+
+## Ubicaciones y Horarios (resumen)
+${ubicacionesList || "- Consultar disponibilidad"}
+
+## Como Responder (JSON)
+{
+  "action": "respond|route|handoff|clarify|show_services|menu|out_of_scope",
+  "text": "Respuesta conversacional",
+  "route_id": "NODO_ID (solo si action=route)",
+  "question": "Pregunta (solo si action=clarify)",
+  "reason": "Por que tomaste esta decision"
+}
+
+## Acciones
+- route: usar cuando hay nodo claro (route_id exacto)
+- respond: respuesta conversacional (saludos o fuera de rubro)
+- handoff: urgencias o sintomas graves
+- clarify: falta dato clave (max 1 vez)
+- show_services: usuario no sabe que necesita
+- out_of_scope: permitido, pero si lo usas incluye text personalizado
+
+## Reglas de Decision (prioridad)
+1. Si existe un nodo claro para el tema podologico -> route con route_id exacto.
+2. Si saluda -> respond con saludo corto y pregunta como ayudar.
+3. Si hay dolor intenso/urgencia/sangrado/pus/infeccion/ulcera -> handoff.
+4. Si pide precios/costos/tarifas -> route PRECIOS_INFO.
+5. Si pide horarios/ubicacion/sucursal/direccion -> route HORARIOS_INFO.
+6. Si pide contacto/asesor/humano -> route CONTACT_METHOD (o handoff si hay urgencia).
+7. Si no sabe que servicio necesita -> show_services.
+8. Si el tema NO es de pies/podologia (ej: peluqueria, reposteria, barberia, maquillaje, manos) -> respond con text personalizado mencionando lo que pidio y aclarando que solo atienden pies. No repitas el mismo mensaje generico.
+9. Usa clarify solo si falta dato clave y como maximo una vez.
+10. NUNCA repitas la misma pregunta de clarificacion.
+
+## Rutas Directas (prioridad alta)
+- precio/costo/cuanto/tarifa -> PRECIOS_INFO
+- servicio/tratamiento/que ofrecen/que tienen -> SERVICIOS_MENU (solo si sigue siendo podologia)
+- horario/ubicacion/donde/sucursal/direccion/como llegar -> HORARIOS_INFO
+- asesor/humano/llamar/contacto/atencion personal -> CONTACT_METHOD
+- unero/una encarnada -> UNERO_TIPO_TRAT
+- hongo/onicomicosis -> HONGOS_TIPO_TRAT
+- pedicure/pedicura -> SVC_PEDICURE_INFO
+- pie de atleta -> OTR_PIE_ATLETA_INFO
+- callo/callosidad -> OTR_CALLOSIDAD_INFO
+- verruga -> OTR_VERRUGA_PLANTAR_INFO
+- diabetes/pie diabetico -> OTR_PIE_DIABETICO_INFO
+
+## Nodos Disponibles para Routing
+${nodeCatalog}
+
+## Importante Final
+- Cuando action sea respond/clarify/out_of_scope, incluye text o question util y personalizado.
+- Cuando route a precio/horario/servicios, no inventes datos: usa el nodo del flujo.`;
 }
 
 /**
@@ -398,7 +467,7 @@ Campos opcionales: route_id, question, reason.
 Si action=clarify incluye question.`;
 }
 
-function buildCloudflareCopyPrompt({ knowledge, action, userText }) {
+function buildCloudflareCopyPrompt({ knowledge, action, userText, kbSnippet = "" }) {
   const personalidad = knowledge?.personalidad || {};
   const clinica = knowledge?.clinica || {};
   const tone = personalidad.tono || "amable, calido y profesional";
@@ -406,6 +475,7 @@ function buildCloudflareCopyPrompt({ knowledge, action, userText }) {
     ? personalidad.emojis_frecuentes.slice(0, 2).join(" ")
     : "🦶";
   const onlyFeet = clinica.especialidad || "solo atendemos temas de pies/podologia";
+  const snippetSuffix = kbSnippet ? `\nContexto relevante:\n${kbSnippet}` : "";
 
   if (action === "clarify") {
     return {
@@ -415,7 +485,7 @@ function buildCloudflareCopyPrompt({ knowledge, action, userText }) {
   }
 
   return {
-    system: `Eres un asistente de ${clinica.nombre || "PODOPIE"}. Tono ${tone}. Maximo 2 oraciones. No inventes horarios, direcciones ni precios. Si el tema no es podologia, aclara que ${onlyFeet}. Puedes usar ${emoji}.`,
+    system: `Eres un asistente de ${clinica.nombre || "PODOPIE"}. Tono ${tone}. Maximo 2 oraciones. No inventes horarios, direcciones ni precios. Si el tema no es podologia, aclara que ${onlyFeet} y menciona brevemente el rubro/servicio pedido por el usuario para personalizar la respuesta. Puedes usar ${emoji}.${snippetSuffix}`,
     user: `Responde al usuario de forma breve y util.\nMensaje del usuario: "${userText}"\nDevuelve solo el texto final, sin JSON ni markdown.`,
   };
 }
@@ -523,11 +593,11 @@ async function routeWithCloudflareRouteFirst({
     previousQuestion,
     summary,
   });
-  const routeUser = buildUserPrompt({
+  const routeUser = buildCompactRouteUserPrompt({
     message: text,
-    history: getHistoryForAI(session?.data),
     summary,
     previousQuestion,
+    session,
   });
 
   let parsed = await callRouteDecisionWithRetry({
@@ -554,6 +624,11 @@ async function routeWithCloudflareRouteFirst({
   // If clarify was already used, downgrade to show_services.
   if (parsed.action === "clarify" && (previousQuestion || summary?.clarificationsAsked >= 1)) {
     parsed = { action: "show_services", reason: "clarify_limit" };
+  }
+
+  // Prefer conversational copy for out-of-scope so the answer can be personalized.
+  if (parsed.action === "out_of_scope") {
+    parsed = { ...parsed, action: "respond" };
   }
 
   // If model returned respond/show_services without a specific route, augment with keyword routing.
@@ -591,10 +666,16 @@ async function routeWithCloudflareRouteFirst({
   }
 
   // Generate text ONLY when the final action is conversational.
+  const kbSnippet = buildKnowledgeSnippetForCopy({
+    knowledge,
+    text,
+    routeId: parsed.route_id,
+  });
   const copyPrompt = buildCloudflareCopyPrompt({
     knowledge,
     action: parsed.action,
     userText: text,
+    kbSnippet,
   });
 
   let copyRaw = "";
@@ -857,6 +938,175 @@ function fallbackKeywordRoute(text) {
   return null;
 }
 
+async function routeWithStandardProviderRouteFirst({
+  text,
+  flow,
+  session,
+  knowledge,
+  provider,
+  model,
+  apiKey,
+  accountId,
+  flowId,
+  summary,
+  previousQuestion,
+}) {
+  logger.info("ai.router_mode", { provider, model, mode: "route_first_compact", flowId });
+
+  const routeSystem = buildCloudflareRouteSystemPrompt({
+    knowledge,
+    flow,
+    previousQuestion,
+    summary,
+  });
+  const routeUser = buildCompactRouteUserPrompt({
+    message: text,
+    summary,
+    previousQuestion,
+    session,
+  });
+
+  logger.info("ai.router_prompt_profile", {
+    provider,
+    model,
+    flowId,
+    strategy: "route_first_compact",
+    routeSystemChars: routeSystem.length,
+    routeUserChars: routeUser.length,
+  });
+
+  let parsed = await callRouteDecisionWithRetry({
+    provider,
+    apiKey,
+    model,
+    accountId,
+    system: routeSystem,
+    user: routeUser,
+    flowId,
+  });
+
+  if (!parsed?.action) return null;
+
+  parsed.action = normalizeRouterAction(parsed.action);
+
+  if (parsed.action === "respond" && parsed.route_id) {
+    parsed.action = "route";
+  }
+
+  if (parsed.action === "clarify" && (previousQuestion || summary?.clarificationsAsked >= 1)) {
+    parsed = { action: "show_services", reason: "clarify_limit" };
+  }
+
+  if (parsed.action === "out_of_scope") {
+    parsed = { ...parsed, action: "respond" };
+  }
+
+  if (!parsed.route_id && (parsed.action === "respond" || parsed.action === "show_services" || parsed.action === "clarify")) {
+    const inferredRoute = fallbackKeywordRoute(text);
+    if (inferredRoute) {
+      logger.info("ai.router_keyword_augmented", {
+        provider,
+        model,
+        originalAction: parsed.action,
+        inferredRoute,
+        stage: "route_first_compact",
+      });
+      parsed = { action: "route", route_id: inferredRoute, reason: "keyword_augmented" };
+    }
+  }
+
+  if (["route", "show_services", "handoff", "menu", "services"].includes(parsed.action)) {
+    logger.info("ai.router_decision", {
+      provider,
+      model,
+      action: parsed.action,
+      route_id: parsed.route_id || null,
+      reason: parsed.reason || null,
+      source: "route_first_compact_model",
+    });
+    return {
+      ...parsed,
+      action: normalizeRouterAction(parsed.action),
+      text: "",
+      ai_used: true,
+      clear_pending: Boolean(previousQuestion),
+      reset_turns: parsed.action === "route" || parsed.action === "show_services" || parsed.action === "menu",
+    };
+  }
+
+  const kbSnippet = buildKnowledgeSnippetForCopy({
+    knowledge,
+    text,
+    routeId: parsed.route_id,
+  });
+  const copyPrompt = buildCloudflareCopyPrompt({
+    knowledge,
+    action: parsed.action,
+    userText: text,
+    kbSnippet,
+  });
+
+  logger.info("ai.router_prompt_profile", {
+    provider,
+    model,
+    flowId,
+    strategy: "copy_rich",
+    copySystemChars: copyPrompt.system.length,
+    copyUserChars: copyPrompt.user.length,
+    kbSnippetChars: kbSnippet.length,
+  });
+
+  let copyRaw = "";
+  try {
+    copyRaw = await callAiProvider(provider, {
+      apiKey,
+      model,
+      accountId,
+      system: copyPrompt.system,
+      user: copyPrompt.user,
+      temperature: 0.2,
+      maxTokens: parsed.action === "clarify" ? 80 : 180,
+    });
+  } catch (error) {
+    logger.warn("ai.router_copy_error", { provider, model, message: error.message, source: "route_first_compact" });
+  }
+
+  const cleanedCopy = String(copyRaw || "")
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/^\s*#+\s*/gm, "")
+    .trim();
+
+  if (parsed.action === "clarify") {
+    const question = parsed.question || cleanedCopy || "¿Podrías contarme un poco más para ayudarte mejor?";
+    return {
+      action: "clarify",
+      question,
+      reason: parsed.reason || null,
+      ai_used: true,
+      clear_pending: Boolean(previousQuestion),
+      reset_turns: false,
+    };
+  }
+
+  const requestedTopic = String(text || "").replace(/\s+/g, " ").trim().slice(0, 80);
+  const fallbackOutOfScopeText =
+    `Te ayudo con gusto, pero en ${knowledge?.clinica?.nombre || "PODOPIE"} solo atendemos temas de pies/podologia` +
+    `${requestedTopic ? ` (tu mensaje fue: "${requestedTopic}")` : ""}. ` +
+    `Si quieres, te cuento los servicios que si tenemos.`;
+  const fallbackText = detectOutOfScopeBusinessIntent(text)
+    ? fallbackOutOfScopeText
+    : "Entiendo tu consulta. Te ayudo con eso.";
+
+  return {
+    action: "respond",
+    text: cleanedCopy || fallbackText,
+    reason: parsed.reason || null,
+    ai_used: true,
+    clear_pending: Boolean(previousQuestion),
+    reset_turns: false,
+  };
+}
+
 /**
  * Main AI routing function - AI-First Architecture
  */
@@ -924,6 +1174,22 @@ async function routeWithAI({ text, flow, config, session }) {
   const summary = getConversationSummary(session?.data);
   const previousQuestion = session?.data?.ai_pending?.question || null;
 
+  const deterministicDecision = buildDeterministicDecision({
+    text,
+    previousQuestion,
+    summary,
+    knowledge,
+  });
+  if (deterministicDecision?.action) {
+    logger.info("ai.router_deterministic", {
+      flowId,
+      action: deterministicDecision.action,
+      route_id: deterministicDecision.route_id || null,
+      reason: deterministicDecision.reason || null,
+    });
+    return deterministicDecision;
+  }
+
   // If no API key, use fallback
   if (!apiKey) {
     logger.warn("ai.router_no_key", { provider, flowId });
@@ -933,10 +1199,6 @@ async function routeWithAI({ text, flow, config, session }) {
     }
     return { action: "show_services", ai_used: false };
   }
-
-  // Build prompts
-  const system = buildSystemPrompt(knowledge, session, flow);
-  const user = buildUserPrompt({ message: text, history, summary, previousQuestion });
 
   // Only use saved model if it's compatible with the current provider.
   // Cloudflare models start with "@cf/" — don't use them for other providers.
@@ -955,6 +1217,27 @@ async function routeWithAI({ text, flow, config, session }) {
         : undefined,
   });
 
+  const cacheKey = buildRouterCacheKey({
+    flowId,
+    provider,
+    model,
+    text,
+    summary,
+    previousQuestion,
+    session,
+  });
+  const cachedDecision = getRouterDecisionFromCache(cacheKey);
+  if (cachedDecision?.action) {
+    return cachedDecision;
+  }
+
+  const cacheAndReturn = (decision) => {
+    if (decision?.action) {
+      setRouterDecisionCache(cacheKey, decision);
+    }
+    return decision;
+  };
+
   if (isCloudflareProvider(provider)) {
     try {
       const cloudflareDecision = await routeWithCloudflareRouteFirst({
@@ -971,23 +1254,57 @@ async function routeWithAI({ text, flow, config, session }) {
         previousQuestion,
       });
       if (cloudflareDecision?.action) {
-        return cloudflareDecision;
+        return cacheAndReturn(cloudflareDecision);
       }
       logger.warn("ai.router_cloudflare_no_decision", { flowId, model });
-      return {
+      return cacheAndReturn({
         action: "respond",
         text: "Puedo ayudarte con temas de pies y podología. Si quieres, dime si buscas información de un servicio, horarios, precios o atención con un asesor.",
         ai_used: false,
-      };
+      });
     } catch (error) {
       logger.error("ai.router_error", { message: error.message, provider, model, flowId });
-      return {
+      return cacheAndReturn({
         action: "respond",
         text: "Tuve un problema procesando tu mensaje, pero puedo ayudarte con temas de pies. Si quieres, dime el servicio que buscas o si prefieres hablar con un asesor.",
         ai_used: false,
-      };
+      });
     }
   }
+
+  try {
+    const compactDecision = await routeWithStandardProviderRouteFirst({
+      text,
+      flow,
+      session,
+      knowledge,
+      provider,
+      model,
+      apiKey,
+      accountId: cloudflareAccountId,
+      flowId,
+      summary,
+      previousQuestion,
+    });
+    if (compactDecision?.action) {
+      return cacheAndReturn(compactDecision);
+    }
+    logger.warn("ai.router_compact_no_decision", { flowId, provider, model });
+  } catch (error) {
+    logger.warn("ai.router_compact_error", { flowId, provider, model, message: error.message });
+  }
+
+  // Full prompt fallback (kept for hard/edge cases)
+  const system = buildSystemPrompt(knowledge, session, flow);
+  const user = buildUserPrompt({ message: text, history, summary, previousQuestion });
+  logger.info("ai.router_prompt_profile", {
+    provider,
+    model,
+    flowId,
+    strategy: "full_fallback",
+    systemChars: system.length,
+    userChars: user.length,
+  });
 
   try {
     // Call AI
@@ -1063,15 +1380,29 @@ async function routeWithAI({ text, flow, config, session }) {
       logger.warn("ai.router_fallback", { flowId });
       const fallbackRoute = fallbackKeywordRoute(text);
       if (fallbackRoute) {
-        return { action: "route", route_id: fallbackRoute, ai_used: false };
+        return cacheAndReturn({ action: "route", route_id: fallbackRoute, ai_used: false });
       }
-      return { action: "show_services", ai_used: false };
+      return cacheAndReturn({ action: "show_services", ai_used: false });
     }
 
     // Handle clarify limit
     if (parsed.action === "clarify" && (previousQuestion || summary.clarificationsAsked >= 1)) {
       logger.info("ai.router_clarify_blocked", { flowId });
-      return { action: "show_services", text: "Te muestro nuestras opciones:", ai_used: true };
+      return cacheAndReturn({ action: "show_services", text: "Te muestro nuestras opciones:", ai_used: true });
+    }
+
+    // Avoid generic repeated out-of-scope node copy; answer conversationally instead.
+    if (parsed.action === "out_of_scope") {
+      const requestedTopic = String(text || "").replace(/\s+/g, " ").trim().slice(0, 80);
+      const fallbackOutOfScopeText =
+        `Te ayudo con gusto, pero en ${knowledge?.clinica?.nombre || "PODOPIE"} solo atendemos temas de pies/podologia` +
+        `${requestedTopic ? ` (tu mensaje fue: "${requestedTopic}")` : ""}. ` +
+        `Si quieres, te cuento los servicios que si tenemos.`;
+      parsed = {
+        ...parsed,
+        action: "respond",
+        text: String(parsed.text || "").trim() || fallbackOutOfScopeText,
+      };
     }
 
     // If the model answered conversationally but skipped routing (or routed to a generic node),
@@ -1112,12 +1443,12 @@ async function routeWithAI({ text, flow, config, session }) {
 
     // Reset turns on successful route to prevent lockout in new context
     const shouldResetTurns = parsed.action === "route" || parsed.action === "show_services";
-    return {
+    return cacheAndReturn({
       ...parsed,
       ai_used: true,
       clear_pending: Boolean(previousQuestion),
       reset_turns: shouldResetTurns,
-    };
+    });
 
   } catch (error) {
     logger.error("ai.router_error", { message: error.message, provider, model, flowId });
@@ -1125,10 +1456,209 @@ async function routeWithAI({ text, flow, config, session }) {
     // Fallback on error
     const fallbackRoute = fallbackKeywordRoute(text);
     if (fallbackRoute) {
-      return { action: "route", route_id: fallbackRoute, ai_used: false };
+      return cacheAndReturn({ action: "route", route_id: fallbackRoute, ai_used: false });
     }
-    return { action: "show_services", ai_used: false };
+    return cacheAndReturn({ action: "show_services", ai_used: false });
   }
+}
+
+// In-memory cache to avoid repeating expensive router/copy calls for the same message context.
+const ROUTER_DECISION_CACHE = new Map();
+const ROUTER_CACHE_TTL_MS = Number(process.env.AI_ROUTER_CACHE_TTL_MS || 10 * 60 * 1000);
+const ROUTER_CACHE_MAX_ENTRIES = Number(process.env.AI_ROUTER_CACHE_MAX_ENTRIES || 500);
+
+const OUT_OF_SCOPE_BUSINESS_WORDS = [
+  "peluqueria", "barberia", "barbero",
+  "reposteria", "pasteleria", "torta", "pastel",
+  "maquillaje", "cejas", "pestanas", "manicure", "unas de manos",
+  "pedicure estetico", "pedicura estetica", "spa facial", "facial", "depilacion",
+  "masaje", "masajes", "cabello", "corte de cabello", "coloracion",
+];
+
+function cloneAiDecision(decision) {
+  if (!decision || typeof decision !== "object") return null;
+  return {
+    ...decision,
+    services_discussed: Array.isArray(decision.services_discussed)
+      ? [...decision.services_discussed]
+      : decision.services_discussed,
+  };
+}
+
+function cleanupRouterDecisionCache(now = Date.now()) {
+  for (const [key, entry] of ROUTER_DECISION_CACHE.entries()) {
+    if (!entry || entry.expiresAt <= now) ROUTER_DECISION_CACHE.delete(key);
+  }
+  if (ROUTER_DECISION_CACHE.size <= ROUTER_CACHE_MAX_ENTRIES) return;
+  const sorted = [...ROUTER_DECISION_CACHE.entries()].sort((a, b) => (a[1]?.at || 0) - (b[1]?.at || 0));
+  const deleteCount = ROUTER_DECISION_CACHE.size - ROUTER_CACHE_MAX_ENTRIES;
+  for (let i = 0; i < deleteCount; i++) {
+    ROUTER_DECISION_CACHE.delete(sorted[i][0]);
+  }
+}
+
+function buildRouterCacheKey({ flowId, provider, model, text, summary, previousQuestion, session }) {
+  const normalized = normalizeText(text || "").toLowerCase().trim();
+  if (!normalized) return null;
+  const currentNode = summary?.currentNode || session?.data?.current_node_id || session?.state || "";
+  return [
+    "v2",
+    flowId || "",
+    provider || "",
+    model || "",
+    currentNode,
+    previousQuestion ? "pending:1" : "pending:0",
+    `clarify:${Number(summary?.clarificationsAsked || 0)}`,
+    normalized,
+  ].join("|");
+}
+
+function getRouterDecisionFromCache(cacheKey) {
+  if (!cacheKey) return null;
+  const entry = ROUTER_DECISION_CACHE.get(cacheKey);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    ROUTER_DECISION_CACHE.delete(cacheKey);
+    return null;
+  }
+  logger.info("ai.router_cache_hit", {
+    action: entry.value?.action || null,
+    route_id: entry.value?.route_id || null,
+  });
+  return cloneAiDecision(entry.value);
+}
+
+function setRouterDecisionCache(cacheKey, decision) {
+  if (!cacheKey || !decision?.action) return;
+  if (decision.action === "clarify") return;
+  const now = Date.now();
+  cleanupRouterDecisionCache(now);
+  ROUTER_DECISION_CACHE.set(cacheKey, {
+    at: now,
+    expiresAt: now + ROUTER_CACHE_TTL_MS,
+    value: cloneAiDecision(decision),
+  });
+}
+
+function detectOutOfScopeBusinessIntent(text) {
+  const raw = String(text || "");
+  if (!raw.trim()) return null;
+  const normalized = normalizeText(raw).toLowerCase();
+  const hasPodiatryContext = PODIATRY_CONTEXT_WORDS.some((word) =>
+    normalized.includes(normalizeText(word).toLowerCase())
+  );
+  if (hasPodiatryContext) return null;
+
+  for (const term of OUT_OF_SCOPE_BUSINESS_WORDS) {
+    const termNorm = normalizeText(term).toLowerCase();
+    if (normalized.includes(termNorm)) return termNorm;
+  }
+  return null;
+}
+
+function buildDeterministicDecision({ text, previousQuestion, summary, knowledge }) {
+  const raw = String(text || "").trim();
+  if (!raw) return null;
+  const normalized = normalizeText(raw).toLowerCase().trim();
+  if (!normalized) return null;
+
+  const outOfScopeTerm = detectOutOfScopeBusinessIntent(raw);
+  if (outOfScopeTerm) {
+    const clinicName = knowledge?.clinica?.nombre || "PODOPIE";
+    return {
+      action: "respond",
+      text: `Te ayudo con gusto, pero en ${clinicName} solo atendemos temas de pies/podologia. Si quieres, te muestro los servicios que si tenemos.`,
+      reason: `deterministic_out_of_scope:${outOfScopeTerm}`,
+      ai_used: false,
+      clear_pending: Boolean(previousQuestion),
+      reset_turns: false,
+    };
+  }
+
+  const inferredRoute = fallbackKeywordRoute(raw);
+  if (!inferredRoute) return null;
+
+  const tokenCount = normalized.split(/\s+/).filter(Boolean).length;
+  const shortMessage = tokenCount <= 9;
+  const highSignalPrefixes = [
+    "precio", "precios", "costo", "costos", "horario", "horarios", "ubicacion", "ubicaciones",
+    "direccion", "donde", "como llegar", "asesor", "humano", "recepcion", "servicios", "menu",
+    "unero", "hongo", "hongos", "pedicure", "pedicura", "callo", "callosidad", "verruga",
+  ];
+  const hasHighSignalPrefix = highSignalPrefixes.some((p) => normalized.startsWith(p));
+  const looksMultiIntent = /\b(y|ademas|tambien|pero)\b/.test(normalized);
+  const inClarifyFlow = Boolean(previousQuestion) || Number(summary?.clarificationsAsked || 0) > 0;
+
+  if ((shortMessage || hasHighSignalPrefix) && !looksMultiIntent && !inClarifyFlow) {
+    return {
+      action: "route",
+      route_id: inferredRoute,
+      text: "",
+      reason: "deterministic_keyword_route",
+      ai_used: false,
+      clear_pending: Boolean(previousQuestion),
+      reset_turns: true,
+    };
+  }
+
+  return null;
+}
+
+function buildCompactRouteUserPrompt({ message, summary, previousQuestion, session }) {
+  const parts = [];
+  const currentNode = summary?.currentNode || session?.data?.current_node_id || session?.state || null;
+  if (currentNode) parts.push(`[nodo_actual]: ${currentNode}`);
+  if (previousQuestion) parts.push(`[pregunta_anterior_no_repetir]: ${previousQuestion}`);
+  if (summary?.clarificationsAsked > 0) parts.push(`[clarificaciones_previas]: ${summary.clarificationsAsked}`);
+  if (summary?.lastUserMessage && summary.lastUserMessage !== message) {
+    parts.push(`[ultimo_mensaje_usuario]: ${summary.lastUserMessage}`);
+  }
+  if (Array.isArray(summary?.servicesDiscussed) && summary.servicesDiscussed.length) {
+    parts.push(`[servicios_ya_mencionados]: ${summary.servicesDiscussed.slice(-3).join(", ")}`);
+  }
+  parts.push(`[mensaje]: ${message}`);
+  return parts.join("\n");
+}
+
+function buildKnowledgeSnippetForCopy({ knowledge, text, routeId }) {
+  const kb = knowledge || {};
+  const normalized = normalizeText(text || "").toLowerCase();
+
+  if (routeId && ["PRECIOS_INFO", "HORARIOS_INFO", "SERVICIOS_MENU", "CONTACT_METHOD"].includes(routeId)) {
+    return "";
+  }
+
+  const snippets = [];
+  const maybeServiceMatches = [
+    { check: ["unero", "una encarnada"], key: "uneros" },
+    { check: ["hongo", "hongos", "onicomicosis"], key: "hongos" },
+    { check: ["pedicure", "pedicura"], key: "pedicure_clinico" },
+    { check: ["nino", "nina", "bebe", "podopediatria"], key: "podopediatria" },
+    { check: ["adulto mayor", "tercera edad", "podogeriatria"], key: "podogeriatria" },
+    { check: ["diabetes", "diabetico", "pie diabetico"], key: "pie_diabetico" },
+    { check: ["pie de atleta"], key: "pie_atleta" },
+    { check: ["callo", "callosidad", "heloma"], key: "callosidades" },
+    { check: ["verruga"], key: "verrugas_plantares" },
+    { check: ["extraccion", "una negra"], key: "extraccion_una" },
+  ];
+
+  for (const candidate of maybeServiceMatches) {
+    if (!candidate.check.some((term) => normalized.includes(term))) continue;
+    const svc = kb?.servicios?.[candidate.key];
+    if (!svc) continue;
+    snippets.push(`Servicio relacionado: ${svc.nombre || candidate.key}. ${svc.descripcion || ""}`.trim());
+    break;
+  }
+
+  if (/(horario|horarios|ubicacion|ubicaciones|sucursal|direccion|donde)/i.test(normalized)) {
+    const locations = Object.values(kb?.ubicaciones || {})
+      .slice(0, 2)
+      .map((loc) => `${loc?.nombre || "Sucursal"}: ${loc?.horario || "consultar horario"}`)
+      .join(" | ");
+    if (locations) snippets.push(`Ubicaciones: ${locations}`);
+  }
+
+  return snippets.join("\n");
 }
 
 /**

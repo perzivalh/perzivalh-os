@@ -8,6 +8,7 @@
 const logger = require("../lib/logger");
 const { normalizeText } = require("../lib/normalize");
 const { callAiProvider } = require("./aiProviders");
+const knowledgeService = require("./knowledgeService");
 const { getHistoryForAI, getConversationSummary } = require("./conversationMemory");
 
 const DEFAULT_MODELS = {
@@ -1279,8 +1280,14 @@ async function routeWithAI({ text, flow, config, session }) {
     logger.info("ai.router_urgency_not_podiatry_or_not_critical", { flowId });
   }
 
-  // Load knowledge base
-  const knowledge = loadKnowledgeBase(flowId);
+  // Load knowledge base (DB-driven con fallback al archivo JS)
+  let knowledge;
+  try {
+    knowledge = await knowledgeService.getKnowledge(flowId);
+  } catch (err) {
+    logger.warn("ai.knowledge_service_error", { message: err.message });
+    knowledge = loadKnowledgeBase(flowId);
+  }
 
   // Get conversation context
   const history = getHistoryForAI(session?.data);

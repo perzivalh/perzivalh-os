@@ -16,6 +16,7 @@ const { resolveChannelByPhoneNumberId } = require("../../tenancy/tenantResolver"
 const { logAudit, createMessage } = require("../../services/conversations");
 const { getSegmentRecipients } = require("../../services/audienceService");
 const { ROLE_OPTIONS } = require("../../config/roles");
+const { invalidateKnowledgeCache } = require("../../services/knowledgeService");
 
 // Settings cache (para sincronizar con webhook)
 const settingsCache = new Map();
@@ -283,6 +284,48 @@ router.patch("/settings", requireAuth, requireRole("admin"), async (req, res) =>
 });
 
 // ==========================================
+// COMPANY PROFILE
+// ==========================================
+
+// GET /api/admin/company-profile
+router.get("/company-profile", requireAuth, requireRole(["admin"]), async (req, res) => {
+    const settings = await prisma.settings.findUnique({ where: { id: 1 } });
+    return res.json({
+        company: settings?.company_json || null,
+        botIdentity: settings?.bot_identity_json || null,
+    });
+});
+
+// PATCH /api/admin/company-profile
+router.patch("/company-profile", requireAuth, requireRole(["admin"]), async (req, res) => {
+    const { company, botIdentity } = req.body || {};
+    const updateData = {};
+    if (company !== undefined) updateData.company_json = company;
+    if (botIdentity !== undefined) updateData.bot_identity_json = botIdentity;
+
+    const settings = await prisma.settings.upsert({
+        where: { id: 1 },
+        update: updateData,
+        create: {
+            id: 1,
+            bot_enabled: true,
+            auto_reply_enabled: true,
+            ...updateData,
+        },
+    });
+    await invalidateKnowledgeCache();
+    await logAudit({
+        userId: req.user.id,
+        action: "company_profile.updated",
+        data: { fields: Object.keys(updateData) },
+    });
+    return res.json({
+        company: settings.company_json || null,
+        botIdentity: settings.bot_identity_json || null,
+    });
+});
+
+// ==========================================
 // BRANCHES
 // ==========================================
 
@@ -302,6 +345,7 @@ router.post("/branches", requireAuth, requireRole(["admin", "marketing"]), async
         address: (req.body?.address || "").trim(),
         lat: Number(req.body?.lat || 0),
         lng: Number(req.body?.lng || 0),
+        maps_url: req.body?.maps_url || null,
         hours_text: (req.body?.hours_text || "").trim(),
         phone: req.body?.phone || null,
         is_active: req.body?.is_active !== false,
@@ -310,6 +354,7 @@ router.post("/branches", requireAuth, requireRole(["admin", "marketing"]), async
         return res.status(400).json({ error: "missing_fields" });
     }
     const branch = await prisma.branch.create({ data });
+    await invalidateKnowledgeCache();
     await logAudit({
         userId: req.user.id,
         action: "branch.created",
@@ -328,11 +373,13 @@ router.patch("/branches/:id", requireAuth, requireRole(["admin", "marketing"]), 
             address: req.body?.address,
             lat: req.body?.lat !== undefined ? Number(req.body.lat) : undefined,
             lng: req.body?.lng !== undefined ? Number(req.body.lng) : undefined,
+            maps_url: req.body?.maps_url,
             hours_text: req.body?.hours_text,
             phone: req.body?.phone,
             is_active: req.body?.is_active,
         },
     });
+    await invalidateKnowledgeCache();
     await logAudit({
         userId: req.user.id,
         action: "branch.updated",
@@ -347,6 +394,7 @@ router.delete("/branches/:id", requireAuth, requireRole(["admin", "marketing"]),
         where: { id: req.params.id },
         data: { is_active: false },
     });
+    await invalidateKnowledgeCache();
     await logAudit({
         userId: req.user.id,
         action: "branch.disabled",
@@ -381,6 +429,7 @@ router.post("/services", requireAuth, requireRole(["admin", "marketing"]), async
         name: (req.body?.name || "").trim(),
         subtitle: req.body?.subtitle || null,
         description: (req.body?.description || "").trim(),
+        keywords: req.body?.keywords || null,
         price_bob: Number(req.body?.price_bob || 0),
         duration_min: req.body?.duration_min ? Number(req.body.duration_min) : null,
         image_url: req.body?.image_url || null,
@@ -391,6 +440,7 @@ router.post("/services", requireAuth, requireRole(["admin", "marketing"]), async
         return res.status(400).json({ error: "missing_fields" });
     }
     const service = await prisma.service.create({ data });
+    await invalidateKnowledgeCache();
     await logAudit({
         userId: req.user.id,
         action: "service.created",
@@ -408,6 +458,7 @@ router.patch("/services/:id", requireAuth, requireRole(["admin", "marketing"]), 
             name: req.body?.name,
             subtitle: req.body?.subtitle,
             description: req.body?.description,
+            keywords: req.body?.keywords,
             price_bob: req.body?.price_bob ? Number(req.body.price_bob) : undefined,
             duration_min:
                 req.body?.duration_min !== undefined
@@ -418,6 +469,7 @@ router.patch("/services/:id", requireAuth, requireRole(["admin", "marketing"]), 
             is_active: req.body?.is_active,
         },
     });
+    await invalidateKnowledgeCache();
     await logAudit({
         userId: req.user.id,
         action: "service.updated",
@@ -432,6 +484,7 @@ router.delete("/services/:id", requireAuth, requireRole(["admin", "marketing"]),
         where: { id: req.params.id },
         data: { is_active: false },
     });
+    await invalidateKnowledgeCache();
     await logAudit({
         userId: req.user.id,
         action: "service.disabled",

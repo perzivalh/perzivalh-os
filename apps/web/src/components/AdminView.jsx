@@ -9,6 +9,7 @@ import NoticeBanner from "./NoticeBanner.jsx";
 import UsersSection from "./admin/UsersSection";
 import GeneralSection from "./admin/GeneralSection";
 import BotSection from "./admin/BotSection";
+import CompanySection from "./admin/CompanySection";
 import TemplatesSection from "./admin/TemplatesSection";
 import AuditSection from "./admin/AuditSection";
 import OdooSection from "./admin/OdooSection";
@@ -18,6 +19,7 @@ import {
   SlidersIcon,
   UsersIcon,
   BotIcon,
+  BuildingIcon,
   TemplateIcon,
   AuditIcon,
   PuzzleIcon,
@@ -74,6 +76,7 @@ function AdminView({
         { id: "general", label: "Lineas", icon: SlidersIcon },
         { id: "users", label: "Gestion de Usuarios", icon: UsersIcon },
         { id: "bot", label: "Configuracion de Bot", icon: BotIcon },
+        { id: "company", label: "Empresa & Bot", icon: BuildingIcon },
       ],
     },
     {
@@ -195,6 +198,8 @@ function AdminView({
             formatDate={formatDate}
           />
         )}
+
+        {settingsSection === "company" && <CompanySection />}
 
         {settingsSection === "odoo" && <OdooSection />}
 

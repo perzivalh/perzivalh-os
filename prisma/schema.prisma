@@ -7,127 +7,48 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ==================== ENUMS ====================
-
-enum UserRole {
-  admin
-  recepcion
-  caja
-  marketing
-  doctor
-}
-
-enum ConversationStatus {
-  open
-  pending
-  closed
-}
-
-enum MessageDirection {
-  in
-  out
-}
-
-enum MessageType {
-  text
-  interactive
-  image
-  video
-  location
-  template
-  unknown
-  note
-}
-
-enum VerificationMethod {
-  phone
-  ci
-  manual
-}
-
-// Template-related enums
-enum TemplateStatus {
-  DRAFT      // Local only, not submitted to Meta
-  PENDING    // Submitted to Meta, awaiting review
-  APPROVED   // Ready to use
-  REJECTED   // Rejected by Meta
-  PAUSED     // Paused by Meta (quality issues)
-  DISABLED   // Disabled by Meta
-}
-
-enum TemplateCategory {
-  MARKETING
-  UTILITY
-  AUTHENTICATION
-}
-
-enum VariableSourceType {
-  odoo    // Field from Odoo (res.partner, medical.patient)
-  db      // Field from local DB (conversation, campaign)
-  static  // Static text value
-}
-
-// Campaign-related enums
-enum CampaignStatus {
-  draft
-  scheduled
-  running
-  paused
-  completed
-  failed
-}
-
-enum RecipientStatus {
-  pending    // Queued for sending
-  sent       // API returned success
-  delivered  // Webhook confirmed delivery
-  read       // Webhook confirmed read
-  failed     // Send failed
-}
-
-// ==================== USER & AUTH ====================
-
 model User {
-  id            String     @id @default(cuid())
-  name          String
-  email         String     @unique
-  password_hash String
-  role          UserRole   @default(recepcion)
-  is_active     Boolean    @default(true)
-  created_at    DateTime   @default(now())
-  
-  AuditLog          AuditLog[]         @relation("UserAuditLogs")
-  Conversation      Conversation[]     @relation("AssignedConversations")
-  Campaign          Campaign[]         @relation("CampaignCreatedBy")
-  MetaTemplate      MetaTemplate[]     @relation("MetaTemplateCreatedBy")
-  AudienceSegment   AudienceSegment[]  @relation("AudienceCreatedBy")
+  id              String            @id @default(cuid())
+  name            String
+  email           String            @unique
+  password_hash   String
+  role            UserRole          @default(recepcion)
+  is_active       Boolean           @default(true)
+  created_at      DateTime          @default(now())
+  AudienceSegment AudienceSegment[] @relation("AudienceCreatedBy")
+  AuditLog        AuditLog[]        @relation("UserAuditLogs")
+  Campaign        Campaign[]        @relation("CampaignCreatedBy")
+  Conversation    Conversation[]    @relation("AssignedConversations")
+  MetaTemplate    MetaTemplate[]    @relation("MetaTemplateCreatedBy")
 }
-
-// ==================== CONVERSATION & MESSAGING ====================
 
 model Conversation {
   id                  String              @id @default(cuid())
-  wa_id               String              @unique
+  wa_id               String
   phone_e164          String
   display_name        String?
   status              ConversationStatus  @default(open)
   assigned_user_id    String?
-  partner_id          Int?
-  patient_id          Int?
-  verified_at         DateTime?
-  verification_method VerificationMethod?
   last_message_at     DateTime?
   created_at          DateTime            @default(now())
-  
-  messages            Message[]
-  tags                ConversationTag[]
+  partner_id          Int?
+  patient_id          Int?
+  verification_method VerificationMethod?
+  verified_at         DateTime?
+  phone_number_id     String?
+  primary_tag_id      String?
+  CampaignMessage     CampaignMessage[]
   assigned_user       User?               @relation("AssignedConversations", fields: [assigned_user_id], references: [id])
-  campaign_recipients CampaignRecipient[]
+  Tag                 Tag?                @relation(fields: [primary_tag_id], references: [id])
+  tags                ConversationTag[]
+  messages            Message[]
 
+  @@unique([wa_id, phone_number_id])
   @@index([status])
   @@index([assigned_user_id])
   @@index([last_message_at])
   @@index([partner_id])
+  @@index([phone_number_id])
 }
 
 model Message {
@@ -145,27 +66,30 @@ model Message {
 }
 
 model Tag {
-  id    String            @id @default(cuid())
-  name  String            @unique
-  color String?
-  tags  ConversationTag[]
+  id           String            @id @default(cuid())
+  name         String            @unique
+  color        String?
+  AudienceTag  AudienceTag[]
+  Conversation Conversation[]
+  tags         ConversationTag[]
 }
 
 model ConversationTag {
   conversation_id String
   tag_id          String
+  created_at      DateTime     @default(now())
   conversation    Conversation @relation(fields: [conversation_id], references: [id])
   tag             Tag          @relation(fields: [tag_id], references: [id])
 
   @@id([conversation_id, tag_id])
 }
 
-// ==================== SETTINGS & AUDIT ====================
-
 model Settings {
   id                 Int      @id @default(1)
   bot_enabled        Boolean  @default(true)
   auto_reply_enabled Boolean  @default(true)
+  company_json       Json?
+  bot_identity_json  Json?
   updated_at         DateTime @updatedAt
 }
 
@@ -173,15 +97,9 @@ model AuditLog {
   id         String   @id @default(cuid())
   user_id    String?
   action     String
-  entity     String?   // e.g., "template", "campaign", "audience"
-  entity_id  String?   // ID of the affected entity
   data_json  Json
   created_at DateTime @default(now())
   user       User?    @relation("UserAuditLogs", fields: [user_id], references: [id])
-
-  @@index([action])
-  @@index([entity, entity_id])
-  @@index([created_at])
 }
 
 model RolePermission {
@@ -192,8 +110,6 @@ model RolePermission {
   updated_at       DateTime @updatedAt
 }
 
-// ==================== CATALOG ====================
-
 model Branch {
   id         String          @id @default(cuid())
   code       String          @unique
@@ -201,6 +117,7 @@ model Branch {
   address    String
   lat        Float
   lng        Float
+  maps_url   String?
   hours_text String
   phone      String?
   is_active  Boolean         @default(true)
@@ -214,6 +131,7 @@ model Service {
   name         String
   subtitle     String?
   description  String
+  keywords     String?
   price_bob    Int
   duration_min Int?
   image_url    String?
@@ -229,39 +147,35 @@ model ServiceBranch {
   service_id   String
   branch_id    String
   is_available Boolean @default(true)
-  service      Service @relation(fields: [service_id], references: [id])
   branch       Branch  @relation(fields: [branch_id], references: [id])
+  service      Service @relation(fields: [service_id], references: [id])
 
   @@id([service_id, branch_id])
 }
 
-// ==================== META TEMPLATES ====================
-
 model MetaTemplate {
-  id                 String           @id @default(cuid())
+  id                 String                        @id @default(cuid())
   name               String
-  meta_template_id   String?          // ID from Meta API (null if draft)
-  category           TemplateCategory @default(UTILITY)
-  language           String           @default("es")
-  status             TemplateStatus   @default(DRAFT)
-  quality_score      String?          // HIGH, MEDIUM, LOW, UNKNOWN
-  components_json    Json             @default("[]") // Header, body, footer, buttons
-  body_text          String?          // Plain text body for preview
-  header_type        String?          // none, text, image, video, document
-  header_content     String?          // Header text or media URL
+  meta_template_id   String?
+  category           TemplateCategory              @default(UTILITY)
+  language           String                        @default("es")
+  status             TemplateStatus                @default(DRAFT)
+  quality_score      String?
+  components_json    Json                          @default("[]")
+  body_text          String?
+  header_type        String?
+  header_content     String?
   footer_text        String?
-  buttons_json       Json?            // Button configurations
+  buttons_json       Json?
   last_synced_at     DateTime?
-  meta_response_json Json?            // Raw response from Meta API
+  meta_response_json Json?
   rejection_reason   String?
   created_by_user_id String?
-  is_deleted         Boolean          @default(false)
-  created_at         DateTime         @default(now())
-  updated_at         DateTime         @updatedAt
-
-  variable_mappings MetaTemplateVariableMapping[]
-  campaigns         Campaign[]
-  created_by_user   User?                         @relation("MetaTemplateCreatedBy", fields: [created_by_user_id], references: [id])
+  is_deleted         Boolean                       @default(false)
+  created_at         DateTime                      @default(now())
+  updated_at         DateTime                      @updatedAt
+  created_by_user    User?                         @relation("MetaTemplateCreatedBy", fields: [created_by_user_id], references: [id])
+  variable_mappings  MetaTemplateVariableMapping[]
 
   @@unique([name, language])
   @@index([status])
@@ -271,167 +185,80 @@ model MetaTemplate {
 model MetaTemplateVariableMapping {
   id            String             @id @default(cuid())
   template_id   String
-  var_index     Int                // 1, 2, 3... matches {{1}}, {{2}}, etc.
-  display_name  String?            // Human-readable name shown in UI
+  var_index     Int
+  display_name  String?
   source_type   VariableSourceType
-  source_path   String             // e.g. "res.partner.name", "conversation.display_name"
-  default_value String?            // Fallback if source is empty
-  transform     String?            // Optional: "uppercase", "date_format:DD/MM/YYYY", etc.
-
-  template MetaTemplate @relation(fields: [template_id], references: [id], onDelete: Cascade)
+  source_path   String
+  default_value String?
+  transform     String?
+  template      MetaTemplate       @relation(fields: [template_id], references: [id], onDelete: Cascade)
 
   @@unique([template_id, var_index])
 }
 
-// ==================== AUDIENCES & CONTACTS ====================
-
 model AudienceSegment {
-  id                 String     @id @default(cuid())
+  id                 String        @id @default(cuid())
   name               String
   description        String?
-  rules_json         Json       // Array of filter rules
-  estimated_count    Int        @default(0)
-  is_active          Boolean    @default(true)
+  rules_json         Json
+  estimated_count    Int           @default(0)
+  is_active          Boolean       @default(true)
   created_by_user_id String?
-  created_at         DateTime   @default(now())
-  updated_at         DateTime   @updatedAt
-
-  campaigns       Campaign[]
-  created_by_user User?      @relation("AudienceCreatedBy", fields: [created_by_user_id], references: [id])
+  last_synced_at     DateTime?
+  created_at         DateTime      @default(now())
+  updated_at         DateTime      @updatedAt
+  created_by_user    User?         @relation("AudienceCreatedBy", fields: [created_by_user_id], references: [id])
+  AudienceTag        AudienceTag[]
 
   @@index([is_active])
 }
 
 model OdooContact {
   id              String   @id @default(cuid())
-  odoo_partner_id Int      @unique // res.partner.id from Odoo
+  odoo_partner_id Int      @unique
   name            String
   phone_e164      String?
-  phone_raw       String?  // Original phone from Odoo
+  phone_raw       String?
   email           String?
-  vat             String?  // CI/VAT
+  vat             String?
   is_patient      Boolean  @default(false)
   odoo_patient_id Int?
-  tags_json       Json?    // Tags from Odoo if any
-  extra_data_json Json?    // Additional Odoo fields
+  tags_json       Json?
+  extra_data_json Json?
   last_synced_at  DateTime @default(now())
   created_at      DateTime @default(now())
-
-  campaign_recipients CampaignRecipient[]
 
   @@index([phone_e164])
   @@index([is_patient])
 }
 
-// ==================== CAMPAIGNS ====================
-
 model Campaign {
-  id                 String         @id @default(cuid())
+  id                 String            @id @default(cuid())
   name               String
-  segment_id         String?
   template_id        String
-  status             CampaignStatus @default(draft)
-  scheduled_at       DateTime?
-  started_at         DateTime?
-  completed_at       DateTime?
-  total_recipients   Int            @default(0)
-  sent_count         Int            @default(0)
-  delivered_count    Int            @default(0)
-  read_count         Int            @default(0)
-  failed_count       Int            @default(0)
-  reply_count        Int            @default(0)
-  error_message      String?
+  audience_filter    Json
+  status             CampaignStatus    @default(draft)
   created_by_user_id String?
-  created_at         DateTime       @default(now())
-  updated_at         DateTime       @updatedAt
-
-  segment         AudienceSegment?    @relation(fields: [segment_id], references: [id])
-  template        MetaTemplate        @relation(fields: [template_id], references: [id])
-  created_by_user User?               @relation("CampaignCreatedBy", fields: [created_by_user_id], references: [id])
-  recipients      CampaignRecipient[]
+  scheduled_for      DateTime?
+  created_at         DateTime          @default(now())
+  created_by_user    User?             @relation("CampaignCreatedBy", fields: [created_by_user_id], references: [id])
+  template           Template          @relation(fields: [template_id], references: [id])
+  CampaignMessage    CampaignMessage[]
 
   @@index([status])
-  @@index([scheduled_at])
-  @@index([created_at])
 }
-
-model CampaignRecipient {
-  id              String          @id @default(cuid())
-  campaign_id     String
-  conversation_id String?
-  odoo_contact_id String?
-  wa_id           String
-  phone_e164      String
-  recipient_name  String?
-  status          RecipientStatus @default(pending)
-  wamid           String?         // WhatsApp Message ID from API response
-  error_json      Json?
-  variables_json  Json?           // Resolved variables for this recipient
-  queued_at       DateTime        @default(now())
-  sent_at         DateTime?
-  delivered_at    DateTime?
-  read_at         DateTime?
-  failed_at       DateTime?
-
-  campaign     Campaign      @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
-  conversation Conversation? @relation(fields: [conversation_id], references: [id])
-  odoo_contact OdooContact?  @relation(fields: [odoo_contact_id], references: [id])
-
-  @@index([campaign_id, status])
-  @@index([wamid])
-  @@index([wa_id])
-}
-
-// ==================== WEBHOOK LOGS ====================
 
 model TemplateWebhookLog {
   id            String   @id @default(cuid())
-  event_type    String   // message_template_status_update, quality_update, etc.
+  event_type    String
   template_name String?
   template_id   String?
   raw_json      Json
-  processed     Boolean  @default(false)
-  error_message String?
-  created_at    DateTime @default(now())
+  processed_at  DateTime @default(now())
 
-  @@index([event_type])
-  @@index([processed])
-  @@index([created_at])
+  @@index([processed_at])
+  @@index([template_name])
 }
-
-model MessageStatusLog {
-  id         String   @id @default(cuid())
-  wamid      String
-  status     String   // sent, delivered, read, failed
-  error_json Json?
-  raw_json   Json
-  processed  Boolean  @default(false)
-  created_at DateTime @default(now())
-
-  @@index([wamid])
-  @@index([processed])
-}
-
-// ==================== CAMPAIGN JOB QUEUE ====================
-
-model CampaignJob {
-  id           String    @id @default(cuid())
-  campaign_id  String    @unique
-  status       String    @default("pending") // pending, running, paused, completed, failed
-  progress     Int       @default(0)         // Number of recipients processed
-  last_error   String?
-  locked_at    DateTime?
-  locked_by    String?   // Worker ID that locked this job
-  started_at   DateTime?
-  completed_at DateTime?
-  created_at   DateTime  @default(now())
-  updated_at   DateTime  @updatedAt
-
-  @@index([status])
-  @@index([locked_at])
-}
-
-// ==================== PROSPECT (kept for compatibility) ====================
 
 model Prospect {
   id           String   @id @default(cuid())
@@ -443,4 +270,168 @@ model Prospect {
   updated_at   DateTime @updatedAt
 
   @@index([created_at])
+}
+
+model AudienceAutomationSetting {
+  id              String   @id
+  phone_number_id String?
+  enabled         Boolean  @default(false)
+  created_at      DateTime @default(now())
+  updated_at      DateTime
+
+  @@index([phone_number_id])
+}
+
+model AudienceTag {
+  id              String          @id
+  tag_id          String?
+  segment_id      String
+  phone_number_id String?
+  is_default      Boolean         @default(false)
+  last_synced_at  DateTime?
+  created_at      DateTime        @default(now())
+  updated_at      DateTime
+  AudienceSegment AudienceSegment @relation(fields: [segment_id], references: [id])
+  Tag             Tag?            @relation(fields: [tag_id], references: [id])
+
+  @@unique([tag_id, phone_number_id])
+  @@index([phone_number_id])
+  @@index([segment_id])
+  @@index([tag_id])
+}
+
+model CampaignMessage {
+  id              String                @id
+  campaign_id     String
+  conversation_id String?
+  wa_id           String
+  phone_e164      String
+  status          CampaignMessageStatus @default(queued)
+  error_json      Json?
+  sent_at         DateTime?
+  phone_number_id String?
+  Campaign        Campaign              @relation(fields: [campaign_id], references: [id])
+  Conversation    Conversation?         @relation(fields: [conversation_id], references: [id])
+
+  @@index([campaign_id])
+  @@index([phone_number_id])
+  @@index([status])
+}
+
+model ImportedContact {
+  id         String   @id
+  phone_e164 String
+  name       String?
+  city       String?
+  tags_json  Json?
+  source     String   @default("excel")
+  source_ref String?
+  created_at DateTime @default(now())
+  updated_at DateTime
+
+  @@index([phone_e164])
+  @@index([source])
+}
+
+model Session {
+  id                   String    @id
+  wa_id                String
+  phone_number_id      String?
+  state                String
+  data                 Json
+  flow_id              String?
+  inactivity_notice_at DateTime?
+  next_due_at          DateTime?
+  created_at           DateTime  @default(now())
+  updated_at           DateTime
+
+  @@unique([wa_id, phone_number_id])
+  @@index([flow_id])
+  @@index([next_due_at])
+  @@index([updated_at])
+}
+
+model Template {
+  id               String     @id
+  name             String     @unique
+  language         String
+  category         String?
+  body_preview     String
+  variables_schema Json?
+  is_active        Boolean    @default(true)
+  created_at       DateTime   @default(now())
+  campaigns        Campaign[]
+}
+
+enum UserRole {
+  admin
+  recepcion
+  caja
+  marketing
+  doctor
+}
+
+enum ConversationStatus {
+  open
+  pending
+  closed
+  assigned
+}
+
+enum MessageDirection {
+  in
+  out
+}
+
+enum MessageType {
+  text
+  interactive
+  image
+  location
+  template
+  unknown
+  note
+  video
+  audio
+}
+
+enum VerificationMethod {
+  phone
+  ci
+  manual
+}
+
+enum TemplateStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  PAUSED
+  DISABLED
+}
+
+enum TemplateCategory {
+  MARKETING
+  UTILITY
+  AUTHENTICATION
+}
+
+enum VariableSourceType {
+  odoo
+  db
+  static
+}
+
+enum CampaignStatus {
+  draft
+  scheduled
+  sending
+  sent
+  failed
+}
+
+enum CampaignMessageStatus {
+  queued
+  sent
+  failed
 }

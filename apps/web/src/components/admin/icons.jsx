@@ -69,3 +69,16 @@ export function PuzzleIcon(props) {
         </svg>
     );
 }
+
+export function BuildingIcon(props) {
+    return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+            <rect x="3" y="6" width="18" height="15" rx="1" strokeWidth="2" />
+            <path d="M8 21V11" strokeWidth="2" />
+            <path d="M16 21V11" strokeWidth="2" />
+            <path d="M3 11h18" strokeWidth="2" />
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" strokeWidth="2" />
+            <rect x="10" y="14" width="4" height="7" strokeWidth="2" />
+        </svg>
+    );
+}

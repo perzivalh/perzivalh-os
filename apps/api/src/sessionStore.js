@@ -1,6 +1,14 @@
 ﻿const prisma = require("./db");
+const { getTenantContext } = require("./tenancy/tenantContext");
+const { rGet, rSet, rDel } = require("./lib/redis");
 
 const DEFAULT_STATE = "MAIN_MENU";
+const SESSION_TTL_SECONDS = 24 * 60 * 60; // 24 horas
+
+function getSessionCacheKey(waId, phoneNumberId) {
+  const { tenantId } = getTenantContext() || {};
+  return `session:${tenantId || "legacy"}:${phoneNumberId || "null"}:${waId}`;
+}
 
 function serializeData(data) {
   return JSON.stringify(data || {});
@@ -27,6 +35,18 @@ async function getSession(waId, phoneNumberId) {
   }
   const phoneId = phoneNumberId || null;
 
+  // L1: Redis cache
+  const cacheKey = getSessionCacheKey(waId, phoneId);
+  const cached = await rGet(cacheKey);
+  if (cached) {
+    try {
+      return JSON.parse(cached);
+    } catch {
+      // cache corrupto, continuar a DB
+    }
+  }
+
+  // L2: Postgres
   const existing = await prisma.session.findUnique({
     where: {
       wa_id_phone_number_id: {
@@ -45,7 +65,7 @@ async function getSession(waId, phoneNumberId) {
         data: {},
       },
     });
-    return {
+    const result = {
       state: created.state,
       data: created.data || {},
       updatedAt: created.updated_at.toISOString(),
@@ -55,9 +75,11 @@ async function getSession(waId, phoneNumberId) {
       wa_id: created.wa_id,
       flow_id: created.flow_id || null,
     };
+    await rSet(cacheKey, JSON.stringify(result), SESSION_TTL_SECONDS);
+    return result;
   }
 
-  return {
+  const result = {
     state: existing.state,
     data: existing.data || {},
     updatedAt: existing.updated_at.toISOString(),
@@ -67,6 +89,8 @@ async function getSession(waId, phoneNumberId) {
     wa_id: existing.wa_id,
     flow_id: existing.flow_id || null,
   };
+  await rSet(cacheKey, JSON.stringify(result), SESSION_TTL_SECONDS);
+  return result;
 }
 
 async function saveSession(waId, phoneNumberId, session) {
@@ -100,6 +124,20 @@ async function saveSession(waId, phoneNumberId, session) {
       flow_id: payload.flow_id,
     },
   });
+
+  // Actualizar Redis con el estado guardado
+  const cacheKey = getSessionCacheKey(waId, phoneId);
+  const cached = {
+    state: payload.state,
+    data: payload.data,
+    updatedAt: new Date().toISOString(),
+    inactivity_notice_at: payload.inactivity_notice_at,
+    next_due_at: payload.next_due_at,
+    phone_number_id: phoneId,
+    wa_id: waId,
+    flow_id: payload.flow_id,
+  };
+  await rSet(cacheKey, JSON.stringify(cached), SESSION_TTL_SECONDS);
 }
 
 async function updateSession(waId, phoneNumberId, updates) {
@@ -128,6 +166,7 @@ async function clearSession(waId, phoneNumberId) {
       phone_number_id: phoneId,
     },
   });
+  await rDel(getSessionCacheKey(waId, phoneId));
 }
 
 async function listSessions(limit = 200) {

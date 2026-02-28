@@ -581,7 +581,7 @@ function App() {
     }
     const roleAccess =
       rolePermissions?.[user.role] || DEFAULT_ROLE_PERMISSIONS[user.role];
-    const sections = ["general", "users", "bot", "templates", "audit", "odoo"];
+    const sections = ["general", "users", "bot", "company", "templates", "audit", "odoo"];
     const allowed = sections.filter((section) =>
       hasPermission(roleAccess, "settings", section)
     );

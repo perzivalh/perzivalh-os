@@ -67,7 +67,7 @@ function AdminView({
   onDismissError,
   brandName = "",
 }) {
-  const roleAccess = rolePermissions?.[currentRole];
+  const roleAccess = rolePermissions?.[currentRole] || defaultRolePermissions?.[currentRole];
 
   const settingsMenu = [
     {

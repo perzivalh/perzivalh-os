@@ -20,6 +20,7 @@ export const SETTINGS_MODULES = [
     { id: "general", label: "Lineas" },
     { id: "users", label: "Gestion de Usuarios" },
     { id: "bot", label: "Configuracion de Bot" },
+    { id: "company", label: "Empresa & Bot" },
     { id: "templates", label: "Plantillas de Meta" },
     { id: "audit", label: "Registros / Auditoria" },
     { id: "odoo", label: "Integracion Odoo" },

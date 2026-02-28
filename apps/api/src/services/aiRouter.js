@@ -10,6 +10,7 @@ const { normalizeText } = require("../lib/normalize");
 const { callAiProvider } = require("./aiProviders");
 const knowledgeService = require("./knowledgeService");
 const { getHistoryForAI, getConversationSummary } = require("./conversationMemory");
+const { getTenantContext } = require("../tenancy/tenantContext");
 
 const DEFAULT_MODELS = {
   openai: "gpt-4o-mini",
@@ -182,25 +183,56 @@ function buildSystemPrompt(knowledge, session, flow) {
   const clinicaNombre = clinica.nombre || "PODOPIE";
   const ciudad = clinica.ciudad || "Santa Cruz, Bolivia";
 
-  // Resume core business data so the model can personalize without sending the full KB.
   const serviciosList = Object.values(servicios)
-    .slice(0, 16)
     .map((svc) => {
       const serviceName = String(svc?.nombre || "").trim();
-      const serviceDesc = String(svc?.descripcion || "").replace(/\s+/g, " ").trim();
       if (!serviceName) return null;
-      return `- ${serviceName}${serviceDesc ? `: ${serviceDesc.slice(0, 90)}` : ""}`;
+
+      const parts = [serviceName];
+      const servicePrice = String(svc?.precio || "").trim();
+      const serviceKeywords = String(svc?.keywords || "").trim();
+      const serviceDesc = String(svc?.descripcion || "").replace(/\s+/g, " ").trim();
+
+      if (servicePrice) {
+        parts.push(`Precio: ${servicePrice}`);
+      }
+      if (serviceKeywords) {
+        parts.push(`Keywords: ${serviceKeywords}`);
+      }
+      if (serviceDesc) {
+        parts.push(`Descripcion: ${serviceDesc.slice(0, 220)}`);
+      }
+
+      return `- ${parts.join(" | ")}`;
     })
     .filter(Boolean)
     .join("\n");
 
   const ubicacionesList = Object.values(ubicaciones)
-    .slice(0, 8)
     .map((loc) => {
       const locName = String(loc?.nombre || "").trim();
-      const locHours = String(loc?.horario || "").replace(/\s+/g, " ").trim();
       if (!locName) return null;
-      return `- ${locName}${locHours ? `: ${locHours.slice(0, 90)}` : ""}`;
+
+      const parts = [locName];
+      const locAddress = String(loc?.direccion || "").replace(/\s+/g, " ").trim();
+      const locHours = String(loc?.horario || "").replace(/\s+/g, " ").trim();
+      const locPhone = String(loc?.telefono || "").trim();
+      const locMaps = String(loc?.maps_url || "").trim();
+
+      if (locAddress) {
+        parts.push(`Direccion: ${locAddress.slice(0, 220)}`);
+      }
+      if (locHours) {
+        parts.push(`Horario: ${locHours.slice(0, 140)}`);
+      }
+      if (locPhone) {
+        parts.push(`Telefono: ${locPhone}`);
+      }
+      if (locMaps) {
+        parts.push(`Mapa: ${locMaps}`);
+      }
+
+      return `- ${parts.join(" | ")}`;
     })
     .filter(Boolean)
     .join("\n");
@@ -317,6 +349,16 @@ function buildUserPrompt({ message, history, summary, previousQuestion }) {
   contextParts.push("[mensaje]: " + message);
 
   return contextParts.join("\n");
+}
+
+function withChatBudget(options, chatBudget) {
+  if (!chatBudget?.waId) {
+    return options;
+  }
+  return {
+    ...options,
+    chatBudget,
+  };
 }
 
 /**
@@ -510,6 +552,24 @@ function buildRoutingNodeCatalog(flow) {
 function buildCloudflareRouteSystemPrompt({ knowledge, flow, previousQuestion, summary }) {
   const clinica = knowledge?.clinica || {};
   const personalidad = knowledge?.personalidad || {};
+  const serviciosCompact = Object.values(knowledge?.servicios || {})
+    .map((svc) => {
+      const name = String(svc?.nombre || "").trim();
+      if (!name) return null;
+      const keywords = String(svc?.keywords || "").trim();
+      return keywords ? `- ${name} (${keywords})` : `- ${name}`;
+    })
+    .filter(Boolean)
+    .join("\n");
+  const ubicacionesCompact = Object.values(knowledge?.ubicaciones || {})
+    .map((loc) => {
+      const name = String(loc?.nombre || "").trim();
+      if (!name) return null;
+      const address = String(loc?.direccion || "").replace(/\s+/g, " ").trim();
+      return address ? `- ${name}: ${address.slice(0, 120)}` : `- ${name}`;
+    })
+    .filter(Boolean)
+    .join("\n");
   const nodeCatalog = buildRoutingNodeCatalog(flow);
   const clarifyCount = Number(summary?.clarificationsAsked || 0);
 
@@ -527,6 +587,13 @@ Reglas clave:
 - Si hay dolor intenso / urgencia => handoff.
 - Usa clarify SOLO si realmente falta dato y como maximo una vez.
 - Si no sabes a que nodo ir pero sigue siendo del negocio => show_services.
+
+DATOS REALES DEL NEGOCIO:
+Servicios:
+${serviciosCompact || "- Consultar menu"}
+
+Sucursales:
+${ubicacionesCompact || "- Consultar nodo de ubicaciones"}
 
 Acciones permitidas: respond, route, handoff, clarify, show_services, menu, out_of_scope.
 ${previousQuestion ? "IMPORTANTE: ya se hizo una pregunta de clarificacion antes, evita otra salvo que sea imprescindible." : ""}
@@ -572,6 +639,7 @@ async function callRouteDecisionWithRetry({
   system,
   user,
   flowId,
+  chatBudget,
 }) {
   const isBlankRaw = (value) => !String(value || "").trim();
   const tryParse = (raw, stage) => {
@@ -605,7 +673,7 @@ async function callRouteDecisionWithRetry({
     flowId,
   };
 
-  const raw = await callAiProvider(provider, {
+  const raw = await callAiProvider(provider, withChatBudget({
     apiKey,
     model,
     accountId,
@@ -615,7 +683,7 @@ async function callRouteDecisionWithRetry({
     temperature: 0,
     maxTokens: 180,
     trace: { ...traceBase, stage: "route_decision_primary", attempt: 1 },
-  });
+  }, chatBudget));
   logger.info("ai.router_raw", { provider, model, length: raw?.length || 0 });
   let parsed = tryParse(raw, "route_primary");
   if (parsed?.action) return parsed;
@@ -625,7 +693,7 @@ async function callRouteDecisionWithRetry({
 
   logger.warn("ai.router_parse_failed", { preview: raw?.slice(0, 100) || "" });
 
-  const retryRaw = await callAiProvider(provider, {
+  const retryRaw = await callAiProvider(provider, withChatBudget({
     apiKey,
     model,
     accountId,
@@ -635,7 +703,7 @@ async function callRouteDecisionWithRetry({
     temperature: 0,
     maxTokens: 180,
     trace: { ...traceBase, stage: "route_decision_retry", attempt: 2 },
-  });
+  }, chatBudget));
   parsed = tryParse(retryRaw, "route_retry");
   if (parsed?.action) return parsed;
   if (isBlankRaw(retryRaw)) {
@@ -645,7 +713,7 @@ async function callRouteDecisionWithRetry({
   }
 
   // Repair pass: if model keeps chatting, ask ONLY for action/route without explanations.
-  const repairRaw = await callAiProvider(provider, {
+  const repairRaw = await callAiProvider(provider, withChatBudget({
     apiKey,
     model,
     accountId,
@@ -655,7 +723,7 @@ async function callRouteDecisionWithRetry({
     temperature: 0,
     maxTokens: 140,
     trace: { ...traceBase, stage: "route_decision_repair", attempt: 3 },
-  });
+  }, chatBudget));
   parsed = tryParse(repairRaw, "route_repair");
   if (parsed?.action) return parsed;
 
@@ -675,6 +743,7 @@ async function routeWithCloudflareRouteFirst({
   flowId,
   summary,
   previousQuestion,
+  chatBudget,
 }) {
   logger.info("ai.router_mode", { provider, model, mode: "route_first", flowId });
 
@@ -699,6 +768,7 @@ async function routeWithCloudflareRouteFirst({
     system: routeSystem,
     user: routeUser,
     flowId,
+    chatBudget,
   });
 
   if (!parsed?.action) {
@@ -723,7 +793,11 @@ async function routeWithCloudflareRouteFirst({
   }
 
   // If model returned respond/show_services without a specific route, augment with keyword routing.
-  if (!parsed.route_id && (parsed.action === "respond" || parsed.action === "show_services" || parsed.action === "clarify")) {
+  if (
+    !parsed.route_id &&
+    shouldForceKeywordRoute(text) &&
+    (parsed.action === "respond" || parsed.action === "show_services" || parsed.action === "clarify")
+  ) {
     const inferredRoute = fallbackKeywordRoute(text);
     if (inferredRoute) {
       logger.info("ai.router_cf_keyword_augmented", {
@@ -771,7 +845,7 @@ async function routeWithCloudflareRouteFirst({
 
   let copyRaw = "";
   try {
-    copyRaw = await callAiProvider(provider, {
+    copyRaw = await callAiProvider(provider, withChatBudget({
       apiKey,
       model,
       accountId: cloudflareAccountId,
@@ -786,8 +860,11 @@ async function routeWithCloudflareRouteFirst({
         mode: "cloudflare_route_first",
         flowId,
       },
-    });
+    }, chatBudget));
   } catch (error) {
+    if (error?.code === "AI_CHAT_DAILY_BUDGET_EXCEEDED") {
+      throw error;
+    }
     logger.warn("ai.router_copy_error", { provider, model, message: error.message });
   }
 
@@ -1061,6 +1138,7 @@ async function routeWithStandardProviderRouteFirst({
   flowId,
   summary,
   previousQuestion,
+  chatBudget,
 }) {
   logger.info("ai.router_mode", { provider, model, mode: "route_first_compact", flowId });
 
@@ -1094,6 +1172,7 @@ async function routeWithStandardProviderRouteFirst({
     system: routeSystem,
     user: routeUser,
     flowId,
+    chatBudget,
   });
 
   if (!parsed?.action) return null;
@@ -1112,7 +1191,11 @@ async function routeWithStandardProviderRouteFirst({
     parsed = { ...parsed, action: "respond" };
   }
 
-  if (!parsed.route_id && (parsed.action === "respond" || parsed.action === "show_services" || parsed.action === "clarify")) {
+  if (
+    !parsed.route_id &&
+    shouldForceKeywordRoute(text) &&
+    (parsed.action === "respond" || parsed.action === "show_services" || parsed.action === "clarify")
+  ) {
     const inferredRoute = fallbackKeywordRoute(text);
     if (inferredRoute) {
       logger.info("ai.router_keyword_augmented", {
@@ -1169,7 +1252,7 @@ async function routeWithStandardProviderRouteFirst({
 
   let copyRaw = "";
   try {
-    copyRaw = await callAiProvider(provider, {
+    copyRaw = await callAiProvider(provider, withChatBudget({
       apiKey,
       model,
       accountId,
@@ -1184,8 +1267,11 @@ async function routeWithStandardProviderRouteFirst({
         mode: "route_first_compact",
         flowId,
       },
-    });
+    }, chatBudget));
   } catch (error) {
+    if (error?.code === "AI_CHAT_DAILY_BUDGET_EXCEEDED") {
+      throw error;
+    }
     logger.warn("ai.router_copy_error", { provider, model, message: error.message, source: "route_first_compact" });
   }
 
@@ -1223,10 +1309,17 @@ async function routeWithStandardProviderRouteFirst({
 /**
  * Main AI routing function - AI-First Architecture
  */
-async function routeWithAI({ text, flow, config, session }) {
+async function routeWithAI({ text, flow, config, session, waId }) {
   const aiConfig = config?.ai || {};
   const aiFlow = flow.ai || {};
   const flowId = flow?.id || "unknown";
+  const { tenantId } = getTenantContext();
+  const chatBudget = waId
+    ? {
+        tenantId: tenantId || "legacy",
+        waId,
+      }
+    : null;
 
   // Check if AI is enabled
   if (!aiFlow.enabled) {
@@ -1384,6 +1477,7 @@ async function routeWithAI({ text, flow, config, session }) {
         flowId,
         summary,
         previousQuestion,
+        chatBudget,
       });
       if (cloudflareDecision?.action) {
         return cacheAndReturn(cloudflareDecision);
@@ -1395,6 +1489,19 @@ async function routeWithAI({ text, flow, config, session }) {
         ai_used: false,
       });
     } catch (error) {
+      if (error?.code === "AI_CHAT_DAILY_BUDGET_EXCEEDED" || error?.code === "AI_BUDGET_EXCEEDED") {
+        logger.warn("ai.router_cloudflare_budget_fallback", { flowId, provider, model, message: error.message });
+        return cacheAndReturn(
+          buildLowCostRecoveryDecision({
+            text,
+            previousQuestion,
+            summary,
+            knowledge,
+            domainGate,
+            reason: "low_cost_recovery:cloudflare_budget_guard",
+          })
+        );
+      }
       logger.error("ai.router_error", { message: error.message, provider, model, flowId });
       return cacheAndReturn({
         action: "respond",
@@ -1420,6 +1527,7 @@ async function routeWithAI({ text, flow, config, session }) {
       flowId,
       summary,
       previousQuestion,
+      chatBudget,
     });
     if (compactDecision?.action) {
       return cacheAndReturn(compactDecision);
@@ -1492,7 +1600,7 @@ async function routeWithAI({ text, flow, config, session }) {
 
   try {
     // Call AI
-    const raw = await callAiProvider(provider, {
+    const raw = await callAiProvider(provider, withChatBudget({
       apiKey,
       model,
       accountId: cloudflareAccountId,
@@ -1507,7 +1615,7 @@ async function routeWithAI({ text, flow, config, session }) {
         stage: "full_fallback_primary",
         flowId,
       },
-    });
+    }, chatBudget));
 
     logger.info("ai.router_raw", { provider, model, length: raw?.length || 0 });
 
@@ -1534,7 +1642,7 @@ async function routeWithAI({ text, flow, config, session }) {
     if (!parsed?.action) {
       logger.warn("ai.router_parse_failed", { preview: raw?.slice(0, 100) });
 
-      const retryRaw = await callAiProvider(provider, {
+      const retryRaw = await callAiProvider(provider, withChatBudget({
         apiKey,
         model,
         accountId: cloudflareAccountId,
@@ -1550,7 +1658,7 @@ async function routeWithAI({ text, flow, config, session }) {
           attempt: 2,
           flowId,
         },
-      });
+      }, chatBudget));
 
       parsed = parseRouterResponse(retryRaw);
       logger.info("ai.router_parse_result", {
@@ -2051,6 +2159,41 @@ function detectDeterministicDomainIntentRoute(text) {
   return best;
 }
 
+function shouldForceKeywordRoute(text) {
+  const normalized = normalizeText(text || "").toLowerCase().trim();
+  if (!normalized) {
+    return false;
+  }
+
+  const tokenCount = normalized.split(/\s+/).filter(Boolean).length;
+  if (/\b(y|ademas|tambien|pero)\b/.test(normalized)) {
+    return false;
+  }
+
+  if (tokenCount <= 3) {
+    return true;
+  }
+
+  const exactUtilityPrompts = new Set([
+    "precio",
+    "precios",
+    "horario",
+    "horarios",
+    "ubicacion",
+    "ubicaciones",
+    "direccion",
+    "sucursal",
+    "sucursales",
+    "servicios",
+    "menu",
+    "asesor",
+    "humano",
+    "recepcion",
+  ]);
+
+  return exactUtilityPrompts.has(normalized);
+}
+
 function buildDeterministicDecision({ text, previousQuestion, summary, knowledge }) {
   const raw = String(text || "").trim();
   if (!raw) return null;
@@ -2062,17 +2205,11 @@ function buildDeterministicDecision({ text, previousQuestion, summary, knowledge
   const inferredRoute = deterministicIntent?.routeId || fallbackKeywordRoute(raw);
 
   const tokenCount = normalized.split(/\s+/).filter(Boolean).length;
-  const shortMessage = tokenCount <= 9;
-  const highSignalPrefixes = [
-    "precio", "precios", "costo", "costos", "horario", "horarios", "ubicacion", "ubicaciones",
-    "direccion", "donde", "como llegar", "asesor", "humano", "recepcion", "servicios", "menu",
-    "unero", "hongo", "hongos", "pedicure", "pedicura", "callo", "callosidad", "verruga",
-  ];
-  const hasHighSignalPrefix = highSignalPrefixes.some((p) => normalized.startsWith(p));
   const looksMultiIntent = /\b(y|ademas|tambien|pero)\b/.test(normalized);
   const inClarifyFlow = Boolean(previousQuestion) || Number(summary?.clarificationsAsked || 0) > 0;
+  const shouldForceRoute = shouldForceKeywordRoute(raw);
 
-  if (inferredRoute && (deterministicIntent || (shortMessage || hasHighSignalPrefix)) && !looksMultiIntent && !inClarifyFlow) {
+  if (inferredRoute && shouldForceRoute && !looksMultiIntent && !inClarifyFlow) {
     return {
       action: "route",
       route_id: inferredRoute,
@@ -2103,6 +2240,7 @@ function classifyCompactRouterError(error) {
     modelBlocked: /model_permission_blocked_org|blocked at the organization level/i.test(message),
     budgetOrRateLimited:
       error?.code === "AI_BUDGET_EXCEEDED" ||
+      error?.code === "AI_CHAT_DAILY_BUDGET_EXCEEDED" ||
       /\b429\b/.test(lower) ||
       lower.includes("rate limit") ||
       lower.includes("quota") ||
@@ -2203,15 +2341,6 @@ function shouldAttemptFullFallback({
     // Keep the expensive fallback for true ambiguity only.
     if (domainGate?.classification !== "ambiguous") {
       return { allow: false, reason: "full_fallback_prompt_too_large" };
-    }
-  }
-
-  const tokenCount = normalizeText(text || "").trim().split(/\s+/).filter(Boolean).length;
-  const inClarifyFlow = Boolean(previousQuestion) || Number(summary?.clarificationsAsked || 0) > 0;
-
-  if (compactResultState === "no_decision") {
-    if (domainGate?.classification === "in_domain" && tokenCount <= 8 && !inClarifyFlow) {
-      return { allow: false, reason: "simple_in_domain_skip_full_fallback" };
     }
   }
 

@@ -2,7 +2,7 @@
  * Flow Executor Dynamic
  * Ejecuta flows definidos en JSON/JS sin logica hardcodeada
  */
-const { sendText, sendButtons, sendList, sendImage, sendVideo } = require("../whatsapp");
+const { sendText, sendButtons, sendList, sendImage, sendVideo, sendLocation } = require("../whatsapp");
 const logger = require("../lib/logger");
 const { normalizeText } = require("../lib/normalize");
 const sessionStore = require("../sessionStore");
@@ -92,6 +92,160 @@ function isMenuTrigger(normalized) {
 function isHandoffAction(action) {
   const normalized = normalizeLabel(action);
   return normalized.includes("handoff") || normalized.includes("atencion_personalizada");
+}
+
+function buildMapsLink(branch) {
+  const explicitLink = (branch?.maps_url || "").trim();
+  if (explicitLink) {
+    return explicitLink;
+  }
+  if (
+    Number.isFinite(branch?.lat) &&
+    Number.isFinite(branch?.lng)
+  ) {
+    return `https://maps.google.com/?q=${branch.lat},${branch.lng}`;
+  }
+  return null;
+}
+
+function getBranchMatchScore(branch, normalizedMessage) {
+  if (!branch || !normalizedMessage) {
+    return 0;
+  }
+
+  const branchCode = normalizeLabel(branch.code);
+  const branchName = normalizeLabel(branch.name);
+  const branchAddress = normalizeLabel(branch.address);
+  const haystack = [branchCode, branchName, branchAddress].filter(Boolean).join(" ");
+
+  if (!haystack) {
+    return 0;
+  }
+
+  let score = 0;
+
+  if (branchCode && normalizedMessage.includes(branchCode)) {
+    score += 12;
+  }
+  if (branchName && normalizedMessage.includes(branchName)) {
+    score += 10;
+  }
+  if (branchAddress && normalizedMessage.includes(branchAddress)) {
+    score += 16;
+  }
+
+  const tokens = normalizedMessage
+    .split(" ")
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3);
+
+  for (const token of tokens) {
+    if (haystack.includes(token)) {
+      score += token.length >= 6 ? 3 : 2;
+    }
+  }
+
+  return score;
+}
+
+function pickBestBranch(branches, normalizedMessage) {
+  if (!Array.isArray(branches) || !branches.length || !normalizedMessage) {
+    return null;
+  }
+
+  let bestBranch = null;
+  let bestScore = 0;
+
+  for (const branch of branches) {
+    const score = getBranchMatchScore(branch, normalizedMessage);
+    if (score > bestScore) {
+      bestScore = score;
+      bestBranch = branch;
+    }
+  }
+
+  return bestScore > 0 ? bestBranch : null;
+}
+
+async function sendSingleBranchLocation(waId, branch) {
+  await sendLocation(waId, branch.lat, branch.lng, branch.name, branch.address);
+
+  const lines = [`📍 ${branch.name}`, branch.address];
+  if (branch.hours_text) {
+    lines.push(`Horario: ${branch.hours_text}`);
+  }
+  if (branch.phone) {
+    lines.push(`Tel: ${branch.phone}`);
+  }
+  const mapsLink = buildMapsLink(branch);
+  if (mapsLink) {
+    lines.push(`Mapa: ${mapsLink}`);
+  }
+
+  await sendText(waId, lines.join("\n"));
+}
+
+async function sendBranchDirectory(waId, branches, normalizedMessage) {
+  const askedNearest =
+    normalizedMessage.includes("cerca") ||
+    normalizedMessage.includes("queda mas cerca") ||
+    normalizedMessage.includes("me queda");
+
+  const intro = askedNearest
+    ? "No puedo medir distancia exacta desde tu zona, pero estas son nuestras sucursales activas:"
+    : "Estas son nuestras sucursales activas:";
+
+  const blocks = branches.map((branch) => {
+    const lines = [`📍 ${branch.name}`, `Dirección: ${branch.address}`];
+    if (branch.hours_text) {
+      lines.push(`Horario: ${branch.hours_text}`);
+    }
+    if (branch.phone) {
+      lines.push(`Tel: ${branch.phone}`);
+    }
+    const mapsLink = buildMapsLink(branch);
+    if (mapsLink) {
+      lines.push(`Mapa: ${mapsLink}`);
+    }
+    return lines.join("\n");
+  });
+
+  await sendText(waId, [intro, ...blocks].join("\n\n"));
+}
+
+async function trySendBranchRouteReply(waId, lineId, flowId, text) {
+  try {
+    const branches = await prisma.branch.findMany({
+      where: { is_active: true },
+      orderBy: { name: "asc" },
+    });
+
+    if (!branches.length) {
+      return false;
+    }
+
+    const normalizedMessage = normalizeLabel(text);
+    const matchedBranch =
+      branches.length === 1 ? branches[0] : pickBestBranch(branches, normalizedMessage);
+
+    await sessionStore.updateSession(waId, lineId, {
+      state: "HORARIOS_INFO",
+      data: { flow_id: flowId },
+    });
+
+    if (matchedBranch) {
+      await sendSingleBranchLocation(waId, matchedBranch);
+      return true;
+    }
+
+    await sendBranchDirectory(waId, branches, normalizedMessage);
+    return true;
+  } catch (error) {
+    logger.warn("flow.branch_route_dynamic_failed", {
+      error: error.message,
+    });
+    return false;
+  }
 }
 
 async function setConversationToPending(waId) {
@@ -299,6 +453,7 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
       flow,
       config: flowData.config,
       session,
+      waId,
     });
     if (aiDecision?.action) {
       const menuId = getStartNodeId(flow);
@@ -395,6 +550,13 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
       }
 
       if (aiDecision.action === "route" && aiDecision.route_id) {
+        if (
+          aiDecision.route_id === "HORARIOS_INFO" &&
+          await trySendBranchRouteReply(waId, lineId, flow.id, text)
+        ) {
+          return;
+        }
+
         const target = nodeMap.get(aiDecision.route_id);
         if (target) {
           await sendNode(waId, flow, target, new Set([aiDecision.route_id]));

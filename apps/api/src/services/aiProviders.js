@@ -5,6 +5,7 @@ const path = require("path");
 const { spawn } = require("child_process");
 const logger = require("../lib/logger");
 const { reserveAiBudget } = require("./aiBudgetManager");
+const { reserveDailyAiQuota } = require("./aiDailyQuota");
 
 const OPENAI_ENDPOINT = "https://api.openai.com/v1/responses";
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
@@ -133,6 +134,9 @@ function getConfiguredFallbackCandidates(primaryProvider, primaryModel, options 
 }
 
 function shouldFallbackToAnotherProvider(error) {
+  if (error?.code === "AI_CHAT_DAILY_BUDGET_EXCEEDED") {
+    return false;
+  }
   const msg = String(error?.message || error || "").toLowerCase();
   if (!msg) return false;
   return (
@@ -816,6 +820,15 @@ async function callAiProviderSingle(provider, options) {
     inputTokensEst: systemTokensEst + userTokensEst,
     systemTokensEst,
     userTokensEst,
+  });
+
+  await reserveDailyAiQuota({
+    tenantId: options?.chatBudget?.tenantId,
+    waId: options?.chatBudget?.waId,
+    provider: normalizedProvider || "openai",
+    model,
+    inputTokensEst: systemTokensEst + userTokensEst,
+    maxTokens: options?.maxTokens ?? null,
   });
 
   reserveAiBudget({

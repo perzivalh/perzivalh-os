@@ -548,23 +548,25 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
         return;
       }
 
-      // For route actions, prefer canonical flow content over free-form AI text to avoid hallucinations
-      // (e.g. horarios/ubicaciones/precios). The node itself contains the verified content.
-      if (aiDecision.action === "route" && aiDecision.route_id) {
-        if (aiText) {
-          logger.info("flow.ai_route_skip_free_text", {
-            route_id: aiDecision.route_id,
+      if (aiText && aiText !== lastSentText) {
+        logger.info(
+          aiDecision.action === "route" && aiDecision.route_id
+            ? "flow.ai_route_preamble_sent"
+            : "flow.ai_preface_sent",
+          {
+            action: aiDecision.action,
+            route_id: aiDecision.route_id || null,
             textPreview: aiText.slice(0, 140),
-          });
-        }
-      } else if (aiText && aiText !== lastSentText) {
+          }
+        );
+
         // Send the conversational text first (if exists and not repeated)
         await sendText(waId, aiText);
         await sessionStore.updateSession(waId, lineId, {
           data: { last_sent_text: aiText },
         });
-        // Small delay to make it feel conversational
-        await sleep(800);
+        // Short delay so the factual node reply lands as a follow-up, not as one cold block.
+        await sleep(aiDecision.action === "route" && aiDecision.route_id ? 550 : 800);
       }
 
       if (aiDecision.action === "route" && aiDecision.route_id) {

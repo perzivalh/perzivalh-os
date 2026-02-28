@@ -631,6 +631,104 @@ function buildCloudflareCopyPrompt({ knowledge, action, userText, kbSnippet = ""
   };
 }
 
+function buildRouteBridgeFallback(routeId, action) {
+  const normalizedRoute = String(routeId || "").trim();
+  if (normalizedRoute === "HORARIOS_INFO") {
+    return "Claro, te comparto la ubicacion y como llegar.";
+  }
+  if (normalizedRoute === "PRECIOS_INFO") {
+    return "Claro, te comparto los precios.";
+  }
+  if (normalizedRoute === "CONTACT_METHOD" || action === "handoff") {
+    return "Claro, te ayudo con eso.";
+  }
+  if (normalizedRoute === "SERVICIOS_MENU" || action === "show_services" || action === "services") {
+    return "Claro, te muestro las opciones.";
+  }
+  if (action === "menu") {
+    return "Claro, volvamos al menu principal.";
+  }
+  return "Claro, te ayudo con eso.";
+}
+
+function buildRouteBridgePrompt({ knowledge, routeId, action, userText }) {
+  const personalidad = knowledge?.personalidad || {};
+  const clinica = knowledge?.clinica || {};
+  const tone = personalidad.tono || "amable, calido y profesional";
+  const objective =
+    routeId === "HORARIOS_INFO"
+      ? "Confirma que vas a compartir ubicacion, sucursal u horarios."
+      : routeId === "PRECIOS_INFO"
+        ? "Confirma que vas a compartir precios."
+        : routeId === "CONTACT_METHOD" || action === "handoff"
+          ? "Confirma que vas a ayudar con contacto o atencion."
+          : routeId === "SERVICIOS_MENU" || action === "show_services" || action === "services"
+            ? "Confirma que vas a mostrar servicios u opciones."
+            : action === "menu"
+              ? "Confirma que vas a volver al menu."
+              : "Confirma que vas a ayudar con lo pedido.";
+
+  return {
+    system: `Eres ${personalidad.nombre || "PODITO"}, asistente de ${clinica.nombre || "PODOPIE"}. Tono ${tone}. Escribe UNA sola frase natural, breve y humana. ${objective} NO inventes datos concretos, NO des direcciones, horarios, precios ni detalles medicos. Solo una frase puente antes de la informacion real.`,
+    user: `Mensaje del usuario: "${userText}"\nDevuelve solo la frase final, sin JSON ni markdown.`,
+  };
+}
+
+async function generateRouteBridgeText({
+  provider,
+  apiKey,
+  model,
+  accountId,
+  knowledge,
+  routeId,
+  action,
+  userText,
+  flowId,
+  chatBudget,
+}) {
+  const fallbackText = buildRouteBridgeFallback(routeId, action);
+  const prompt = buildRouteBridgePrompt({
+    knowledge,
+    routeId,
+    action,
+    userText,
+  });
+
+  try {
+    const raw = await callAiProvider(provider, withChatBudget({
+      apiKey,
+      model,
+      accountId,
+      system: prompt.system,
+      user: prompt.user,
+      temperature: 0.2,
+      maxTokens: 60,
+      trace: {
+        feature: "ai_router",
+        operation: "copy",
+        stage: "route_bridge",
+        flowId,
+      },
+    }, chatBudget));
+
+    const cleaned = String(raw || "")
+      .replace(/```[\s\S]*?```/g, "")
+      .replace(/^\s*#+\s*/gm, "")
+      .trim();
+
+    return cleaned || fallbackText;
+  } catch (error) {
+    logger.warn("ai.router_route_bridge_error", {
+      provider,
+      model,
+      routeId: routeId || null,
+      action,
+      message: error.message,
+    });
+    return fallbackText;
+  }
+}
+
 async function callRouteDecisionWithRetry({
   provider,
   apiKey,
@@ -776,6 +874,15 @@ async function routeWithCloudflareRouteFirst({
   }
 
   parsed.action = normalizeRouterAction(parsed.action);
+  parsed = normalizeOutOfScopeDecision({
+    parsed,
+    flow,
+    text,
+    knowledge,
+    provider,
+    model,
+    source: "cloudflare_route_first",
+  });
 
   // If the model returned respond but also supplied route_id, prefer route.
   if (parsed.action === "respond" && parsed.route_id) {
@@ -812,6 +919,22 @@ async function routeWithCloudflareRouteFirst({
 
   // Route-like actions should not send AI free text to avoid hallucinating business facts.
   if (["route", "show_services", "handoff", "menu", "services", "out_of_scope"].includes(parsed.action)) {
+    const normalizedAction = normalizeRouterAction(parsed.action);
+    const routeBridgeText =
+      normalizedAction === "out_of_scope"
+        ? String(parsed.text || "").trim()
+        : await generateRouteBridgeText({
+            provider,
+            apiKey,
+            model,
+            accountId: cloudflareAccountId,
+            knowledge,
+            routeId: parsed.route_id,
+            action: normalizedAction,
+            userText: text,
+            flowId,
+            chatBudget,
+          });
     logger.info("ai.router_decision", {
       provider,
       model,
@@ -822,8 +945,8 @@ async function routeWithCloudflareRouteFirst({
     });
     return {
       ...parsed,
-      action: normalizeRouterAction(parsed.action),
-      text: "",
+      action: normalizedAction,
+      text: routeBridgeText,
       ai_used: true,
       clear_pending: Boolean(previousQuestion),
       reset_turns: parsed.action === "route" || parsed.action === "show_services" || parsed.action === "menu",
@@ -1178,6 +1301,15 @@ async function routeWithStandardProviderRouteFirst({
   if (!parsed?.action) return null;
 
   parsed.action = normalizeRouterAction(parsed.action);
+  parsed = normalizeOutOfScopeDecision({
+    parsed,
+    flow,
+    text,
+    knowledge,
+    provider,
+    model,
+    source: "route_first_compact",
+  });
 
   if (parsed.action === "respond" && parsed.route_id) {
     parsed.action = "route";
@@ -1210,6 +1342,19 @@ async function routeWithStandardProviderRouteFirst({
   }
 
   if (["route", "show_services", "handoff", "menu", "services"].includes(parsed.action)) {
+    const normalizedAction = normalizeRouterAction(parsed.action);
+    const routeBridgeText = await generateRouteBridgeText({
+      provider,
+      apiKey,
+      model,
+      accountId,
+      knowledge,
+      routeId: parsed.route_id,
+      action: normalizedAction,
+      userText: text,
+      flowId,
+      chatBudget,
+    });
     logger.info("ai.router_decision", {
       provider,
       model,
@@ -1220,8 +1365,8 @@ async function routeWithStandardProviderRouteFirst({
     });
     return {
       ...parsed,
-      action: normalizeRouterAction(parsed.action),
-      text: "",
+      action: normalizedAction,
+      text: routeBridgeText,
       ai_used: true,
       clear_pending: Boolean(previousQuestion),
       reset_turns: parsed.action === "route" || parsed.action === "show_services" || parsed.action === "menu",
@@ -1690,6 +1835,16 @@ async function routeWithAI({ text, flow, config, session, waId }) {
       return cacheAndReturn({ action: "show_services", ai_used: false });
     }
 
+    parsed = normalizeOutOfScopeDecision({
+      parsed,
+      flow,
+      text,
+      knowledge,
+      provider,
+      model,
+      source: "full_fallback",
+    });
+
     // Handle clarify limit
     if (parsed.action === "clarify" && (previousQuestion || summary.clarificationsAsked >= 1)) {
       logger.info("ai.router_clarify_blocked", { flowId });
@@ -2129,6 +2284,60 @@ function buildOutOfDomainResponseText({ text, knowledge }) {
   return `Gracias por escribirnos 😊 En ${clinicName} atendemos solo salud podologica 🦶. Si quieres, te muestro servicios, horarios o precios.`;
 }
 
+function isAiConversationRequest(text) {
+  const normalized = normalizeText(text || "").toLowerCase().replace(/\s+/g, " ").trim();
+  if (!normalized) return false;
+
+  const directPhrases = [
+    "hablar con la ia",
+    "hablar con ia",
+    "quiero hablar con la ia",
+    "quiero hablar con ia",
+    "hablar contigo",
+    "quiero que me responda la ia",
+    "responde vos",
+    "responde tu",
+  ];
+
+  return directPhrases.some((phrase) => normalized.includes(phrase));
+}
+
+function buildAiConversationReplyText({ knowledge }) {
+  const botName = knowledge?.personalidad?.nombre || "PODITO";
+  return `${botName} te responde directamente por aqui. Dime que necesitas saber y te ayudo con sucursales, precios, horarios o tratamientos de podologia.`;
+}
+
+function normalizeOutOfScopeDecision({ parsed, flow, text, knowledge, provider, model, source }) {
+  if (!parsed || typeof parsed !== "object") {
+    return parsed;
+  }
+
+  const outOfScopeNodeId = flow?.ai?.out_of_scope_node_id || "OUT_OF_SCOPE";
+  const routeId = String(parsed.route_id || "").trim();
+  const shouldNormalize =
+    parsed.action === "out_of_scope" ||
+    (routeId && routeId === outOfScopeNodeId);
+
+  if (!shouldNormalize) {
+    return parsed;
+  }
+
+  logger.info("ai.router_out_of_scope_normalized", {
+    provider,
+    model,
+    source,
+    originalAction: parsed.action || null,
+    originalRouteId: routeId || null,
+  });
+
+  return {
+    ...parsed,
+    action: "respond",
+    route_id: null,
+    text: String(parsed.text || "").trim() || buildOutOfDomainResponseText({ text, knowledge }),
+  };
+}
+
 function detectDeterministicDomainIntentRoute(text) {
   const normalized = normalizeText(text || "").toLowerCase().trim();
   if (!normalized) return null;
@@ -2199,6 +2408,17 @@ function buildDeterministicDecision({ text, previousQuestion, summary, knowledge
   if (!raw) return null;
   const normalized = normalizeText(raw).toLowerCase().trim();
   if (!normalized) return null;
+
+  if (isAiConversationRequest(raw)) {
+    return {
+      action: "respond",
+      text: buildAiConversationReplyText({ knowledge }),
+      reason: "ai_conversation_request",
+      ai_used: false,
+      clear_pending: Boolean(previousQuestion),
+      reset_turns: false,
+    };
+  }
 
   const domainGate = evaluateDomainGate({ text: raw, knowledge });
   const deterministicIntent = detectDeterministicDomainIntentRoute(raw);

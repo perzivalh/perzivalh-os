@@ -1087,6 +1087,52 @@ router.get("/bots", requireAuth, requireRole("admin"), async (req, res) => {
     }
 });
 
+// PATCH /api/admin/bots/ai-quota
+// Updates per-tenant AI quota policy stored in Settings.bot_identity_json.ai_quota
+router.patch("/bots/ai-quota", requireAuth, requireRole("admin"), async (req, res) => {
+    const tenantId = req.user.tenant_id || getTenantContext().tenantId || "legacy";
+    try {
+        const nextConfig = normalizeAiQuotaConfig(req.body || {});
+        const currentSettings = await prisma.settings.findUnique({ where: { id: 1 } });
+        const nextBotIdentity = {
+            ...(currentSettings?.bot_identity_json || {}),
+            ai_quota: nextConfig,
+        };
+
+        await prisma.settings.upsert({
+            where: { id: 1 },
+            update: {
+                bot_identity_json: nextBotIdentity,
+            },
+            create: {
+                id: 1,
+                bot_enabled: true,
+                auto_reply_enabled: true,
+                bot_identity_json: nextBotIdentity,
+            },
+        });
+
+        invalidateAiQuotaConfigCache(tenantId);
+
+        await logAudit({
+            userId: req.user.id,
+            action: "bot.ai_quota.updated",
+            data: {
+                enabled: nextConfig.enabled,
+                tracked_providers: nextConfig.tracked_providers,
+                tenant_daily_token_limit: nextConfig.tenant_daily_token_limit,
+                chat_daily_token_limit: nextConfig.chat_daily_token_limit,
+            },
+        });
+
+        const snapshot = await getDailyAiQuotaSnapshot({ tenantId });
+        return res.json(snapshot);
+    } catch (error) {
+        logger.error("bots.ai_quota_update_failed", { message: error.message });
+        return res.status(500).json({ error: "update_failed" });
+    }
+});
+
 // PATCH /api/admin/bots/:id
 // Toggle bot active/inactive for this tenant
 router.patch("/bots/:id", requireAuth, requireRole("admin"), async (req, res) => {
@@ -1148,52 +1194,6 @@ router.get("/bots/ai-quota", requireAuth, requireRole("admin"), async (req, res)
     } catch (error) {
         logger.error("bots.ai_quota_failed", { message: error.message });
         return res.status(500).json({ error: "load_failed" });
-    }
-});
-
-// PATCH /api/admin/bots/ai-quota
-// Updates per-tenant AI quota policy stored in Settings.bot_identity_json.ai_quota
-router.patch("/bots/ai-quota", requireAuth, requireRole("admin"), async (req, res) => {
-    const tenantId = req.user.tenant_id || getTenantContext().tenantId || "legacy";
-    try {
-        const nextConfig = normalizeAiQuotaConfig(req.body || {});
-        const currentSettings = await prisma.settings.findUnique({ where: { id: 1 } });
-        const nextBotIdentity = {
-            ...(currentSettings?.bot_identity_json || {}),
-            ai_quota: nextConfig,
-        };
-
-        await prisma.settings.upsert({
-            where: { id: 1 },
-            update: {
-                bot_identity_json: nextBotIdentity,
-            },
-            create: {
-                id: 1,
-                bot_enabled: true,
-                auto_reply_enabled: true,
-                bot_identity_json: nextBotIdentity,
-            },
-        });
-
-        invalidateAiQuotaConfigCache(tenantId);
-
-        await logAudit({
-            userId: req.user.id,
-            action: "bot.ai_quota.updated",
-            data: {
-                enabled: nextConfig.enabled,
-                tracked_providers: nextConfig.tracked_providers,
-                tenant_daily_token_limit: nextConfig.tenant_daily_token_limit,
-                chat_daily_token_limit: nextConfig.chat_daily_token_limit,
-            },
-        });
-
-        const snapshot = await getDailyAiQuotaSnapshot({ tenantId });
-        return res.json(snapshot);
-    } catch (error) {
-        logger.error("bots.ai_quota_update_failed", { message: error.message });
-        return res.status(500).json({ error: "update_failed" });
     }
 });
 

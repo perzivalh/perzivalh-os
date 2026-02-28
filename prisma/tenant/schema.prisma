@@ -163,6 +163,8 @@ model Settings {
   id                 Int      @id @default(1)
   bot_enabled        Boolean  @default(true)
   auto_reply_enabled Boolean  @default(true)
+  company_json       Json?
+  bot_identity_json  Json?
   updated_at         DateTime @updatedAt
 }
 
@@ -210,6 +212,7 @@ model Branch {
   address    String
   lat        Float
   lng        Float
+  maps_url   String?
   hours_text String
   phone      String?
   is_active  Boolean  @default(true)
@@ -223,6 +226,7 @@ model Service {
   name         String
   subtitle     String?
   description  String
+  keywords     String?
   price_bob    Int
   duration_min Int?
   image_url    String?

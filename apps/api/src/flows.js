@@ -227,9 +227,6 @@ function formatServiceMessage(service) {
     lines.push(service.subtitle);
   }
   lines.push(`Precio: Bs ${service.price_bob}`);
-  if (service.duration_min) {
-    lines.push(`Duración: ${service.duration_min} min`);
-  }
   if (service.description) {
     lines.push(service.description);
   }

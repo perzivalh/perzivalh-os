@@ -66,7 +66,6 @@ async function buildKnowledgeFromDb() {
       descripcion: s.description,
       keywords: s.keywords || null,
       precio: s.price_bob ? `Bs. ${s.price_bob}` : null,
-      duracion: s.duration_min ? `${s.duration_min} min` : null,
     };
   }
 

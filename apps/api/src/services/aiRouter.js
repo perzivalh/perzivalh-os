@@ -818,6 +818,7 @@ async function routeWithCloudflareRouteFirst({
 
   const textReply =
     cleanedCopy ||
+    String(parsed.text || "").trim() ||
     (evaluateDomainGate({ text, knowledge }).classification === "out_of_domain"
       ? buildOutOfDomainResponseText({ text, knowledge })
       : "Entiendo tu consulta. Te ayudo con eso.");
@@ -1211,7 +1212,7 @@ async function routeWithStandardProviderRouteFirst({
 
   return {
     action: "respond",
-    text: cleanedCopy || fallbackText,
+    text: cleanedCopy || String(parsed.text || "").trim() || fallbackText,
     reason: parsed.reason || null,
     ai_used: true,
     clear_pending: Boolean(previousQuestion),
@@ -1319,24 +1320,6 @@ async function routeWithAI({ text, flow, config, session }) {
       reason: deterministicDecision.reason || null,
     });
     return deterministicDecision;
-  }
-
-  if (domainGate.classification === "out_of_domain" && Number(domainGate.confidence || 0) >= 0.9) {
-    const decision = {
-      action: "respond",
-      text: buildOutOfDomainResponseText({ text, knowledge }),
-      reason: `domain_gate_pre_ai:${domainGate.reason || "no_allowlist_match"}`,
-      ai_used: false,
-      clear_pending: Boolean(previousQuestion),
-      reset_turns: false,
-    };
-    logger.info("ai.router_domain_gate_short_circuit", {
-      flowId,
-      action: decision.action,
-      reason: decision.reason,
-      confidence: domainGate.confidence,
-    });
-    return decision;
   }
 
   // If no API key, use fallback
@@ -2103,17 +2086,6 @@ function buildDeterministicDecision({ text, previousQuestion, summary, knowledge
     };
   }
 
-  if (domainGate.classification === "out_of_domain" && Number(domainGate.confidence || 0) >= 0.86) {
-    return {
-      action: "respond",
-      text: buildOutOfDomainResponseText({ text: raw, knowledge }),
-      reason: `domain_gate_out_of_scope:${domainGate.reason || "no_allowlist_match"}`,
-      ai_used: false,
-      clear_pending: Boolean(previousQuestion),
-      reset_turns: false,
-    };
-  }
-
   return null;
 }
 
@@ -2238,9 +2210,6 @@ function shouldAttemptFullFallback({
   const inClarifyFlow = Boolean(previousQuestion) || Number(summary?.clarificationsAsked || 0) > 0;
 
   if (compactResultState === "no_decision") {
-    if (domainGate?.classification === "out_of_domain") {
-      return { allow: false, reason: "out_of_domain_skip_full_fallback" };
-    }
     if (domainGate?.classification === "in_domain" && tokenCount <= 8 && !inClarifyFlow) {
       return { allow: false, reason: "simple_in_domain_skip_full_fallback" };
     }

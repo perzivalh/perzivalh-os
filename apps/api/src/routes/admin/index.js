@@ -339,53 +339,68 @@ router.get("/branches", requireAuth, requireRole(["admin", "marketing"]), async 
 
 // POST /api/admin/branches
 router.post("/branches", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
-    const data = {
-        code: (req.body?.code || "").trim(),
-        name: (req.body?.name || "").trim(),
-        address: (req.body?.address || "").trim(),
-        lat: Number(req.body?.lat || 0),
-        lng: Number(req.body?.lng || 0),
-        maps_url: req.body?.maps_url || null,
-        hours_text: (req.body?.hours_text || "").trim(),
-        phone: req.body?.phone || null,
-        is_active: req.body?.is_active !== false,
-    };
-    if (!data.code || !data.name || !data.address) {
-        return res.status(400).json({ error: "missing_fields" });
+    try {
+        const data = {
+            code: (req.body?.code || "").trim(),
+            name: (req.body?.name || "").trim(),
+            address: (req.body?.address || "").trim(),
+            lat: Number(req.body?.lat || 0),
+            lng: Number(req.body?.lng || 0),
+            hours_text: (req.body?.hours_text || "").trim(),
+            phone: req.body?.phone || null,
+            is_active: req.body?.is_active !== false,
+        };
+        if (!data.code || !data.name || !data.address) {
+            return res.status(400).json({ error: "missing_fields" });
+        }
+        const branch = await prisma.branch.create({ data });
+        await invalidateKnowledgeCache();
+        await logAudit({
+            userId: req.user.id,
+            action: "branch.created",
+            data: { branch_id: branch.id },
+        });
+        return res.json({ branch });
+    } catch (error) {
+        logger.error("admin.branches.create_failed", {
+            userId: req.user?.id,
+            error: error?.message || String(error),
+        });
+        return res.status(500).json({ error: "branch_create_failed" });
     }
-    const branch = await prisma.branch.create({ data });
-    await invalidateKnowledgeCache();
-    await logAudit({
-        userId: req.user.id,
-        action: "branch.created",
-        data: { branch_id: branch.id },
-    });
-    return res.json({ branch });
 });
 
 // PATCH /api/admin/branches/:id
 router.patch("/branches/:id", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
-    const branch = await prisma.branch.update({
-        where: { id: req.params.id },
-        data: {
-            code: req.body?.code,
-            name: req.body?.name,
-            address: req.body?.address,
-            lat: req.body?.lat !== undefined ? Number(req.body.lat) : undefined,
-            lng: req.body?.lng !== undefined ? Number(req.body.lng) : undefined,
-            maps_url: req.body?.maps_url,
-            hours_text: req.body?.hours_text,
-            phone: req.body?.phone,
-            is_active: req.body?.is_active,
-        },
-    });
-    await invalidateKnowledgeCache();
-    await logAudit({
-        userId: req.user.id,
-        action: "branch.updated",
-        data: { branch_id: branch.id },
-    });
-    return res.json({ branch });
+    try {
+        const branch = await prisma.branch.update({
+            where: { id: req.params.id },
+            data: {
+                code: req.body?.code,
+                name: req.body?.name,
+                address: req.body?.address,
+                lat: req.body?.lat !== undefined ? Number(req.body.lat) : undefined,
+                lng: req.body?.lng !== undefined ? Number(req.body.lng) : undefined,
+                hours_text: req.body?.hours_text,
+                phone: req.body?.phone,
+                is_active: req.body?.is_active,
+            },
+        });
+        await invalidateKnowledgeCache();
+        await logAudit({
+            userId: req.user.id,
+            action: "branch.updated",
+            data: { branch_id: branch.id },
+        });
+        return res.json({ branch });
+    } catch (error) {
+        logger.error("admin.branches.update_failed", {
+            userId: req.user?.id,
+            branchId: req.params.id,
+            error: error?.message || String(error),
+        });
+        return res.status(500).json({ error: "branch_update_failed" });
+    }
 });
 
 // DELETE /api/admin/branches/:id

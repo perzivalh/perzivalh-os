@@ -30,7 +30,6 @@ const EMPTY_BRANCH = {
     address: "",
     lat: "",
     lng: "",
-    maps_url: "",
     hours_text: "",
     phone: "",
 };
@@ -189,7 +188,6 @@ function CompanySection() {
                 address: branch.address || "",
                 lat: branch.lat != null ? String(branch.lat) : "",
                 lng: branch.lng != null ? String(branch.lng) : "",
-                maps_url: branch.maps_url || "",
                 hours_text: branch.hours_text || "",
                 phone: branch.phone || "",
             },
@@ -208,7 +206,6 @@ function CompanySection() {
                 address: data.address.trim(),
                 lat: parseFloat(data.lat) || 0,
                 lng: parseFloat(data.lng) || 0,
-                maps_url: data.maps_url.trim() || null,
                 hours_text: data.hours_text.trim(),
                 phone: data.phone.trim() || null,
             };
@@ -605,12 +602,6 @@ function CompanySection() {
                                                 value={branchModal.data.lng}
                                                 onChange={(e) => setBranchModal((m) => ({ ...m, data: { ...m.data, lng: e.target.value } }))}
                                                 placeholder="-63.1821" />
-                                        </div>
-                                        <div style={{ gridColumn: "1 / -1" }}>
-                                            <label className="settings-label">Link Google Maps</label>
-                                            <input className="settings-input" value={branchModal.data.maps_url}
-                                                onChange={(e) => setBranchModal((m) => ({ ...m, data: { ...m.data, maps_url: e.target.value } }))}
-                                                placeholder="https://maps.app.goo.gl/..." />
                                         </div>
                                         <div style={{ gridColumn: "1 / -1" }}>
                                             <label className="settings-label">Horario *</label>

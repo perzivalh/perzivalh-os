@@ -108,6 +108,9 @@ async function loadStoredAiQuotaConfig(tenantId) {
   const cacheKey = getConfigCacheKey(tenantId);
   const cached = CONFIG_CACHE.get(cacheKey);
   if (cached && (Date.now() - cached.at) < CONFIG_CACHE_TTL_MS) {
+    if (isVerbose()) {
+      logger.info("ai.daily_quota_config_cache_hit", { tenantId });
+    }
     return cached.value;
   }
 
@@ -127,6 +130,12 @@ async function loadStoredAiQuotaConfig(tenantId) {
       at: Date.now(),
       value: rawConfig,
     });
+    if (isVerbose()) {
+      logger.info("ai.daily_quota_config_loaded", {
+        tenantId,
+        source: rawConfig ? "settings.bot_identity_json.ai_quota" : "defaults",
+      });
+    }
     return rawConfig;
   } catch (error) {
     logger.warn("ai.daily_quota_config_load_failed", {
@@ -298,7 +307,7 @@ async function getDailyAiQuotaSnapshot({ tenantId, topChatsLimit = 8 } = {}) {
 
   chatUsage.sort((a, b) => b.used_tokens - a.used_tokens);
 
-  return {
+  const snapshot = {
     day,
     config,
     usage: {
@@ -312,6 +321,17 @@ async function getDailyAiQuotaSnapshot({ tenantId, topChatsLimit = 8 } = {}) {
       chats: chatUsage.slice(0, Math.max(1, Number(topChatsLimit || 8))),
     },
   };
+
+  logger.info("ai.daily_quota_snapshot", {
+    tenantId: resolvedTenantId,
+    day,
+    enabled: config.enabled,
+    tenantUsedTokens: snapshot.usage.tenant.used_tokens,
+    tenantLimitTokens: snapshot.usage.tenant.limit_tokens,
+    trackedChats: snapshot.usage.chats.length,
+  });
+
+  return snapshot;
 }
 
 async function reserveDailyAiQuota({
@@ -326,16 +346,37 @@ async function reserveDailyAiQuota({
   const config = await getEffectiveAiQuotaConfig({ tenantId: resolvedTenantId });
 
   if (!config.enabled) {
+    if (isVerbose()) {
+      logger.info("ai.daily_quota_skipped", {
+        tenantId: resolvedTenantId,
+        provider: normalizeProviderName(provider),
+        reason: "disabled",
+      });
+    }
     return { reserved: false, reason: "disabled", config };
   }
 
   const normalizedProvider = normalizeProviderName(provider);
   const trackedProviders = normalizeTrackedProviders(config.tracked_providers, []);
   if (trackedProviders.length && !trackedProviders.includes(normalizedProvider)) {
+    if (isVerbose()) {
+      logger.info("ai.daily_quota_skipped", {
+        tenantId: resolvedTenantId,
+        provider: normalizedProvider,
+        reason: "provider_not_tracked",
+      });
+    }
     return { reserved: false, reason: "provider_not_tracked", config };
   }
 
   if (!config.tenant_daily_token_limit && !config.chat_daily_token_limit) {
+    if (isVerbose()) {
+      logger.info("ai.daily_quota_skipped", {
+        tenantId: resolvedTenantId,
+        provider: normalizedProvider,
+        reason: "limits_not_configured",
+      });
+    }
     return { reserved: false, reason: "limits_not_configured", config };
   }
 

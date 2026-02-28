@@ -183,6 +183,12 @@ async function sendSingleBranchLocation(waId, branch) {
   }
 
   await sendText(waId, lines.join("\n"));
+  logger.info("flow.branch_route_reply", {
+    mode: "single_branch",
+    branchId: branch.id,
+    branchCode: branch.code,
+    branchName: branch.name,
+  });
 }
 
 async function sendBranchDirectory(waId, branches, normalizedMessage) {
@@ -211,6 +217,11 @@ async function sendBranchDirectory(waId, branches, normalizedMessage) {
   });
 
   await sendText(waId, [intro, ...blocks].join("\n\n"));
+  logger.info("flow.branch_route_reply", {
+    mode: "branch_directory",
+    branchCount: branches.length,
+    nearestHint: askedNearest,
+  });
 }
 
 async function trySendBranchRouteReply(waId, lineId, flowId, text) {
@@ -456,6 +467,13 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
       waId,
     });
     if (aiDecision?.action) {
+      logger.info("flow.ai_decision_applied", {
+        flowId: flow.id,
+        action: aiDecision.action,
+        routeId: aiDecision.route_id || null,
+        aiUsed: Boolean(aiDecision.ai_used),
+        reason: aiDecision.reason || null,
+      });
       const menuId = getStartNodeId(flow);
       const servicesId = flow.ai?.services_node_id || "SERVICIOS_MENU";
       const handoffId = flow.ai?.handoff_node_id || "AI_HANDOFF_OFFER";

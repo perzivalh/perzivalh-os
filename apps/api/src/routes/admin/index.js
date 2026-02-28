@@ -1113,6 +1113,14 @@ router.patch("/bots/ai-quota", requireAuth, requireRole("admin"), async (req, re
         });
 
         invalidateAiQuotaConfigCache(tenantId);
+        logger.info("bots.ai_quota_updated", {
+            tenantId,
+            enabled: nextConfig.enabled,
+            trackedProviders: nextConfig.tracked_providers,
+            tenantDailyTokenLimit: nextConfig.tenant_daily_token_limit,
+            chatDailyTokenLimit: nextConfig.chat_daily_token_limit,
+            outputWeight: nextConfig.output_weight,
+        });
 
         await logAudit({
             userId: req.user.id,
@@ -1190,6 +1198,12 @@ router.get("/bots/ai-quota", requireAuth, requireRole("admin"), async (req, res)
     const tenantId = req.user.tenant_id || getTenantContext().tenantId || "legacy";
     try {
         const snapshot = await getDailyAiQuotaSnapshot({ tenantId });
+        logger.info("bots.ai_quota_read", {
+            tenantId,
+            enabled: snapshot?.config?.enabled,
+            tenantUsedTokens: snapshot?.usage?.tenant?.used_tokens || 0,
+            trackedChats: Array.isArray(snapshot?.usage?.chats) ? snapshot.usage.chats.length : 0,
+        });
         return res.json(snapshot);
     } catch (error) {
         logger.error("bots.ai_quota_failed", { message: error.message });

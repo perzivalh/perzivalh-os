@@ -548,37 +548,42 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
         return;
       }
 
-      if (aiText && aiText !== lastSentText) {
-        logger.info(
-          aiDecision.action === "route" && aiDecision.route_id
-            ? "flow.ai_route_preamble_sent"
-            : "flow.ai_preface_sent",
-          {
+      const shouldPreferNodeContent =
+        (aiDecision.action === "route" && aiDecision.route_id) ||
+        aiDecision.action === "show_services" ||
+        aiDecision.action === "services" ||
+        aiDecision.action === "handoff" ||
+        aiDecision.action === "menu";
+
+      if (shouldPreferNodeContent) {
+        if (aiText) {
+          logger.info("flow.ai_route_skip_free_text", {
             action: aiDecision.action,
             route_id: aiDecision.route_id || null,
             textPreview: aiText.slice(0, 140),
-          }
-        );
+          });
+        }
+      } else if (aiText && aiText !== lastSentText) {
+        logger.info("flow.ai_preface_sent", {
+          action: aiDecision.action,
+          route_id: aiDecision.route_id || null,
+          textPreview: aiText.slice(0, 140),
+        });
 
-        // Send the conversational text first (if exists and not repeated)
         await sendText(waId, aiText);
         await sessionStore.updateSession(waId, lineId, {
           data: { last_sent_text: aiText },
         });
-        // Short delay so the factual node reply lands as a follow-up, not as one cold block.
-        await sleep(aiDecision.action === "route" && aiDecision.route_id ? 550 : 800);
+        await sleep(800);
       }
 
       if (aiDecision.action === "route" && aiDecision.route_id) {
-        if (
-          aiDecision.route_id === "HORARIOS_INFO" &&
-          await trySendBranchRouteReply(waId, lineId, flow.id, text)
-        ) {
-          return;
-        }
-
         const target = nodeMap.get(aiDecision.route_id);
         if (target) {
+          logger.info("flow.route_node_sent", {
+            flowId: flow.id,
+            routeId: aiDecision.route_id,
+          });
           await sendNode(waId, flow, target, new Set([aiDecision.route_id]));
           return;
         }

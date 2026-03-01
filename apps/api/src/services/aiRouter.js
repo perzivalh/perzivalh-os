@@ -545,57 +545,51 @@ function buildRoutingNodeCatalog(flow) {
   }
 
   return [...nodeMap.values()]
-    .map((n) => `- ${n.id}${n.title ? ` :: ${n.title}` : ""}`)
+    .map((n) => `- ${n.id}`)
     .join("\n");
 }
 
 function buildCloudflareRouteSystemPrompt({ knowledge, flow, previousQuestion, summary }) {
   const clinica = knowledge?.clinica || {};
-  const personalidad = knowledge?.personalidad || {};
   const serviciosCompact = Object.values(knowledge?.servicios || {})
     .map((svc) => {
       const name = String(svc?.nombre || "").trim();
       if (!name) return null;
       const keywords = String(svc?.keywords || "").trim();
-      return keywords ? `- ${name} (${keywords})` : `- ${name}`;
+      const compactKeywords = keywords
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .slice(0, 3)
+        .join(", ");
+      return compactKeywords ? `- ${name}: ${compactKeywords}` : `- ${name}`;
     })
     .filter(Boolean)
-    .join("\n");
-  const ubicacionesCompact = Object.values(knowledge?.ubicaciones || {})
-    .map((loc) => {
-      const name = String(loc?.nombre || "").trim();
-      if (!name) return null;
-      const address = String(loc?.direccion || "").replace(/\s+/g, " ").trim();
-      return address ? `- ${name}: ${address.slice(0, 120)}` : `- ${name}`;
-    })
-    .filter(Boolean)
+    .slice(0, 12)
     .join("\n");
   const nodeCatalog = buildRoutingNodeCatalog(flow);
   const clarifyCount = Number(summary?.clarificationsAsked || 0);
 
-  return `Eres un router de flujo de WhatsApp para ${clinica.nombre || "PODOPIE"} (podologia).
+  return `Eres un router de WhatsApp para ${clinica.nombre || "PODOPIE"}.
+Devuelve SOLO JSON valido.
+Tu trabajo es decidir accion y route_id. No expliques nada, no redactes horarios, no des direcciones.
 
-TU TAREA ES SOLO DECIDIR LA ACCION Y EL NODO. NO EXPLIQUES SERVICIOS, NO INVENTES HORARIOS, NO INVENTES DIRECCIONES.
-Responde SOLO JSON valido.
+Reglas:
+- route: si pide servicios, tratamiento, horarios, ubicacion, direccion, sucursal, precios o contacto del negocio.
+- handoff: si pide humano/asesor o hay urgencia.
+- respond: solo si es fuera de podologia.
+- clarify: solo si falta contexto real y maximo una vez.
+- show_services: si es del negocio pero no identificas nodo exacto.
 
-Reglas clave:
-- Si el usuario pide informacion de un servicio/tema podologico => action="route" con route_id correcto.
-- Si pide horarios, ubicacion, sucursal, direccion => route a nodo de horarios/ubicaciones.
-- Si pide precios/costos => route a nodo de precios.
-- Si pide asesor/humano/recepcion/denuncia/reclamo => handoff o route a contacto/atencion personalizada.
-- Si el tema NO es de pies/podologia => respond (mensaje corto aclarando que solo atienden pies).
-- Si hay dolor intenso / urgencia => handoff.
-- Usa clarify SOLO si realmente falta dato y como maximo una vez.
-- Si no sabes a que nodo ir pero sigue siendo del negocio => show_services.
+Atajos:
+- ubicacion, direccion, sucursal, como llegar -> HORARIOS_INFO
+- precio, costo, cuanto cuesta -> PRECIOS_INFO
+- asesor, humano, recepcion -> CONTACT_METHOD
 
-DATOS REALES DEL NEGOCIO:
-Servicios:
-${serviciosCompact || "- Consultar menu"}
+Servicios detectables:
+${serviciosCompact || "- servicios"}
 
-Sucursales:
-${ubicacionesCompact || "- Consultar nodo de ubicaciones"}
-
-Acciones permitidas: respond, route, handoff, clarify, show_services, menu, out_of_scope.
+Acciones permitidas: respond, route, handoff, clarify, show_services, menu.
 ${previousQuestion ? "IMPORTANTE: ya se hizo una pregunta de clarificacion antes, evita otra salvo que sea imprescindible." : ""}
 ${clarifyCount >= 1 ? "IMPORTANTE: ya hubo clarificaciones previas; prioriza route/show_services/handoff." : ""}
 
@@ -723,6 +717,56 @@ async function generateRouteBridgeText({
       model,
       routeId: routeId || null,
       action,
+      message: error.message,
+    });
+    return fallbackText;
+  }
+}
+
+async function generateOutOfDomainReplyText({
+  provider,
+  apiKey,
+  model,
+  accountId,
+  knowledge,
+  userText,
+  flowId,
+  chatBudget,
+}) {
+  const fallbackText = buildOutOfDomainResponseText({ text: userText, knowledge });
+  const prompt = buildCloudflareCopyPrompt({
+    knowledge,
+    action: "respond",
+    userText,
+  });
+
+  try {
+    const raw = await callAiProvider(provider, withChatBudget({
+      apiKey,
+      model,
+      accountId,
+      system: prompt.system,
+      user: prompt.user,
+      temperature: 0.2,
+      maxTokens: 90,
+      trace: {
+        feature: "ai_router",
+        operation: "copy",
+        stage: "out_of_domain_copy",
+        flowId,
+      },
+    }, chatBudget));
+
+    const cleaned = String(raw || "")
+      .replace(/```[\s\S]*?```/g, "")
+      .replace(/^\s*#+\s*/gm, "")
+      .trim();
+
+    return cleaned || fallbackText;
+  } catch (error) {
+    logger.warn("ai.router_out_of_domain_copy_error", {
+      provider,
+      model,
       message: error.message,
     });
     return fallbackText;
@@ -920,21 +964,6 @@ async function routeWithCloudflareRouteFirst({
   // Route-like actions should not send AI free text to avoid hallucinating business facts.
   if (["route", "show_services", "handoff", "menu", "services", "out_of_scope"].includes(parsed.action)) {
     const normalizedAction = normalizeRouterAction(parsed.action);
-    const routeBridgeText =
-      normalizedAction === "out_of_scope"
-        ? String(parsed.text || "").trim()
-        : await generateRouteBridgeText({
-            provider,
-            apiKey,
-            model,
-            accountId: cloudflareAccountId,
-            knowledge,
-            routeId: parsed.route_id,
-            action: normalizedAction,
-            userText: text,
-            flowId,
-            chatBudget,
-          });
     logger.info("ai.router_decision", {
       provider,
       model,
@@ -946,7 +975,7 @@ async function routeWithCloudflareRouteFirst({
     return {
       ...parsed,
       action: normalizedAction,
-      text: routeBridgeText,
+      text: normalizedAction === "out_of_scope" ? String(parsed.text || "").trim() : "",
       ai_used: true,
       clear_pending: Boolean(previousQuestion),
       reset_turns: parsed.action === "route" || parsed.action === "show_services" || parsed.action === "menu",
@@ -1343,18 +1372,6 @@ async function routeWithStandardProviderRouteFirst({
 
   if (["route", "show_services", "handoff", "menu", "services"].includes(parsed.action)) {
     const normalizedAction = normalizeRouterAction(parsed.action);
-    const routeBridgeText = await generateRouteBridgeText({
-      provider,
-      apiKey,
-      model,
-      accountId,
-      knowledge,
-      routeId: parsed.route_id,
-      action: normalizedAction,
-      userText: text,
-      flowId,
-      chatBudget,
-    });
     logger.info("ai.router_decision", {
       provider,
       model,
@@ -1366,7 +1383,7 @@ async function routeWithStandardProviderRouteFirst({
     return {
       ...parsed,
       action: normalizedAction,
-      text: routeBridgeText,
+      text: "",
       ai_used: true,
       clear_pending: Boolean(previousQuestion),
       reset_turns: parsed.action === "route" || parsed.action === "show_services" || parsed.action === "menu",
@@ -1695,6 +1712,54 @@ async function routeWithAI({ text, flow, config, session, waId }) {
     return cacheAndReturn({ action: "show_services", ai_used: false });
   }
 
+  if (domainGate.classification === "out_of_domain") {
+    logger.info("ai.router_skip_full_fallback", {
+      flowId,
+      provider,
+      model,
+      reason: "out_of_domain_cheap_copy",
+      compactResultState,
+    });
+    const outOfDomainText = await generateOutOfDomainReplyText({
+      provider,
+      apiKey,
+      model,
+      accountId: cloudflareAccountId,
+      knowledge,
+      userText: text,
+      flowId,
+      chatBudget,
+    });
+    return cacheAndReturn({
+      action: "respond",
+      text: outOfDomainText,
+      ai_used: true,
+      clear_pending: Boolean(previousQuestion),
+      reset_turns: false,
+      reason: "out_of_domain_cheap_copy",
+    });
+  }
+
+  if (domainGate.classification === "in_domain") {
+    logger.info("ai.router_skip_full_fallback", {
+      flowId,
+      provider,
+      model,
+      reason: "route_priority_low_cost_recovery",
+      compactResultState,
+    });
+    return cacheAndReturn(
+      buildLowCostRecoveryDecision({
+        text,
+        previousQuestion,
+        summary,
+        knowledge,
+        domainGate,
+        reason: "low_cost_recovery:route_priority_compact_no_decision",
+      })
+    );
+  }
+
   // Full prompt fallback (kept for hard/edge cases)
   const system = buildSystemPrompt(knowledge, session, flow);
   const user = buildUserPrompt({ message: text, history, summary, previousQuestion });
@@ -1866,14 +1931,16 @@ async function routeWithAI({ text, flow, config, session, waId }) {
     // while using action="respond" for queries that clearly have a specific node.
     if (parsed.action === "respond" || parsed.action === "clarify") {
       const inferredRoute = fallbackKeywordRoute(text);
+      const canPromoteToMainMenu = inferredRoute !== "MAIN_MENU" || shouldForceKeywordRoute(text);
       logger.info("ai.router_route_augmentation_check", {
         provider,
         model,
         action: parsed.action,
         inferredRoute: inferredRoute || null,
+        canPromoteToMainMenu,
         userTextPreview: String(text || "").slice(0, 140),
       });
-      if (inferredRoute) {
+      if (inferredRoute && canPromoteToMainMenu) {
         logger.info("ai.router_route_augmented_from_keywords", {
           provider,
           model,
@@ -1884,7 +1951,16 @@ async function routeWithAI({ text, flow, config, session, waId }) {
           ...parsed,
           action: "route",
           route_id: inferredRoute,
+          text: "",
         };
+      } else if (inferredRoute) {
+        logger.info("ai.router_route_augmentation_skipped", {
+          provider,
+          model,
+          originalAction: parsed.action,
+          inferredRoute,
+          reason: "main_menu_requires_simple_prompt",
+        });
       }
     }
 

@@ -1,6 +1,7 @@
 ﻿
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut, setToken } from "./api";
+import { API_BASE } from "./apiBase";
 import { connectSocket } from "./socket";
 import { useToast } from "./components/ToastProvider.jsx";
 import NavRail from "./components/NavRail.jsx";
@@ -1403,7 +1404,6 @@ function App() {
       if (dashboardChannel) {
         params.set("channel", dashboardChannel);
       }
-      const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:3000";
       const token = localStorage.getItem("token");
       const response = await fetch(`${API_BASE}/api/dashboard/report?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },

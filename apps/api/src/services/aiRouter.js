@@ -1717,6 +1717,25 @@ async function routeWithAI({ text, flow, config, session, waId }) {
   }
 
   if (domainGate.classification === "out_of_domain") {
+    const recoveredRoute = fallbackKeywordRoute(text);
+    if (recoveredRoute) {
+      logger.info("ai.router_out_of_domain_route_recovered", {
+        flowId,
+        provider,
+        model,
+        recoveredRoute,
+        compactResultState,
+      });
+      return cacheAndReturn({
+        action: "route",
+        route_id: recoveredRoute,
+        ai_used: false,
+        clear_pending: Boolean(previousQuestion),
+        reset_turns: true,
+        reason: "low_cost_recovery:out_of_domain_route_recovered",
+      });
+    }
+
     logger.info("ai.router_skip_full_fallback", {
       flowId,
       provider,

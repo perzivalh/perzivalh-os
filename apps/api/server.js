@@ -11,6 +11,7 @@
  */
 
 const path = require("path");
+const fs = require("fs");
 require("dotenv").config({ path: path.resolve(__dirname, "../../.env") });
 
 const http = require("http");
@@ -190,6 +191,28 @@ void (async () => {
 // ==========================================
 
 setupRoutes(app);
+
+const frontendDistPath = path.resolve(__dirname, "../web/dist");
+const frontendIndexPath = path.join(frontendDistPath, "index.html");
+const hasBuiltFrontend =
+    process.env.NODE_ENV === "production" &&
+    fs.existsSync(frontendDistPath) &&
+    fs.existsSync(frontendIndexPath);
+
+if (hasBuiltFrontend) {
+    app.use(express.static(frontendDistPath));
+    app.get("*", (req, res, next) => {
+        if (
+            req.path.startsWith("/api") ||
+            req.path.startsWith("/webhook") ||
+            req.path.startsWith("/socket.io") ||
+            req.path.startsWith("/debug")
+        ) {
+            return next();
+        }
+        return res.sendFile(frontendIndexPath);
+    });
+}
 
 // ==========================================
 // PROCESAMIENTO DE CAMPAÑAS

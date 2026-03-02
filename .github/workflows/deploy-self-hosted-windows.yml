@@ -1,0 +1,42 @@
+name: Deploy Self-Hosted Windows
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on:
+      - self-hosted
+      - windows
+    env:
+      DEPLOY_PATH: ${{ vars.WINDOWS_DEPLOY_PATH }}
+    steps:
+      - name: Validate deploy path
+        shell: powershell
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:DEPLOY_PATH)) {
+            throw "Set the repository variable WINDOWS_DEPLOY_PATH before using this workflow."
+          }
+          if (-not (Test-Path $env:DEPLOY_PATH)) {
+            throw "DEPLOY_PATH does not exist: $env:DEPLOY_PATH"
+          }
+
+      - name: Pull and deploy
+        shell: powershell
+        run: |
+          Set-Location $env:DEPLOY_PATH
+          git config --global --add safe.directory $env:DEPLOY_PATH | Out-Null
+          $branch = if ([string]::IsNullOrWhiteSpace($env:GITHUB_REF_NAME)) { "main" } else { $env:GITHUB_REF_NAME }
+          git fetch origin $branch
+          git show-ref --verify --quiet "refs/heads/$branch"
+          if ($LASTEXITCODE -ne 0) {
+            git checkout -b $branch "origin/$branch"
+          } else {
+            git checkout $branch
+          }
+          git pull --ff-only origin $branch
+          powershell -ExecutionPolicy Bypass -File .\scripts\deploy-windows.ps1 -SkipPull -Branch $branch

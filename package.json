@@ -18,9 +18,12 @@
     "prisma:migrate": "npm --workspace apps/api run prisma:migrate",
     "prisma:control:migrate": "npm --workspace apps/api run prisma:control:migrate",
     "prisma:control:deploy": "npm --workspace apps/api run prisma:control:deploy",
+    "provision:control": "node scripts/provision-control-db.js",
+    "provision:tenant": "node scripts/provision-tenant-db.js",
     "seed:admin": "node prisma/seed.js",
     "seed:superadmin": "node scripts/seed-control-superadmin.js",
-    "seed:tenant-user": "node scripts/seed-tenant-user.js"
+    "seed:tenant-user": "node scripts/seed-tenant-user.js",
+    "deploy:windows": "powershell -ExecutionPolicy Bypass -File scripts/deploy-windows.ps1"
   },
   "engines": {
     "node": ">=18"

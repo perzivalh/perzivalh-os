@@ -81,7 +81,7 @@ const DETERMINISTIC_DOMAIN_INTENTS = [
   { routeId: "HORARIOS_INFO", intent: "hours", phrases: ["horario", "horarios", "hora", "horas", "rango de hora", "rango de horas", "atienden"] },
   { routeId: "HORARIOS_INFO", intent: "location", phrases: ["ubicacion", "ubicaciones", "direccion", "sucursal", "sucursales", "como llegar", "donde estan", "donde queda", "clinica"] },
   { routeId: "CONTACT_METHOD", intent: "contact", phrases: ["asesor", "asesora", "humano", "recepcion", "hablar con alguien", "hablar con una persona", "llamar"] },
-  { routeId: "SERVICIOS_MENU", intent: "services_menu", phrases: ["servicios", "que servicios", "que ofrecen", "que tienen", "que hacen", "tratamientos disponibles", "ver opciones"] },
+  { routeId: "SERVICIOS_MENU", intent: "services_menu", phrases: ["servicios", "que servicios", "que ofrecen", "que tienen", "que hacen", "tratamientos disponibles", "ver opciones", "con que trabajan", "en que trabajan", "con que trabajan entonces", "en que trabajan entonces"] },
   { routeId: "UNERO_TIPO_TRAT", intent: "unero", phrases: ["unero", "uneros", "una encarnada", "unas encarnadas", "una clavada"] },
   { routeId: "TRAT_MATRICECTOMIA_INFO", intent: "matricectomia", phrases: ["matricectomia", "matricetomia", "cirugia de unero", "operacion unero"] },
   { routeId: "HONGOS_TIPO_TRAT", intent: "hongos", phrases: ["hongo", "hongos", "onicomicosis"] },
@@ -1095,6 +1095,10 @@ function fallbackKeywordRoute(text) {
     "que ofrecen": "SERVICIOS_MENU",
     "que tienen": "SERVICIOS_MENU",
     "que hacen": "SERVICIOS_MENU",
+    "con que trabajan": "SERVICIOS_MENU",
+    "en que trabajan": "SERVICIOS_MENU",
+    "con que trabajan entonces": "SERVICIOS_MENU",
+    "en que trabajan entonces": "SERVICIOS_MENU",
     "tratamientos disponibles": "SERVICIOS_MENU",
 
     // === UNERO (entrada principal) → UNERO_TIPO_TRAT ===
@@ -2111,6 +2115,12 @@ function includesWholePhrase(normalizedText, phrase) {
   }
 }
 
+function stripLeadingSoftConnector(normalizedText) {
+  return String(normalizedText || "")
+    .replace(/^(y|ademas|tambien|pero)\s+/i, "")
+    .trim();
+}
+
 function addTermsToDomainLexicon(targetSet, sourceText) {
   const normalized = normalizeText(sourceText || "").toLowerCase().trim();
   if (!normalized) return;
@@ -2360,6 +2370,18 @@ function buildOutOfDomainResponseText({ text, knowledge }) {
   return `Gracias por escribirnos 😊 En ${clinicName} atendemos solo salud podologica 🦶. Si quieres, te muestro servicios, horarios o precios.`;
 }
 
+// Override the legacy copy above with cleaner wording.
+function buildOutOfDomainResponseText({ text, knowledge }) {
+  const clinicName = knowledge?.clinica?.nombre || "PODOPIE";
+  const topic = extractOutOfDomainTopicHint(text);
+
+  if (topic) {
+    return `Gracias por escribirnos. En ${clinicName} no brindamos informacion sobre ${topic}. Atendemos solo salud podologica. Si quieres, te muestro servicios, horarios o precios.`;
+  }
+
+  return `Gracias por escribirnos. En ${clinicName} atendemos solo salud podologica. Si quieres, te muestro servicios, horarios o precios.`;
+}
+
 function isAiConversationRequest(text) {
   const normalized = normalizeText(text || "").toLowerCase().replace(/\s+/g, " ").trim();
   if (!normalized) return false;
@@ -2450,10 +2472,8 @@ function shouldForceKeywordRoute(text) {
     return false;
   }
 
-  const tokenCount = normalized.split(/\s+/).filter(Boolean).length;
-  if (/\b(y|ademas|tambien|pero)\b/.test(normalized)) {
-    return false;
-  }
+  const softened = stripLeadingSoftConnector(normalized);
+  const tokenCount = softened.split(/\s+/).filter(Boolean).length;
 
   if (tokenCount <= 3) {
     return true;
@@ -2470,13 +2490,15 @@ function shouldForceKeywordRoute(text) {
     "sucursal",
     "sucursales",
     "servicios",
+    "con que trabajan",
+    "en que trabajan",
     "menu",
     "asesor",
     "humano",
     "recepcion",
   ]);
 
-  return exactUtilityPrompts.has(normalized);
+  return exactUtilityPrompts.has(softened);
 }
 
 function buildDeterministicDecision({ text, previousQuestion, summary, knowledge }) {
@@ -2484,6 +2506,7 @@ function buildDeterministicDecision({ text, previousQuestion, summary, knowledge
   if (!raw) return null;
   const normalized = normalizeText(raw).toLowerCase().trim();
   if (!normalized) return null;
+  const softenedNormalized = stripLeadingSoftConnector(normalized);
 
   if (isAiConversationRequest(raw)) {
     return {
@@ -2500,8 +2523,8 @@ function buildDeterministicDecision({ text, previousQuestion, summary, knowledge
   const deterministicIntent = detectDeterministicDomainIntentRoute(raw);
   const inferredRoute = deterministicIntent?.routeId || fallbackKeywordRoute(raw);
 
-  const tokenCount = normalized.split(/\s+/).filter(Boolean).length;
-  const looksMultiIntent = /\b(y|ademas|tambien|pero)\b/.test(normalized);
+  const tokenCount = softenedNormalized.split(/\s+/).filter(Boolean).length;
+  const looksMultiIntent = /\b(y|ademas|tambien|pero)\b/.test(softenedNormalized);
   const inClarifyFlow = Boolean(previousQuestion) || Number(summary?.clarificationsAsked || 0) > 0;
   const shouldForceRoute = shouldForceKeywordRoute(raw);
 

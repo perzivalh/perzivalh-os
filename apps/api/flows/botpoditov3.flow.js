@@ -28,13 +28,13 @@ module.exports = {
     {
       "id": "WELCOME",
       "type": "text",
-      "text": "¡Hola! 👋 Bienvenido a PODOPIE.\nIMPORTANTE: La valoración es totalmente gratuita y realizada por un especialista 🤩🦶",
+      "text": "¡Hola! 👋 Bienvenido a *PODOPIE*.\n*IMPORTANTE*: La valoración es totalmente gratuita y realizada por un especialista 🤩🦶",
       "next": "MAIN_MENU"
     },
     {
       "id": "MAIN_MENU",
       "type": "text",
-      "text": "Soy PODITO 🤖, tu asistente virtual de PODOPIE 🦶✨ ¿En qué puedo ayudarte?",
+      "text": "Soy *PODITO* 🤖, tu asistente virtual de *PODOPIE* 🦶✨ ¿En qué puedo ayudarte?",
       "delayMs": 2500,
       "buttons": [
         {
@@ -58,7 +58,7 @@ module.exports = {
     {
       "id": "OUT_OF_SCOPE",
       "type": "text",
-      "text": "En PODOPIE nos especializamos en salud podológica 🦶 (solo pies). Te muestro los servicios que SÍ tenemos:",
+      "text": "En *PODOPIE* nos especializamos en salud podológica 🦶 (solo pies). Te muestro los servicios que *SÍ* tenemos:",
       "delayMs": 1000,
       "next": "SERVICIOS_MENU"
     },
@@ -109,7 +109,7 @@ module.exports = {
       "id": "HORARIOS_CENTRAL_VIDEO",
       "type": "video",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/centralComoLlegar.mp4",
-      "text": "Mediante este video puedes encontrar la central de PODOPIE 📌⬆️",
+      "text": "Mediante este video puedes encontrar la central de *PODOPIE* 📌⬆️",
       "next": "HORARIOS_SUCURSAL_TITLE"
     },
     {
@@ -144,7 +144,7 @@ module.exports = {
       "id": "HORARIOS_SUCURSAL_VIDEO",
       "type": "video",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/sucursalComoLlegar.mp4",
-      "text": "Mediante este video puedes encontrar la sucursal de PODOPIE 📌⬆️",
+      "text": "Mediante este video puedes encontrar la sucursal de *PODOPIE* 📌⬆️",
       "next": "HORARIOS_NAV"
     },
     {
@@ -166,7 +166,7 @@ module.exports = {
     {
       "id": "PRECIOS_INFO",
       "type": "text",
-      "text": "💰 Precios PODOPIE\n\nTe comparto nuestro tarifario general.\n\n*¿Quieres que te ayude a elegir el servicio adecuado?*",
+      "text": "💰 Precios *PODOPIE*\n\nTe comparto nuestro tarifario general.\n\n*¿Quieres que te ayude a elegir el servicio adecuado?*",
       "next": "PRECIOS_IMG_1"
     },
     {
@@ -229,7 +229,7 @@ module.exports = {
     {
       "id": "SERVICIOS_MENU",
       "type": "text",
-      "text": "SELECCIONA EL SERVICIO QUE NECESITES",
+      "text": "*SELECCIONA* *EL* *SERVICIO* *QUE* *NECESITES*",
       "delayMs": 2500,
       "buttons": [
         {
@@ -275,14 +275,14 @@ module.exports = {
       "id": "UNERO_INFO_2",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/U%C3%B1ero/2.jpg",
-      "text": "El servicio de extracción de UNO O VARIOS UÑEROS EN UN PIE tiene un costo de *200 BS* 💰.",
+      "text": "El servicio de extracción de *UNO* *O* *VARIOS* *UÑEROS* *EN* *UN* *PIE* tiene un costo de *200 BS* 💰.",
       "next": "UNERO_INFO_3"
     },
     {
       "id": "UNERO_INFO_3",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/U%C3%B1ero/3.jpg",
-      "text": "Si desea la extracción de UÑEROS EN AMBOS PIES, el costo es de *300 BS* por todos los uñeros en ambos pies. 💵",
+      "text": "Si desea la extracción de *UÑEROS* *EN* *AMBOS* *PIES*, el costo es de *300 BS* por todos los uñeros en ambos pies. 💵",
       "next": "UNERO_INFO_4"
     },
     {
@@ -296,7 +296,7 @@ module.exports = {
       "id": "UNERO_INFO_5",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/U%C3%B1ero/podomix.jpg",
-      "text": "Si necesita un paquete completo 🦶✨ tiene una opción accesible y detallada por realizarse, PODOMIX incluye una valoración profesional 👨‍⚕️📋, extracción de uñeros ✂️🦶 y pedicure clínico 🧼💅, todo por un costo de 350 Bs 💰.\nEste paquete se realiza únicamente bajo recomendación del especialista 🩺, ya que durante la valoración 🔍 se determinará si el paciente necesita o no dicho tratamiento ✅❌.",
+      "text": "Si necesita un paquete completo 🦶✨ tiene una opción accesible y detallada por realizarse, *PODOMIX* incluye una valoración profesional 👨‍⚕️📋, extracción de uñeros ✂️🦶 y pedicure clínico 🧼💅, todo por un costo de *350 Bs* 💰.\nEste paquete se realiza únicamente bajo recomendación del especialista 🩺, ya que durante la valoración 🔍 se determinará si el paciente necesita o no dicho tratamiento ✅❌.",
       "next": "UNERO_TIPO_TRAT_OPTIONS"
     },
     {
@@ -329,13 +329,13 @@ module.exports = {
       "id": "HONGOS_INFO_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/1.jpg",
-      "text": "En nuestro centro, ofrecemos una variedad de tratamientos para hongos en las uñas, incluyendo opciones TÓPICAS, SISTÉMICO, LÁSER, OZONO y ALTA FRECUENCIA. Los tratamientos más solicitados son el TÓPICO y el tratamiento LÁSER, cada uno con sus propias características y beneficios. 🦶",
+      "text": "En nuestro centro, ofrecemos una variedad de tratamientos para hongos en las uñas, incluyendo opciones *TÓPICAS*, *SISTÉMICO*, *LÁSER*, *OZONO* y *ALTA* *FRECUENCIA*. Los tratamientos más solicitados son el *TÓPICO* y el tratamiento *LÁSER*, cada uno con sus propias características y beneficios. 🦶",
       "next": "HONGOS_PACKS_TITLE"
     },
     {
       "id": "HONGOS_PACKS_TITLE",
       "type": "text",
-      "text": "NUESTROS PAQUETES",
+      "text": "*NUESTROS* *PAQUETES*",
       "next": "HONGOS_PACK_1"
     },
     {
@@ -402,14 +402,14 @@ module.exports = {
       "id": "TRAT_MATRICECTOMIA_STEP_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/U%C3%B1ero/Matricectomia/1.jpg",
-      "text": "PROTOCOLO PRE-QUIRUGICO. 🩺\n- El paciente debe asistir a la microcirugía con chinelas o calzado abierto y ropa cómoda, evitando zapatos cerrados y en el caso de mujeres, faldas o vestidos.\n- Es obligatorio firmar el consentimiento informado antes del procedimiento.\n- Si el caso lo requiere, el profesional de salud podrá solicitar pruebas especiales previas a la cirugía.",
+      "text": "*PROTOCOLO* *PRE-QUIRUGICO*. 🩺\n- El paciente debe asistir a la microcirugía con chinelas o calzado abierto y ropa cómoda, evitando zapatos cerrados y en el caso de mujeres, faldas o vestidos.\n- Es obligatorio firmar el consentimiento informado antes del procedimiento.\n- Si el caso lo requiere, el profesional de salud podrá solicitar pruebas especiales previas a la cirugía.",
       "next": "TRAT_MATRICECTOMIA_STEP_2"
     },
     {
       "id": "TRAT_MATRICECTOMIA_STEP_2",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/U%C3%B1ero/Matricectomia/2.jpg",
-      "text": "Tarifas según el tipo de procedimiento:\n• Unilateral (un solo lado) en un dedo de un pie: 800 Bs.\n• Bilateral (ambos lados) en un dedo de un pie: 1.000 Bs.\n• Unilateral en ambos pies (un lado de un dedo en cada pie): 1.600 Bs.\n• Bilateral en ambos pies (ambos lados de un dedo en cada pie): 2.000 Bs.\n• Combinado: unilateral en un pie y bilateral en el otro: 1.800 Bs.\nCuraciones: 🩹\n• Primer curativo (obligatorio): gratuito, dentro de las primeras 48 horas.\n• Curativos posteriores: 50 Bs por sesión.",
+      "text": "Tarifas según el tipo de procedimiento:\n• Unilateral (un solo lado) en un dedo de un pie: *800 Bs*.\n• Bilateral (ambos lados) en un dedo de un pie: *1.000 Bs*.\n• Unilateral en ambos pies (un lado de un dedo en cada pie): *1.600 Bs*.\n• Bilateral en ambos pies (ambos lados de un dedo en cada pie): *2.000 Bs*.\n• Combinado: unilateral en un pie y bilateral en el otro: *1.800 Bs*.\nCuraciones: 🩹\n• Primer curativo (obligatorio): gratuito, dentro de las primeras 48 horas.\n• Curativos posteriores: *50 Bs* por sesión.",
       "next": "TRAT_MATRICECTOMIA_STEP_3"
     },
     {
@@ -459,7 +459,7 @@ module.exports = {
       "id": "TRAT_ORTESIS_STEP_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/U%C3%B1ero/Ortesis/IMAGEN%201.jpg",
-      "text": "🦶✨ *La ortesis ungueal* es un tratamiento que corrige la forma de la uña del pie, ayudando a que crezca correctamente y evitando que se encarne 💅😊 Costo: 150 Bs un dedo.",
+      "text": "🦶✨ *La ortesis ungueal* es un tratamiento que corrige la forma de la uña del pie, ayudando a que crezca correctamente y evitando que se encarne 💅😊 Costo: *150 Bs* un dedo.",
       "next": "TRAT_ORTESIS_STEP_2"
     },
     {
@@ -503,7 +503,7 @@ module.exports = {
       "id": "TRAT_TOPICO_STEP_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/T%C3%B3pico/IMAGEN%202.jpg",
-      "text": "TRATAMIENTO TÓPICO:\n* Costo: 150 Bs (Incluye diagnóstico, revisión y limpieza).\n* Este tratamiento se sugiere realizarlo con una LACA ANTIMICÓTICA cuyo costo varía según la laca. Es importante seguir las indicaciones para obtener los mejores resultados, el costo de la laca antimicótica es aparte. 💧",
+      "text": "*TRATAMIENTO* *TÓPICO*:\n* Costo: *150 Bs* (Incluye diagnóstico, revisión y limpieza).\n* Este tratamiento se sugiere realizarlo con una *LACA* *ANTIMICÓTICA* cuyo costo varía según la laca. Es importante seguir las indicaciones para obtener los mejores resultados, el costo de la laca antimicótica es aparte. 💧",
       "next": "TRAT_TOPICO_STEP_2"
     },
     {
@@ -547,14 +547,14 @@ module.exports = {
       "id": "TRAT_LASER_STEP_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/L%C3%A1ser/1.jpg",
-      "text": "El TRATAMIENTO LÁSER es una opción eficaz y moderna para eliminar los hongos en las uñas. Utilizamos equipos podológicos con LUZ LÁSER INDOLORA, garantizando que no existan efectos secundarios, con resultados que no dañan la uña en su crecimiento, en algunos casos sin necesidad de medicación oral. 🩹",
+      "text": "El *TRATAMIENTO* *LÁSER* es una opción eficaz y moderna para eliminar los hongos en las uñas. Utilizamos equipos podológicos con *LUZ* *LÁSER* *INDOLORA*, garantizando que no existan efectos secundarios, con resultados que no dañan la uña en su crecimiento, en algunos casos sin necesidad de medicación oral. 🩹",
       "next": "TRAT_LASER_STEP_2"
     },
     {
       "id": "TRAT_LASER_STEP_2",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/L%C3%A1ser/2.jpg",
-      "text": "TRATAMIENTO LÁSER: ⚡\n⚡🦶 Tratamiento rápido y efectivo, con resultados visibles en menos tiempo.\nLas sesiones se programan según tu disponibilidad semanal 📅\nAmbas opciones son efectivas, pero el láser actúa más rápido 🛑✨",
+      "text": "*TRATAMIENTO* *LÁSER*: ⚡\n⚡🦶 Tratamiento rápido y efectivo, con resultados visibles en menos tiempo.\nLas sesiones se programan según tu disponibilidad semanal 📅\nAmbas opciones son efectivas, pero el láser actúa más rápido 🛑✨",
       "next": "TRAT_LASER_STEP_3"
     },
     {
@@ -567,7 +567,7 @@ module.exports = {
       "id": "TRAT_LASER_STEP_4",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/L%C3%A1ser/3.jpg",
-      "text": "¿CUÁNTAS SESIONES LÁSER NECESITO? 🤔\nEl podólogo EVALÚA TU CASO y te recomienda un ESTIMADO DE SESIONES, las mismas pueden son programadas de manera semanal o con intervalos de 5 a 7 días. Con este tratamiento Láser en 10, 20, 30 SESIÓNES o más según sea tu caso específico SE VERÁN LOS RESULTADOS, el tiempo PUEDE VARIAR SEGÚN EL ESTADO DE LAS UÑAS DE TUS PIES, esto se ajusta a tu disponibilidad económica y tu tiempo, asegurando que recibas el tratamiento que mejor se adapte a tus necesidades. 🥼",
+      "text": "¿*CUÁNTAS* *SESIONES* *LÁSER* *NECESITO*? 🤔\nEl podólogo *EVALÚA* *TU* *CASO* y te recomienda un *ESTIMADO* *DE* *SESIONES*, las mismas pueden son programadas de manera semanal o con intervalos de 5 a 7 días. Con este tratamiento Láser en 10, 20, 30 *SESIÓNES* o más según sea tu caso específico *SE* *VERÁN* *LOS* *RESULTADOS*, el tiempo *PUEDE* *VARIAR* *SEGÚN* *EL* *ESTADO* *DE* *LAS* *UÑAS* *DE* *TUS* *PIES*, esto se ajusta a tu disponibilidad económica y tu tiempo, asegurando que recibas el tratamiento que mejor se adapte a tus necesidades. 🥼",
       "next": "TRAT_LASER_STEP_5"
     },
     {
@@ -611,7 +611,7 @@ module.exports = {
       "id": "TRAT_SISTEMICO_STEP_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/Sist%C3%A9mico/1.jpg",
-      "text": "También te ofrecemos un TRATAMIENTO SISTÉMICO eficaz para combatir los hongos desde la raíz. 🔝",
+      "text": "También te ofrecemos un *TRATAMIENTO* *SISTÉMICO* eficaz para combatir los hongos desde la raíz. 🔝",
       "next": "TRAT_SISTEMICO_STEP_2"
     },
     {
@@ -655,21 +655,21 @@ module.exports = {
       "id": "SVC_PEDICURE_STEP_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Pedicure%20Cl%C3%ADnico/1.jpg",
-      "text": "La PEDICURA CLÍNICA es un servicio especializado que es diferente a la pedicura tradicional estética. Se realiza por nuestros podólogos y se enfoca en TRATAR AFECCIONES DE LOS PIES Y EN LA PREVENCIÓN DE PROBLEMAS FUTUROS. 🦶 🛡",
+      "text": "La *PEDICURA* *CLÍNICA* es un servicio especializado que es diferente a la pedicura tradicional estética. Se realiza por nuestros podólogos y se enfoca en *TRATAR* *AFECCIONES* *DE* *LOS* *PIES* *Y* *EN* *LA* *PREVENCIÓN* *DE* *PROBLEMAS* *FUTUROS*. 🦶 🛡",
       "next": "SVC_PEDICURE_STEP_2"
     },
     {
       "id": "SVC_PEDICURE_STEP_2",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Pedicure%20Cl%C3%ADnico/2.jpg",
-      "text": "Costo de la PEDICURA CLÍNICA es de 100 Bs. Este servicio incluye limpieza, corte correcto de uñas, eliminación de callosidades leves y recomendaciones personalizadas para el cuidado de tus pies. 💵\nNuestros podólogos te darán ASESORAMIENTO PERSONALIZADO para la salud de tus pies, incluyendo el uso del calzado adecuado y consejos en la higiene de tus pies. 🧼",
+      "text": "Costo de la *PEDICURA* *CLÍNICA* es de *100 Bs*. Este servicio incluye limpieza, corte correcto de uñas, eliminación de callosidades leves y recomendaciones personalizadas para el cuidado de tus pies. 💵\nNuestros podólogos te darán *ASESORAMIENTO* *PERSONALIZADO* para la salud de tus pies, incluyendo el uso del calzado adecuado y consejos en la higiene de tus pies. 🧼",
       "next": "SVC_PEDICURE_STEP_3"
     },
     {
       "id": "SVC_PEDICURE_STEP_3",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Pedicure%20Cl%C3%ADnico/3.jpg",
-      "text": "Si en la consulta se detecta la necesidad de tratar UÑEROS, FISURAS, VERRUGAS, HONGOS E HIPERQUERATOSIS el precio variará según el servicio a realizar, así usted decide si desea el SERVICIO ADICIONAL en ese momento. 👣🚶‍♂️🚶‍♀️",
+      "text": "Si en la consulta se detecta la necesidad de tratar *UÑEROS*, *FISURAS*, *VERRUGAS*, *HONGOS* *E* *HIPERQUERATOSIS* el precio variará según el servicio a realizar, así usted decide si desea el *SERVICIO* *ADICIONAL* en ese momento. 👣🚶‍♂️🚶‍♀️",
       "next": "SVC_PEDICURE_STEP_4"
     },
     {
@@ -727,27 +727,27 @@ module.exports = {
       "id": "SVC_PODOPEDIATRIA_STEP_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podopediatr%C3%ADa/1.jpg",
-      "text": "La PODOPEDIATRÍA se enfoca en el diagnóstico, tratamiento y prevención de las afecciones podológicas de los niños desde su nacimiento hasta la adolescencia, ASEGURANDO UN CORRECTO DESARROLLO y evitando problemas futuros en sus pies. 👶🏽\n¡Los pies de tus pequeños necesitan un cuidado especializado! 🧑‍⚕️👩‍⚕️",
+      "text": "La *PODOPEDIATRÍA* se enfoca en el diagnóstico, tratamiento y prevención de las afecciones podológicas de los niños desde su nacimiento hasta la adolescencia, *ASEGURANDO* *UN* *CORRECTO* *DESARROLLO* y evitando problemas futuros en sus pies. 👶🏽\n¡Los pies de tus pequeños necesitan un cuidado especializado! 🧑‍⚕️👩‍⚕️",
       "next": "SVC_PODOPEDIATRIA_STEP_2"
     },
     {
       "id": "SVC_PODOPEDIATRIA_STEP_2",
       "type": "text",
-      "text": "En la especialidad de PODOPEDIATRÍA adaptamos el tratamiento a cada niño mediante una evaluación integral. 🤱🏽\n- Analizamos el desarrollo, antecedentes y estructura del pie.\n- Detectamos deformidades o lesiones.\n- Trabajamos con los padres, orientando sobre cuidado y calzado.\nEl progreso depende de la edad, la afección y el seguimiento del tratamiento recomendado. 🕒",
+      "text": "En la especialidad de *PODOPEDIATRÍA* adaptamos el tratamiento a cada niño mediante una evaluación integral. 🤱🏽\n- Analizamos el desarrollo, antecedentes y estructura del pie.\n- Detectamos deformidades o lesiones.\n- Trabajamos con los padres, orientando sobre cuidado y calzado.\nEl progreso depende de la edad, la afección y el seguimiento del tratamiento recomendado. 🕒",
       "next": "SVC_PODOPEDIATRIA_STEP_3"
     },
     {
       "id": "SVC_PODOPEDIATRIA_STEP_3",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podopediatr%C3%ADa/2.jpg",
-      "text": "Este servicio se enfoca en PREVENIR Y TRATAR MOLESTIAS COMUNES en los pies de niños como son las uñas encarnadas, malos cortes de uñas o infecciones por mala higiene. 🍼",
+      "text": "Este servicio se enfoca en *PREVENIR* *Y* *TRATAR* *MOLESTIAS* *COMUNES* en los pies de niños como son las uñas encarnadas, malos cortes de uñas o infecciones por mala higiene. 🍼",
       "next": "SVC_PODOPEDIATRIA_STEP_4"
     },
     {
       "id": "SVC_PODOPEDIATRIA_STEP_4",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podopediatr%C3%ADa/3.jpg",
-      "text": "Sabemos que este cuidado debe ser constante, por ese motivo, la PRIMERA CONSULTA TIENE UN COSTO DE 150 BS y posteriormente a su registro en PODOPIE, el paciente es beneficiado de un SEGUIMIENTO Y TRATAMIENTO POR SOLO 50 BS. 🤓",
+      "text": "Sabemos que este cuidado debe ser constante, por ese motivo, la *PRIMERA* *CONSULTA* *TIENE* *UN* *COSTO* *DE* *150 BS* y posteriormente a su registro en *PODOPIE*, el paciente es beneficiado de un *SEGUIMIENTO* *Y* *TRATAMIENTO* *POR* *SOLO* *50 BS*. 🤓",
       "next": "SVC_PODOPEDIATRIA_STEP_5"
     },
     {
@@ -798,14 +798,14 @@ module.exports = {
       "id": "SVC_PODOGERIATRIA_STEP_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podogeriatria/1.jpg",
-      "text": "Tratamos afecciones comunes como UÑAS ENGROSADAS, CALLOS, DUREZAS Y DEFORMIDADES. Prevenimos úlceras en pacientes con diabetes, orientamos sobre calzado adecuado y PROMOVEMOS EL AUTOCUIDADO para mantener la movilidad, aliviar el dolor y mejorar la calidad de vida para las personas de la tercera edad. 🩹🩺",
+      "text": "Tratamos afecciones comunes como *UÑAS* *ENGROSADAS*, *CALLOS*, *DUREZAS* *Y* *DEFORMIDADES*. Prevenimos úlceras en pacientes con diabetes, orientamos sobre calzado adecuado y *PROMOVEMOS* *EL* *AUTOCUIDADO* para mantener la movilidad, aliviar el dolor y mejorar la calidad de vida para las personas de la tercera edad. 🩹🩺",
       "next": "SVC_PODOGERIATRIA_STEP_2"
     },
     {
       "id": "SVC_PODOGERIATRIA_STEP_2",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podogeriatria/2.jpg",
-      "text": "El servicio de PODOGERIATRÍA tiene un costo de 200 Bs. 💵\nRealizamos cortes de uñas cuidadosos, revisamos lesiones, tratamos durezas y controlamos cualquier condición que pueda afectar la salud de sus pies.\nNuestro objetivo es brindar comodidad, prevenir complicaciones y mejorar su calidad de vida.",
+      "text": "El servicio de *PODOGERIATRÍA* tiene un costo de *200 Bs*. 💵\nRealizamos cortes de uñas cuidadosos, revisamos lesiones, tratamos durezas y controlamos cualquier condición que pueda afectar la salud de sus pies.\nNuestro objetivo es brindar comodidad, prevenir complicaciones y mejorar su calidad de vida.",
       "next": "SVC_PODOGERIATRIA_STEP_3"
     },
     {
@@ -819,7 +819,7 @@ module.exports = {
       "id": "SVC_PODOGERIATRIA_STEP_3_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podogeriatria/4.jpg",
-      "text": "Si necesita un paquete completo 🦶✨ tiene una opción accesible y detallada por realizarse, PODOGERIATRIK incluye un chequeo médico 👨‍⚕️📋, revisión podal 👣🔍, limpieza profunda ✂️🦶 e hidratación podal 🧼💅, todo por un costo de 200 Bs 💰. \nEste paquete se realiza únicamente bajo recomendación del especialista 🩺, ya que durante la valoración 🔍 se determinará si el paciente necesita o no dicho tratamiento ✅❌.",
+      "text": "Si necesita un paquete completo 🦶✨ tiene una opción accesible y detallada por realizarse, *PODOGERIATRIK* incluye un chequeo médico 👨‍⚕️📋, revisión podal 👣🔍, limpieza profunda ✂️🦶 e hidratación podal 🧼💅, todo por un costo de *200 Bs* 💰. \nEste paquete se realiza únicamente bajo recomendación del especialista 🩺, ya que durante la valoración 🔍 se determinará si el paciente necesita o no dicho tratamiento ✅❌.",
       "next": "SVC_PODOGERIATRIA_ACTIONS"
     },
     {
@@ -892,14 +892,14 @@ module.exports = {
       "id": "OTR_CALLOSIDAD_STEP_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/1.%20Callosidades/1.jpg",
-      "text": "En PODOPIE, comprendemos lo importante que es mantener tus pies saludables y sin molestias. ?\nPor eso, ofrecemos un tratamiento especializado para la ELIMINACIÓN DE CALLOSIDADES, realizado por profesionales podólogos capacitados, que utilizan técnicas seguras y completamente indoloras. 🩹",
+      "text": "En *PODOPIE*, comprendemos lo importante que es mantener tus pies saludables y sin molestias. ?\nPor eso, ofrecemos un tratamiento especializado para la *ELIMINACIÓN* *DE* *CALLOSIDADES*, realizado por profesionales podólogos capacitados, que utilizan técnicas seguras y completamente indoloras. 🩹",
       "next": "OTR_CALLOSIDAD_STEP_2"
     },
     {
       "id": "OTR_CALLOSIDAD_STEP_2",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/1.%20Callosidades/2.jpg",
-      "text": "- El podólogo analiza las callosidades, identificando sus causas (fricción, calzado inadecuado o alteraciones biomecánicas).\n- Con instrumentos esterilizados, retira la piel engrosada usando bisturí o limas, preservando la piel sana.\n- Programa visitas periódicas de seguimiento para controlar diariamente las callosidades y ajustar el tratamiento según las necesidades específicas del paciente.\n- Este servicio tiene un costo de 150 Bs y nos enfocamos solamente en eliminar la mayor cantidad de hiperqueratosis en las zonas afectadas. 💵",
+      "text": "- El podólogo analiza las callosidades, identificando sus causas (fricción, calzado inadecuado o alteraciones biomecánicas).\n- Con instrumentos esterilizados, retira la piel engrosada usando bisturí o limas, preservando la piel sana.\n- Programa visitas periódicas de seguimiento para controlar diariamente las callosidades y ajustar el tratamiento según las necesidades específicas del paciente.\n- Este servicio tiene un costo de *150 Bs* y nos enfocamos solamente en eliminar la mayor cantidad de hiperqueratosis en las zonas afectadas. 💵",
       "next": "OTR_CALLOSIDAD_STEP_2_1"
     },
     {
@@ -913,7 +913,7 @@ module.exports = {
       "id": "OTR_CALLOSIDAD_STEP_3",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/1.%20Callosidades/235a0c02-2a0e-4d93-a3b1-031880e3a7d3.jpg",
-      "text": "Si necesita un paquete completo 🦶✨ tiene una opción accesible y detallada por realizarse, PODOCALLOS incluye una valoración profesional 👨‍⚕️📋, pedicure clínico 🧼💅, tratamiento y limpieza de callosidades, todo por un costo de 150 Bs 💰.\nEste paquete se realiza únicamente bajo recomendación del especialista 🩺, ya que durante la valoración 🔍 se determinará si el paciente necesita o no dicho tratamiento ✅❌.",
+      "text": "Si necesita un paquete completo 🦶✨ tiene una opción accesible y detallada por realizarse, *PODOCALLOS* incluye una valoración profesional 👨‍⚕️📋, pedicure clínico 🧼💅, tratamiento y limpieza de callosidades, todo por un costo de *150 Bs* 💰.\nEste paquete se realiza únicamente bajo recomendación del especialista 🩺, ya que durante la valoración 🔍 se determinará si el paciente necesita o no dicho tratamiento ✅❌.",
       "next": "OTR_CALLOSIDAD_ACTIONS"
     },
     {
@@ -950,20 +950,20 @@ module.exports = {
       "id": "OTR_VERRUGA_STEP_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/2.%20Verruga%20plantar/1.jpg",
-      "text": "El VPH son lesiones duras y rugosas causadas por el Virus del Papiloma Humano. Se transmiten principalmente en lugares públicos húmedos, como piscinas o duchas. 🦶\n¿Te duelen esas molestas verrugas en la planta del pie? 🤕\n¡En PODOPIE tenemos la solución!",
+      "text": "El *VPH* son lesiones duras y rugosas causadas por el Virus del Papiloma Humano. Se transmiten principalmente en lugares públicos húmedos, como piscinas o duchas. 🦶\n¿Te duelen esas molestas verrugas en la planta del pie? 🤕\n¡En *PODOPIE* tenemos la solución!",
       "next": "OTR_VERRUGA_STEP_2"
     },
     {
       "id": "OTR_VERRUGA_STEP_2",
       "type": "text",
-      "text": "El podólogo examina las verrugas y selecciona el tratamiento adecuado, que puede incluir cremas, cauterización o eliminación quirúrgica en casos graves.🔎\nSe asesora al paciente sobre cómo evitar la expansión del VPH y se programan seguimientos para garantizar la curación.",
+      "text": "El podólogo examina las verrugas y selecciona el tratamiento adecuado, que puede incluir cremas, cauterización o eliminación quirúrgica en casos graves.🔎\nSe asesora al paciente sobre cómo evitar la expansión del *VPH* y se programan seguimientos para garantizar la curación.",
       "next": "OTR_VERRUGA_STEP_3"
     },
     {
       "id": "OTR_VERRUGA_STEP_3",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/2.%20Verruga%20plantar/2.jpg",
-      "text": "Precio del servicio. 💵\n- Verrugas simple, 400 Bs.\n- Verrugas dobles, 600 Bs.\n- Verrugas múltiples, 800 Bs",
+      "text": "Precio del servicio. 💵\n- Verrugas simple, *400 Bs*.\n- Verrugas dobles, *600 Bs*.\n- Verrugas múltiples, *800 Bs*",
       "next": "OTR_VERRUGA_STEP_4"
     },
     {
@@ -1007,7 +1007,7 @@ module.exports = {
       "id": "OTR_HELOMA_STEP_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/3.%20Heloma/f12c6c99-9fbd-4e0a-8ee2-d36909000335.jpg",
-      "text": "Un *heloma* es una lesión en la piel del pie 🦶, conocida comúnmente como *callo*, que se forma por *presión o fricción constante* 👟🔁. Se caracteriza por un *engrosamiento de la piel* 🧱 y puede causar *dolor* 😖, especialmente al caminar 🚶‍♂️ o al usar *calzado ajustado* 👞. Suele aparecer en la planta del pie 👣 o en los *dedos* 🦶✨.\n*El tratamiento de heloma* consiste en la *eliminación segura del callo*, alivio del *dolor*, y *recomendaciones personalizadas* para evitar que reaparezca 👣✨\nEl consto del tratamiento tiene un valor de 100 Bs.",
+      "text": "Un *heloma* es una lesión en la piel del pie 🦶, conocida comúnmente como *callo*, que se forma por *presión o fricción constante* 👟🔁. Se caracteriza por un *engrosamiento de la piel* 🧱 y puede causar *dolor* 😖, especialmente al caminar 🚶‍♂️ o al usar *calzado ajustado* 👞. Suele aparecer en la planta del pie 👣 o en los *dedos* 🦶✨.\n*El tratamiento de heloma* consiste en la *eliminación segura del callo*, alivio del *dolor*, y *recomendaciones personalizadas* para evitar que reaparezca 👣✨\nEl consto del tratamiento tiene un valor de *100 Bs*.",
       "next": "OTR_HELOMA_ACTIONS"
     },
     {
@@ -1044,7 +1044,7 @@ module.exports = {
       "id": "OTR_EXTRACCION_STEP_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/4.%20Extracci%C3%B3n%20de%20u%C3%B1a/IMAGEN%201.jpg",
-      "text": "En PODOPIE realizamos la extracción profesional de uñas de forma segura, limpia y sin dolor, utilizando anestesia local y técnicas especializadas.",
+      "text": "En *PODOPIE* realizamos la extracción profesional de uñas de forma segura, limpia y sin dolor, utilizando anestesia local y técnicas especializadas.",
       "next": "OTR_EXTRACCION_STEP_2"
     },
     {
@@ -1057,7 +1057,7 @@ module.exports = {
       "id": "OTR_EXTRACCION_STEP_3",
       "type": "video",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/4.%20Extracci%C3%B3n%20de%20u%C3%B1a/extraccionDeUna.mp4",
-      "text": "IMPORTANTE: ⚠️\nNo siempre es necesario quitar la uña. En PODOPIE solo realizamos la extracción si es clínicamente justificado, ya que *quitar la uña no elimina los hongos ni cura los uñeros por sí solo.* Por eso, cada caso es evaluado individualmente",
+      "text": "*IMPORTANTE*: ⚠️\nNo siempre es necesario quitar la uña. En *PODOPIE* solo realizamos la extracción si es clínicamente justificado, ya que *quitar la uña no elimina los hongos ni cura los uñeros por sí solo.* Por eso, cada caso es evaluado individualmente",
       "next": "OTR_EXTRACCION_STEP_4"
     },
     {
@@ -1144,7 +1144,7 @@ module.exports = {
       "id": "OTR_PIE_DIABETICO_STEP_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/6.%20Paciente%20Diab%C3%A9tico/1.jpg",
-      "text": "En PODOPIE contamos con un servicio especializado en podología para pacientes diabéticos, enfocado en la prevención de complicaciones como úlceras, infecciones y lesiones que pueden poner en riesgo la salud del pie. 🩸 👣\n¿POR QUÉ ES IMPORTANTE? 🤷🏽‍♂️\nLas personas con diabetes pueden tener daño en los nervios (neuropatía) o problemas de circulación, lo que hace que un mal corte de uñas o UNA PEQUEÑA LESIÓN pueda CONVERTIRSE EN UNA COMPLICACIÓN SERIA. ⚕",
+      "text": "En *PODOPIE* contamos con un servicio especializado en podología para pacientes diabéticos, enfocado en la prevención de complicaciones como úlceras, infecciones y lesiones que pueden poner en riesgo la salud del pie. 🩸 👣\n¿*POR* *QUÉ* *ES* *IMPORTANTE*? 🤷🏽‍♂️\nLas personas con diabetes pueden tener daño en los nervios (neuropatía) o problemas de circulación, lo que hace que un mal corte de uñas o *UNA* *PEQUEÑA* *LESIÓN* pueda *CONVERTIRSE* *EN* *UNA* *COMPLICACIÓN* *SERIA*. ⚕",
       "next": "OTR_PIE_DIABETICO_STEP_2"
     },
     {

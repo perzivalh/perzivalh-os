@@ -14,6 +14,7 @@ const { routeWithAI } = require("../services/aiRouter");
 
 const MAX_LIST_TITLE = 24;
 const BUTTON_TITLE_LIMIT = 20;
+const VIDEO_TEXT_FOLLOWUP_DELAY_MS = 1500;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -348,6 +349,7 @@ async function sendNode(waId, flow, node, visited) {
     // Some WhatsApp mobile clients render multiline video captions with broken layout.
     await sendVideo(waId, mediaUrl, null);
     if (nodeText.trim().length > 0) {
+      await sleep(VIDEO_TEXT_FOLLOWUP_DELAY_MS);
       await sendText(waId, nodeText);
     }
   } else if (buttons.length > 0) {

@@ -35,7 +35,7 @@ module.exports = {
       "id": "MAIN_MENU",
       "type": "text",
       "text": "Soy PODITO 🤖, tu asistente virtual de PODOPIE 🦶✨ ¿En qué puedo ayudarte?",
-      "delayMs": 1500,
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "🕒 HORARIOS Y UBICACION",
@@ -66,6 +66,7 @@ module.exports = {
       "id": "AI_HANDOFF_OFFER",
       "type": "text",
       "text": "¿Te derivamos con un operador?",
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "✅ SÍ",
@@ -80,7 +81,7 @@ module.exports = {
     {
       "id": "HORARIOS_INFO",
       "type": "text",
-      "text": "CENTRAL",
+      "text": "*CENTRAL*",
       "next": "HORARIOS_CENTRAL_HORARIO_IMG"
     },
     {
@@ -114,7 +115,7 @@ module.exports = {
     {
       "id": "HORARIOS_SUCURSAL_TITLE",
       "type": "text",
-      "text": "SUCURSAL",
+      "text": "*SUCURSAL*",
       "delayMs": 1500,
       "next": "HORARIOS_SUCURSAL_HORARIO_IMG"
     },
@@ -150,7 +151,7 @@ module.exports = {
       "id": "HORARIOS_NAV",
       "type": "text",
       "text": "¿Necesitas algo más?",
-      "delayMs": 1500,
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "⬅️ VOLVER AL MENU",
@@ -165,13 +166,13 @@ module.exports = {
     {
       "id": "PRECIOS_INFO",
       "type": "text",
-      "text": "💰 Precios PODOPIE\n\nTe comparto nuestro tarifario general.\n\n¿Quieres que te ayude a elegir el servicio adecuado?",
+      "text": "💰 Precios PODOPIE\n\nTe comparto nuestro tarifario general.\n\n*¿Quieres que te ayude a elegir el servicio adecuado?*",
       "next": "PRECIOS_IMG_1"
     },
     {
       "id": "PRECIOS_IMG_1",
       "type": "image",
-      "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/precios1.jpg",
+      "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/precios3.jpg",
       "text": " ",
       "next": "PRECIOS_IMG_2"
     },
@@ -185,7 +186,7 @@ module.exports = {
     {
       "id": "PRECIOS_IMG_3",
       "type": "image",
-      "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/precios3.jpg",
+      "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/precios1.jpg",
       "text": " ",
       "next": "PRECIOS_ACTIONS"
     },
@@ -193,7 +194,7 @@ module.exports = {
       "id": "PRECIOS_ACTIONS",
       "type": "text",
       "text": "¿Necesitas un servicio en específico?",
-      "delayMs": 1500,
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "👨‍💻 ATENCIÓN PERSONAL",
@@ -212,8 +213,8 @@ module.exports = {
     {
       "id": "PRECIOS_MAS",
       "type": "text",
-      "text": "¿Necesitas algo más? Si quieres volver al menú principal o terminar la conversación, elige una opción.",
-      "delayMs": 1500,
+      "text": "*¿Necesitas algo más?* Si quieres volver al menú principal o terminar la conversación, elige una opción.",
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "⬅️ VOLVER AL MENU",
@@ -229,7 +230,7 @@ module.exports = {
       "id": "SERVICIOS_MENU",
       "type": "text",
       "text": "SELECCIONA EL SERVICIO QUE NECESITES",
-      "delayMs": 1500,
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "🦶 UÑERO",
@@ -274,14 +275,14 @@ module.exports = {
       "id": "UNERO_INFO_2",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/U%C3%B1ero/2.jpg",
-      "text": "El servicio de extracción de UNO O VARIOS UÑEROS EN UN PIE tiene un costo de 200 BS 💰.",
+      "text": "El servicio de extracción de UNO O VARIOS UÑEROS EN UN PIE tiene un costo de *200 BS* 💰.",
       "next": "UNERO_INFO_3"
     },
     {
       "id": "UNERO_INFO_3",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/U%C3%B1ero/3.jpg",
-      "text": "Si desea la extracción de UÑEROS EN AMBOS PIES, el costo es de 300 BS por todos los uñeros en ambos pies. 💵",
+      "text": "Si desea la extracción de UÑEROS EN AMBOS PIES, el costo es de *300 BS* por todos los uñeros en ambos pies. 💵",
       "next": "UNERO_INFO_4"
     },
     {
@@ -301,8 +302,8 @@ module.exports = {
     {
       "id": "UNERO_TIPO_TRAT_OPTIONS",
       "type": "text",
-      "text": "🦶✨ Nuestro servicio de uñero cuenta con dos tipos de procedimientos\nElige la opción que mejor se adapte a tu caso y conoce todos los detalles 👇😊",
-      "delayMs": 1500,
+      "text": "🦶✨ Nuestro servicio de uñero cuenta con dos tipos de procedimientos:\nPreventivo (matricectomía) y Correctivo (órtesis). ",
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "✂️ MATRICECTOMIA",
@@ -375,7 +376,7 @@ module.exports = {
       "id": "HONGOS_TIPO_TRAT_OPTIONS",
       "type": "text",
       "text": "🦶✨ Nuestro servicio de hongos (onicomicosis) cuenta con tres tipos de procedimientos\nElige la opción que mejor se adapte a tu caso y conoce todos los detalles 👇😊",
-      "delayMs": 1500,
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "🧴 TÓPICO",
@@ -428,7 +429,7 @@ module.exports = {
       "id": "TRAT_MATRICECTOMIA_ACTIONS",
       "type": "text",
       "text": "¿Tienes alguna otra duda?",
-      "delayMs": 1500,
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "👨‍💻 ATENCIÓN PERSONAL",
@@ -458,7 +459,7 @@ module.exports = {
       "id": "TRAT_ORTESIS_STEP_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/U%C3%B1ero/Ortesis/IMAGEN%201.jpg",
-      "text": "🦶✨ La ortesis ungueal es un tratamiento que corrige la forma de la uña del pie, ayudando a que crezca correctamente y evitando que se encarne 💅😊* Costo: 150 Bs un dedo.",
+      "text": "🦶✨ *La ortesis ungueal* es un tratamiento que corrige la forma de la uña del pie, ayudando a que crezca correctamente y evitando que se encarne 💅😊 Costo: 150 Bs un dedo.",
       "next": "TRAT_ORTESIS_STEP_2"
     },
     {
@@ -472,7 +473,7 @@ module.exports = {
       "id": "TRAT_ORTESIS_ACTIONS",
       "type": "text",
       "text": "¿Tienes alguna otra duda?",
-      "delayMs": 1500,
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "👨‍💻 ATENCIÓN PERSONAL",
@@ -516,7 +517,7 @@ module.exports = {
       "id": "TRAT_TOPICO_ACTIONS",
       "type": "text",
       "text": "¿Tienes alguna otra duda?",
-      "delayMs": 1500,
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "👨‍💻 ATENCIÓN PERSONAL",
@@ -580,7 +581,7 @@ module.exports = {
       "id": "TRAT_LASER_ACTIONS",
       "type": "text",
       "text": "¿Tienes alguna otra duda?",
-      "delayMs": 1500,
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "👨‍💻 ATENCIÓN PERSONAL",
@@ -624,7 +625,7 @@ module.exports = {
       "id": "TRAT_SISTEMICO_ACTIONS",
       "type": "text",
       "text": "¿Tienes alguna otra duda?",
-      "delayMs": 1500,
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "👨‍💻 ATENCIÓN PERSONAL",
@@ -696,7 +697,7 @@ module.exports = {
       "id": "SVC_PEDICURE_ACTIONS",
       "type": "text",
       "text": "¿Tienes alguna otra duda?",
-      "delayMs": 1500,
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "👨‍💻 ATENCIÓN PERSONAL",
@@ -760,14 +761,14 @@ module.exports = {
       "id": "SVC_PODOPEDIATRIA_STEP_5_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podopediatr%C3%ADa/5.jpg",
-      "text": "Si necesita un paquete completo 🦶 tiene una opción accesible y detallada por realizarse, PODOPEDIATRIK incluye un chequeo médico 🩺📋, revisión podal 👣🔍, y limpieza podal 💧✨, todo por un costo de 150 Bs 💵. \nEste paquete se realiza únicamente bajo recomendación del especialista 🩺, ya que durante la valoración 🔍 se determinará si el paciente necesita o no dicho tratamiento ✅❌.",
+      "text": "Si necesita un paquete completo 🦶 tiene una opción accesible y detallada por realizarse, *PODOPEDIATRIK* incluye un *chequeo médico* 🩺📋, *revisión podal* 👣🔍, y *limpieza podal* 💧✨, todo por un costo de *150 Bs* 💵. \nEste paquete se realiza únicamente bajo recomendación del especialista 🩺, ya que durante la valoración 🔍 se determinará si el paciente necesita o no dicho tratamiento ✅❌.",
       "next": "SVC_PODOPEDIATRIA_ACTIONS"
     },
     {
       "id": "SVC_PODOPEDIATRIA_ACTIONS",
       "type": "text",
       "text": "¿Tienes alguna otra duda?",
-      "delayMs": 1500,
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "👨‍💻 ATENCIÓN PERSONAL",
@@ -825,7 +826,7 @@ module.exports = {
       "id": "SVC_PODOGERIATRIA_ACTIONS",
       "type": "text",
       "text": "¿Tienes alguna otra duda?",
-      "delayMs": 1500,
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "👨‍💻 ATENCIÓN PERSONAL",
@@ -849,7 +850,7 @@ module.exports = {
       "id": "OTROS_MENU",
       "type": "text",
       "text": "Selecciona la patología que presentas 🩺 para enviarte la información correcta 📋📨",
-      "delayMs": 1500,
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "🦶 CALLOSIDAD",
@@ -919,7 +920,7 @@ module.exports = {
       "id": "OTR_CALLOSIDAD_ACTIONS",
       "type": "text",
       "text": "¿Tienes alguna otra duda?",
-      "delayMs": 1500,
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "👨‍💻 ATENCIÓN PERSONAL",
@@ -976,7 +977,7 @@ module.exports = {
       "id": "OTR_VERRUGA_ACTIONS",
       "type": "text",
       "text": "¿Tienes alguna otra duda?",
-      "delayMs": 1500,
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "👨‍💻 ATENCIÓN PERSONAL",
@@ -1006,14 +1007,14 @@ module.exports = {
       "id": "OTR_HELOMA_STEP_1",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/3.%20Heloma/f12c6c99-9fbd-4e0a-8ee2-d36909000335.jpg",
-      "text": "Un heloma es una lesión en la piel del pie 🦶, conocida comúnmente como callo, que se forma por presión o fricción constante 👟🔁. Se caracteriza por un engrosamiento de la piel 🧱 y puede causar dolor 😖, especialmente al caminar 🚶‍♂️ o al usar calzado ajustado 👞. Suele aparecer en la planta del pie 👣 o en los dedos 🦶✨.\nEl tratamiento de heloma consiste en la eliminación segura del callo, alivio del dolor, y recomendaciones personalizadas para evitar que reaparezca 👣✨\nEl consto del tratamiento tiene un valor de 100 Bs.",
+      "text": "Un *heloma* es una lesión en la piel del pie 🦶, conocida comúnmente como *callo*, que se forma por *presión o fricción constante* 👟🔁. Se caracteriza por un *engrosamiento de la piel* 🧱 y puede causar *dolor* 😖, especialmente al caminar 🚶‍♂️ o al usar *calzado ajustado* 👞. Suele aparecer en la planta del pie 👣 o en los *dedos* 🦶✨.\n*El tratamiento de heloma* consiste en la *eliminación segura del callo*, alivio del *dolor*, y *recomendaciones personalizadas* para evitar que reaparezca 👣✨\nEl consto del tratamiento tiene un valor de 100 Bs.",
       "next": "OTR_HELOMA_ACTIONS"
     },
     {
       "id": "OTR_HELOMA_ACTIONS",
       "type": "text",
       "text": "¿Tienes alguna otra duda?",
-      "delayMs": 1500,
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "👨‍💻 ATENCIÓN PERSONAL",
@@ -1049,27 +1050,27 @@ module.exports = {
     {
       "id": "OTR_EXTRACCION_STEP_2",
       "type": "text",
-      "text": "🔍 ¿En qué casos se recomienda la extracción?\n• Golpes fuertes que provocan hematomas o desprendimiento\n• Uñas parcialmente sueltas o fracturadas\n• Infecciones severas con riesgo de complicación",
+      "text": "🔍 *¿En qué casos se recomienda la extracción?*\n• Golpes fuertes que provocan hematomas o desprendimiento\n• Uñas parcialmente sueltas o fracturadas\n• Infecciones severas con riesgo de complicación",
       "next": "OTR_EXTRACCION_STEP_3"
     },
     {
       "id": "OTR_EXTRACCION_STEP_3",
       "type": "video",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/4.%20Extracci%C3%B3n%20de%20u%C3%B1a/extraccionDeUna.mp4",
-      "text": "IMPORTANTE: ⚠️\nNo siempre es necesario quitar la uña. En PODOPIE solo realizamos la extracción si es clínicamente justificado, ya que quitar la uña no elimina los hongos ni cura los uñeros por sí solo. Por eso, cada caso es evaluado individualmente",
+      "text": "IMPORTANTE: ⚠️\nNo siempre es necesario quitar la uña. En PODOPIE solo realizamos la extracción si es clínicamente justificado, ya que *quitar la uña no elimina los hongos ni cura los uñeros por sí solo.* Por eso, cada caso es evaluado individualmente",
       "next": "OTR_EXTRACCION_STEP_4"
     },
     {
       "id": "OTR_EXTRACCION_STEP_4",
       "type": "text",
-      "text": "✅ ¿Qué incluye el procedimiento?\n• Evaluación podológica completa\n• Extracción con anestesia local (sin dolor)\n• Limpieza y cuidado del lecho ungueal\n• Recomendaciones post-procedimiento\n💰 Costo: 200 Bs por uña",
+      "text": "✅ *¿Qué incluye el procedimiento?*\n• Evaluación podológica completa\n• Extracción con anestesia local (sin dolor)\n• Limpieza y cuidado del lecho ungueal\n• Recomendaciones post-procedimiento\n💰 *Costo: 200 Bs por uña*",
       "next": "OTR_EXTRACCION_ACTIONS"
     },
     {
       "id": "OTR_EXTRACCION_ACTIONS",
       "type": "text",
       "text": "¿Tienes alguna otra duda?",
-      "delayMs": 1500,
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "👨‍💻 ATENCIÓN PERSONAL",
@@ -1106,14 +1107,14 @@ module.exports = {
       "id": "OTR_PIE_ATLETA_STEP_2",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/5.%20Pie%20de%20atleta/2.jpg",
-      "text": "🛡️ Prevención\nPara evitar el pie de atleta se recomienda:\n• Secar bien los pies, especialmente entre los dedos\n• Usar calcetines limpios y transpirables\n• Evitar caminar descalzo en lugares públicos\n• No compartir objetos personales\n💰 Costo: 100 Bs",
+      "text": "🛡️ Prevención\nPara evitar el pie de atleta se recomienda:\n• Secar bien los pies, especialmente entre los dedos\n• Usar calcetines limpios y transpirables\n• Evitar caminar descalzo en lugares públicos\n• No compartir objetos personales\n💰 *Costo: 100 Bs*",
       "next": "OTR_PIE_ATLETA_ACTIONS"
     },
     {
       "id": "OTR_PIE_ATLETA_ACTIONS",
       "type": "text",
       "text": "¿Tienes alguna otra duda?",
-      "delayMs": 1500,
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "👨‍💻 ATENCIÓN PERSONAL",
@@ -1164,14 +1165,14 @@ module.exports = {
       "id": "OTR_PIE_DIABETICO_STEP_3",
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/6.%20Paciente%20Diab%C3%A9tico/58369928-c3fd-4e9b-a79b-992a866b37d6.jpg",
-      "text": "Si necesita un paquete completo 🦶🩵 tiene una opción accesible y detallada por realizarse, PODODIABETIK incluye un chequeo médico 🩺📋, revisión podal 👣🔍, profilaxis podal 🧼🦶 e hidratación podal 💧✨, todo por un costo de 150 Bs 💵.\nEste paquete se realiza únicamente bajo recomendación del especialista 🩺, ya que durante la valoración 🔍 se determinará si el paciente necesita o no dicho tratamiento ✅❌.",
+      "text": "Si necesita un paquete completo 🦶🩵 tiene una opción accesible y detallada por realizarse, *PODODIABETIK* incluye un *chequeo médico* 🩺📋, *revisión podal* 👣🔍, *profilaxis podal* 🧼🦶 e *hidratación podal* 💧✨, todo por un costo de *150 Bs* 💵.\nEste paquete se realiza únicamente bajo recomendación del especialista 🩺, ya que durante la valoración 🔍 se determinará si el paciente necesita o no dicho tratamiento ✅❌.",
       "next": "OTR_PIE_DIABETICO_ACTIONS"
     },
     {
       "id": "OTR_PIE_DIABETICO_ACTIONS",
       "type": "text",
       "text": "¿Tienes alguna otra duda?",
-      "delayMs": 1500,
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "👨‍💻 ATENCIÓN PERSONAL",
@@ -1195,7 +1196,7 @@ module.exports = {
       "id": "CONTACT_METHOD",
       "type": "text",
       "text": "Selección de forma de atención",
-      "delayMs": 1500,
+      "delayMs": 2500,
       "buttons": [
         {
           "label": "📞 LLAMADA",
@@ -1261,7 +1262,7 @@ module.exports = {
     {
       "id": "CIERRE_HORARIO_UBICACION_0",
       "type": "text",
-      "text": "ATENCIÓN CENTRAL",
+      "text": "*ATENCIÓN CENTRAL*",
       "next": "CIERRE_HORARIO_CENTRAL_1"
     },
     {
@@ -1288,7 +1289,7 @@ module.exports = {
     {
       "id": "CIERRE_HORARIO_SUCURSAL_TITLE",
       "type": "text",
-      "text": "ATENCIÓN SUCURSAL",
+      "text": "*ATENCIÓN SUCURSAL*",
       "next": "CIERRE_HORARIO_SUCURSAL_1"
     },
     {

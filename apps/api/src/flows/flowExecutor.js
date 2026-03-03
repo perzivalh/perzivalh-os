@@ -331,15 +331,25 @@ async function sendNode(waId, flow, node, visited) {
     return;
   }
 
-  const bodyText = node.text || node.title || "Selecciona una opcion:";
+  const nodeText =
+    typeof node.text === "string"
+      ? node.text
+      : typeof node.title === "string"
+        ? node.title
+        : "";
+  const bodyText = nodeText || "Selecciona una opcion:";
 
   const buttons = Array.isArray(node.buttons) ? node.buttons : [];
   const mediaUrl = node.url || node.media || node.video || node.image;
   const mediaType = inferMediaType(node, mediaUrl);
   if (mediaType === "image") {
-    await sendImage(waId, mediaUrl, bodyText || null);
+    await sendImage(waId, mediaUrl, nodeText || null);
   } else if (mediaType === "video") {
-    await sendVideo(waId, mediaUrl, bodyText || null);
+    // Some WhatsApp mobile clients render multiline video captions with broken layout.
+    await sendVideo(waId, mediaUrl, null);
+    if (nodeText.trim().length > 0) {
+      await sendText(waId, nodeText);
+    }
   } else if (buttons.length > 0) {
     if (shouldUseList(buttons)) {
       const rows = buttons.map((btn) => ({

@@ -1,4 +1,4 @@
-const CACHE_NAME = "perzivalh-chats-pwa-v8";
+const CACHE_NAME = "perzivalh-chats-pwa-v9";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest?v=8",
@@ -81,5 +81,87 @@ self.addEventListener("fetch", (event) => {
       }
       return response;
     })
+  );
+});
+
+async function hasVisibleClient() {
+  const clientList = await self.clients.matchAll({
+    type: "window",
+    includeUncontrolled: true,
+  });
+  return clientList.some(
+    (client) =>
+      client &&
+      client.visibilityState === "visible"
+  );
+}
+
+self.addEventListener("push", (event) => {
+  if (!event.data) {
+    return;
+  }
+  event.waitUntil(
+    (async () => {
+      let payload = {};
+      try {
+        payload = event.data.json();
+      } catch (error) {
+        payload = {
+          title: "Nueva conversación pendiente",
+          body: event.data.text(),
+        };
+      }
+
+      if (await hasVisibleClient()) {
+        return;
+      }
+
+      const title = payload.title || "Nueva conversación pendiente";
+      const options = {
+        body: payload.body || "Tienes una conversación pendiente por atender.",
+        icon: payload.icon || "/pwa-icon-192-v8.png",
+        badge: payload.badge || "/pwa-icon-192-v8.png",
+        tag: payload.tag || "pending-conversation",
+        renotify: payload.renotify !== false,
+        requireInteraction: Boolean(payload.requireInteraction),
+        data: payload.data || { url: "/" },
+      };
+
+      await self.registration.showNotification(title, options);
+    })()
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(
+    (async () => {
+      const targetUrl = event.notification?.data?.url || "/";
+      const clientList = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+
+      for (const client of clientList) {
+        if (!client) {
+          continue;
+        }
+        if ("navigate" in client) {
+          try {
+            await client.navigate(targetUrl);
+          } catch (error) {
+            // ignore navigation errors
+          }
+        }
+        if ("focus" in client) {
+          return client.focus();
+        }
+      }
+
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+      return undefined;
+    })()
   );
 });

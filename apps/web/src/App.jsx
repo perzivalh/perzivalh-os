@@ -3,6 +3,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut, setToken } from "./api";
 import { API_BASE } from "./apiBase";
 import { connectSocket } from "./socket";
+import {
+  ensureAndroidPushSubscription,
+  getCurrentPushSubscription,
+  getNotificationPermission,
+  isAndroidPushSupported,
+} from "./push";
 import { useToast } from "./components/ToastProvider.jsx";
 import NavRail from "./components/NavRail.jsx";
 import ChatView from "./components/ChatView.jsx";
@@ -143,12 +149,15 @@ function App() {
   });
   const [loadingConversation, setLoadingConversation] = useState(false);
   const [pageError, setPageError] = useState("");
+  const [pushPublicKey, setPushPublicKey] = useState("");
+  const [pushNoticeDismissed, setPushNoticeDismissed] = useState(false);
   const { pushToast } = useToast();
   const pendingUserDeletesRef = useRef(new Map());
   const pendingRoleDeletesRef = useRef(new Map());
   const pendingTemplateDeletesRef = useRef(new Map());
   const pendingTagDeletesRef = useRef(new Map());
   const conversationStatusRef = useRef(new Map());
+  const pushSubscriptionEndpointRef = useRef("");
 
   const [metrics, setMetrics] = useState(null);
   const [dashboardPeriod, setDashboardPeriod] = useState("30d");
@@ -269,6 +278,99 @@ function App() {
     () => messages.filter((message) => message.type === "note"),
     [messages]
   );
+
+  async function unregisterSystemPushSubscription({ silent = false } = {}) {
+    if (
+      !token ||
+      !user ||
+      user.role === "superadmin" ||
+      !isAndroidPushSupported()
+    ) {
+      return false;
+    }
+    try {
+      const currentToken = token;
+      const subscription = await getCurrentPushSubscription();
+      const endpoint = subscription?.endpoint || pushSubscriptionEndpointRef.current;
+      if (!endpoint) {
+        return true;
+      }
+      const response = await fetch(`${API_BASE}/api/push/unsubscribe`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${currentToken}`,
+        },
+        body: JSON.stringify({ endpoint }),
+      });
+      if (!response.ok) {
+        throw new Error("push_unsubscribe_failed");
+      }
+      pushSubscriptionEndpointRef.current = "";
+      return true;
+    } catch (error) {
+      if (!silent) {
+        pushToast({
+          type: "error",
+          message: "No se pudo desactivar el registro de notificaciones",
+        });
+      }
+      return false;
+    }
+  }
+
+  async function syncSystemPushSubscription({
+    requestPermission = false,
+    silent = false,
+    publicKeyOverride = null,
+  } = {}) {
+    const resolvedPublicKey = publicKeyOverride || pushPublicKey;
+    if (
+      !resolvedPublicKey ||
+      !token ||
+      !user ||
+      user.role === "superadmin" ||
+      !isAndroidPushSupported()
+    ) {
+      return false;
+    }
+    try {
+      const subscription = await ensureAndroidPushSubscription({
+        publicKey: resolvedPublicKey,
+        requestPermission,
+      });
+      const subscriptionPayload =
+        typeof subscription?.toJSON === "function"
+          ? subscription.toJSON()
+          : subscription;
+      pushSubscriptionEndpointRef.current = subscription?.endpoint || "";
+      await apiPost("/api/push/subscription", {
+        subscription: subscriptionPayload,
+        device_label: "android",
+        user_agent:
+          typeof window !== "undefined" ? window.navigator?.userAgent || "" : "",
+      });
+      if (!silent) {
+        pushToast({ message: "Notificaciones de sistema activadas" });
+      }
+      return true;
+    } catch (error) {
+      const message = String(error?.message || error || "");
+      if (message === "push_permission_required") {
+        return false;
+      }
+      if (!silent) {
+        pushToast({
+          type: "error",
+          message:
+            message === "push_denied"
+              ? "Las notificaciones están bloqueadas en este dispositivo"
+              : "No se pudieron activar las notificaciones del sistema",
+        });
+      }
+      return false;
+    }
+  }
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -594,6 +696,45 @@ function App() {
       setSettingsSection(allowed[0]);
     }
   }, [user, view, settingsSection, rolePermissions]);
+
+  useEffect(() => {
+    if (!token || !user || user.role === "superadmin") {
+      setPushPublicKey("");
+      pushSubscriptionEndpointRef.current = "";
+      return;
+    }
+    if (!isAndroidPushSupported()) {
+      setPushPublicKey("");
+      return;
+    }
+
+    let cancelled = false;
+    setPushNoticeDismissed(false);
+
+    void apiGet("/api/push/config")
+      .then((data) => {
+        if (cancelled) {
+          return;
+        }
+        const nextKey = data?.enabled ? data.publicKey || "" : "";
+        setPushPublicKey(nextKey);
+        if (nextKey && getNotificationPermission() === "granted") {
+          void syncSystemPushSubscription({
+            publicKeyOverride: nextKey,
+            silent: true,
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPushPublicKey("");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, user?.id]);
 
   useEffect(() => {
     if (!token) {
@@ -960,7 +1101,8 @@ function App() {
     }
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    void unregisterSystemPushSubscription({ silent: true });
     setTokenState("");
     setToken(null);
     setUser(null);
@@ -992,16 +1134,17 @@ function App() {
     navigateTo("/", { replace: true });
   }
 
-  function handleReturnToSuperadmin() {
+  async function handleReturnToSuperadmin() {
     const stored =
       superadminToken ||
       (typeof window !== "undefined"
         ? localStorage.getItem("superadmin_token")
         : "");
     if (!stored) {
-      handleLogout();
+      void handleLogout();
       return;
     }
+    void unregisterSystemPushSubscription({ silent: true });
     localStorage.removeItem("superadmin_token");
     setSuperadminToken("");
     setTokenState(stored);
@@ -2162,6 +2305,17 @@ function App() {
   });
 
   const canReturnToSuperadmin = Boolean(superadminToken) && user.role !== "superadmin";
+  const pushPermission = getNotificationPermission();
+  const showPushEnableBanner =
+    Boolean(pushPublicKey) &&
+    isAndroidPushSupported() &&
+    pushPermission === "default" &&
+    !pushNoticeDismissed;
+  const showPushBlockedBanner =
+    Boolean(pushPublicKey) &&
+    isAndroidPushSupported() &&
+    pushPermission === "denied" &&
+    !pushNoticeDismissed;
 
   return (
     <div
@@ -2352,6 +2506,28 @@ function App() {
               brandName={displayBrandName}
             />
           )}
+
+          {showPushEnableBanner ? (
+            <NoticeBanner
+              variant="offline"
+              title="Activa notificaciones en Android"
+              message="Puedes recibir alertas del sistema cuando un chat pase a pendiente, incluso con la app en segundo plano."
+              actionLabel="Activar"
+              onAction={() => {
+                void syncSystemPushSubscription({ requestPermission: true });
+              }}
+              dismissLabel="Cerrar"
+              onDismiss={() => setPushNoticeDismissed(true)}
+            />
+          ) : showPushBlockedBanner ? (
+            <NoticeBanner
+              variant="error"
+              title="Notificaciones bloqueadas"
+              message="Android tiene bloqueadas las notificaciones para esta app. Habilítalas desde la configuración del navegador o de la PWA."
+              dismissLabel="Cerrar"
+              onDismiss={() => setPushNoticeDismissed(true)}
+            />
+          ) : null}
 
           {isOffline ? (
             <NoticeBanner

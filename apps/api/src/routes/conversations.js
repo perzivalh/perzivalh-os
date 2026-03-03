@@ -22,6 +22,12 @@ const {
     createMessage,
     logAudit,
 } = require("../services/conversations");
+const {
+    getPushPublicKey,
+    isPushConfigured,
+    savePushSubscription,
+    removePushSubscription,
+} = require("../services/pushNotifications");
 const audienceAutomationService = require("../services/audienceAutomationService");
 
 // Aplicar rate limiter a todas las rutas /api
@@ -30,6 +36,51 @@ router.use(panelLimiter);
 // GET /api/me
 router.get("/me", requireAuth, (req, res) => {
     return res.json({ user: req.user });
+});
+
+// GET /api/push/config
+router.get("/push/config", requireAuth, (req, res) => {
+    return res.json({
+        enabled: isPushConfigured(),
+        publicKey: getPushPublicKey(),
+    });
+});
+
+// POST /api/push/subscription
+router.post("/push/subscription", requireAuth, async (req, res) => {
+    if (!isPushConfigured()) {
+        return res.status(503).json({ error: "push_disabled" });
+    }
+    try {
+        await savePushSubscription({
+            userId: req.user.id,
+            subscription: req.body?.subscription,
+            deviceLabel: String(req.body?.device_label || "").trim() || null,
+            userAgent: String(req.body?.user_agent || "").trim() || null,
+        });
+        return res.json({ ok: true });
+    } catch (error) {
+        if (error.message === "invalid_push_subscription") {
+            return res.status(400).json({ error: "invalid_push_subscription" });
+        }
+        if (error.message === "push_disabled") {
+            return res.status(503).json({ error: "push_disabled" });
+        }
+        return res.status(500).json({ error: "push_subscription_failed" });
+    }
+});
+
+// POST /api/push/unsubscribe
+router.post("/push/unsubscribe", requireAuth, async (req, res) => {
+    try {
+        await removePushSubscription({
+            userId: req.user.id,
+            endpoint: req.body?.endpoint,
+        });
+        return res.json({ ok: true });
+    } catch (error) {
+        return res.status(500).json({ error: "push_unsubscribe_failed" });
+    }
 });
 
 // GET /api/tenant

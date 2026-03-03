@@ -1,5 +1,6 @@
 const prisma = require("../db");
 const { emitEvent } = require("../realtime");
+const { sendPendingConversationPush } = require("./pushNotifications");
 
 const CONVERSATION_SELECT = {
   id: true,
@@ -150,6 +151,17 @@ async function createMessage({
   const formatted = formatConversation(conversation);
   emitEvent("message:new", { conversation: formatted, message });
   emitEvent("conversation:update", { conversation: formatted });
+  if (
+    direction === "in" &&
+    formatted?.status === "pending" &&
+    !formatted?.assigned_user_id
+  ) {
+    await sendPendingConversationPush({
+      conversation: formatted,
+      message,
+      trigger: "pending_message",
+    });
+  }
   return { message, conversation: formatted };
 }
 
@@ -200,6 +212,12 @@ async function setConversationStatus({ conversationId, status, userId }) {
   });
   const formatted = formatConversation(updated);
   emitEvent("conversation:update", { conversation: formatted });
+  if (formatted?.status === "pending" && !formatted?.assigned_user_id) {
+    await sendPendingConversationPush({
+      conversation: formatted,
+      trigger: "pending_status",
+    });
+  }
   return formatted;
 }
 

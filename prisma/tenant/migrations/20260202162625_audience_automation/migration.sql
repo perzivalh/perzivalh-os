@@ -1,3 +1,18 @@
+-- CreateTable
+CREATE TABLE "AudienceSegment" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "rules_json" JSONB NOT NULL,
+    "estimated_count" INTEGER NOT NULL DEFAULT 0,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "created_by_user_id" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "AudienceSegment_pkey" PRIMARY KEY ("id")
+);
+
 -- AlterTable
 ALTER TABLE "AudienceSegment" ADD COLUMN     "last_synced_at" TIMESTAMP(3);
 
@@ -48,6 +63,9 @@ CREATE TABLE "ImportedContact" (
 );
 
 -- CreateIndex
+CREATE INDEX "AudienceSegment_is_active_idx" ON "AudienceSegment"("is_active");
+
+-- CreateIndex
 CREATE INDEX "AudienceAutomationSetting_phone_number_id_idx" ON "AudienceAutomationSetting"("phone_number_id");
 
 -- CreateIndex
@@ -70,6 +88,9 @@ CREATE INDEX "ImportedContact_source_idx" ON "ImportedContact"("source");
 
 -- AddForeignKey
 ALTER TABLE "Conversation" ADD CONSTRAINT "Conversation_primary_tag_id_fkey" FOREIGN KEY ("primary_tag_id") REFERENCES "Tag"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AudienceSegment" ADD CONSTRAINT "AudienceSegment_created_by_user_id_fkey" FOREIGN KEY ("created_by_user_id") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "AudienceTag" ADD CONSTRAINT "AudienceTag_tag_id_fkey" FOREIGN KEY ("tag_id") REFERENCES "Tag"("id") ON DELETE SET NULL ON UPDATE CASCADE;

@@ -201,11 +201,11 @@ module.exports = {
           "next": "CONTACT_METHOD"
         },
         {
-          "label": "? NO",
+          "label": "NO",
           "next": "PRECIOS_MAS"
         },
         {
-          "label": "? SI",
+          "label": "SI",
           "next": "SERVICIOS_MENU"
         }
       ]
@@ -375,7 +375,7 @@ module.exports = {
     {
       "id": "HONGOS_TIPO_TRAT_OPTIONS",
       "type": "text",
-      "text": "🦶✨ Nuestro servicio de hongos (onicomicosis) cuenta con tres tipos de procedimientos\nElige la opción que mejor se adapte a tu caso y conoce todos los detalles 👇😊",
+      "text": "🦶✨ Nuestro servicio de hongos *(onicomicosis)* cuenta con tres tipos de procedimientos\nElige la opción que mejor se adapte a tu caso y conoce todos los detalles 👇😊",
       "delayMs": 2500,
       "buttons": [
         {
@@ -754,7 +754,7 @@ module.exports = {
       "id": "SVC_PODOPEDIATRIA_STEP_5",
       "type": "video",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Podopediatr%C3%ADa/podopediatria.mp4",
-      "text": "👣 ¿Preocupado por el caminar de tu hijo? 🎥 Te compartimos este video sobre podopediatría",
+      "text": "Para cualquier dato adicional, no dude en contactarnos por este medio, a nuestro WhatsApp o llamando a la línea de atención al cliente 62100083. 📱",
       "next": "SVC_PODOPEDIATRIA_STEP_5_1"
     },
     {
@@ -906,7 +906,7 @@ module.exports = {
       "id": "OTR_CALLOSIDAD_STEP_2_1",
       "type": "video",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/1.%20Callosidades/callosidades.mp4",
-      "text": "👣 Así tratamos las callosidades con seguridad.",
+      "text": "Estamos ubicados en Santa Cruz de la Sierra, tercer Anillo interno y rotonda Av. Alemana. \n Haz clic *Aquí* para ver nuestra ubicación en Google Maps: \n https://maps.app.goo.gl/eXTejzQhp8zm3EmT8 \n 📞 Escribanos o llámanos al: 62100083",
       "next": "OTR_CALLOSIDAD_STEP_3"
     },
     {
@@ -943,7 +943,7 @@ module.exports = {
     {
       "id": "OTR_VERRUGA_PLANTAR_INFO",
       "type": "text",
-      "text": "Información de Verruga Plantar",
+      "text": "*Verruga Plantar*",
       "next": "OTR_VERRUGA_STEP_1"
     },
     {
@@ -1158,7 +1158,7 @@ module.exports = {
       "id": "OTR_PIE_DIABETICO_STEP_3_1",
       "type": "video",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Otros/6.%20Paciente%20Diab%C3%A9tico/pacienteDiabetico.mp4",
-      "text": "Este servicio es realizado por un equipo profesional capacitado en complicaciones relacionadas con la diabetes. 🛡️",
+      "text": "Este servicio es realizado por un equipo profesional capacitado en complicaciones relacionadas con la diabetes. 🛡️ \n Para cualquier dato adicional, no dude en contactarnos por este medio, a nuestro WhatsApp o llamando al 62100083. 📱",
       "next": "OTR_PIE_DIABETICO_STEP_3"
     },
     {

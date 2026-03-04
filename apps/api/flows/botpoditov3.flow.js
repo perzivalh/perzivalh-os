@@ -364,6 +364,7 @@ module.exports = {
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/5.jpeg",
       "text": " ",
+      "nextDelayMs": 1800,
       "next": "HONGOS_PACK_NOTE"
     },
     {
@@ -555,6 +556,7 @@ module.exports = {
       "type": "image",
       "url": "https://pub-d02cc32ec9504df3a4d645e1520c6f43.r2.dev/media/Servicios/Hongo/L%C3%A1ser/2.jpg",
       "text": "*TRATAMIENTO* *LÁSER*: ⚡\n⚡🦶 Tratamiento rápido y efectivo, con resultados visibles en menos tiempo.\nLas sesiones se programan según tu disponibilidad semanal 📅\nAmbas opciones son efectivas, pero el láser actúa más rápido 🛑✨",
+      "nextDelayMs": 2200,
       "next": "TRAT_LASER_STEP_3"
     },
     {

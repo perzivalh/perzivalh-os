@@ -15,6 +15,8 @@ const { routeWithAI } = require("../services/aiRouter");
 const MAX_LIST_TITLE = 24;
 const BUTTON_TITLE_LIMIT = 20;
 const VIDEO_TEXT_FOLLOWUP_DELAY_MS = 1500;
+const IMAGE_AUTO_NEXT_DELAY_MS = 900;
+const VIDEO_AUTO_NEXT_DELAY_MS = 1500;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -107,6 +109,25 @@ function buildMapsLink(branch) {
     return `https://maps.google.com/?q=${branch.lat},${branch.lng}`;
   }
   return null;
+}
+
+function getAutoAdvanceDelayMs(node, mediaType) {
+  if (!node?.next) {
+    return 0;
+  }
+  if (Number.isFinite(node.nextDelayMs) && node.nextDelayMs > 0) {
+    return node.nextDelayMs;
+  }
+  if (Number.isFinite(node.nextDelaySeconds) && node.nextDelaySeconds > 0) {
+    return Math.round(node.nextDelaySeconds * 1000);
+  }
+  if (mediaType === "video") {
+    return VIDEO_AUTO_NEXT_DELAY_MS;
+  }
+  if (mediaType === "image") {
+    return IMAGE_AUTO_NEXT_DELAY_MS;
+  }
+  return 0;
 }
 
 function getBranchMatchScore(branch, normalizedMessage) {
@@ -343,14 +364,23 @@ async function sendNode(waId, flow, node, visited) {
   const buttons = Array.isArray(node.buttons) ? node.buttons : [];
   const mediaUrl = node.url || node.media || node.video || node.image;
   const mediaType = inferMediaType(node, mediaUrl);
+  let sendResult = null;
   if (mediaType === "image") {
-    await sendImage(waId, mediaUrl, nodeText || null);
+    sendResult = await sendImage(waId, mediaUrl, nodeText || null);
   } else if (mediaType === "video") {
     // Some WhatsApp mobile clients render multiline video captions with broken layout.
-    await sendVideo(waId, mediaUrl, null);
+    sendResult = await sendVideo(waId, mediaUrl, null);
     if (nodeText.trim().length > 0) {
       await sleep(VIDEO_TEXT_FOLLOWUP_DELAY_MS);
-      await sendText(waId, nodeText);
+      const followupResult = await sendText(waId, nodeText);
+      if (!followupResult?.ok) {
+        logger.warn("flow.video_followup_send_failed", {
+          flowId: flow.id,
+          nodeId: node.id,
+          next: node.next || null,
+        });
+        return;
+      }
     }
   } else if (buttons.length > 0) {
     if (shouldUseList(buttons)) {
@@ -359,7 +389,7 @@ async function sendNode(waId, flow, node, visited) {
         title: truncateTitle(btn.label),
         description: (btn.label || "").length > MAX_LIST_TITLE ? btn.label : "",
       }));
-      await sendList(
+      sendResult = await sendList(
         waId,
         null,
         bodyText,
@@ -373,7 +403,7 @@ async function sendNode(waId, flow, node, visited) {
         ]
       );
     } else {
-      await sendButtons(
+      sendResult = await sendButtons(
         waId,
         bodyText,
         buttons.map((btn) => ({
@@ -383,7 +413,18 @@ async function sendNode(waId, flow, node, visited) {
       );
     }
   } else {
-    await sendText(waId, bodyText);
+    sendResult = await sendText(waId, bodyText);
+  }
+
+  if (sendResult && !sendResult.ok) {
+    logger.warn("flow.node_send_failed", {
+      flowId: flow.id,
+      nodeId: node.id,
+      nodeType: node.type,
+      mediaType,
+      next: node.next || null,
+    });
+    return;
   }
 
   if (node.terminal) {
@@ -399,6 +440,10 @@ async function sendNode(waId, flow, node, visited) {
       if (!nextNode) {
         logger.warn("flow.next_missing", { flowId: flow.id, next: node.next });
         return;
+      }
+      const autoAdvanceDelayMs = getAutoAdvanceDelayMs(node, mediaType);
+      if (autoAdvanceDelayMs > 0) {
+        await sleep(autoAdvanceDelayMs);
       }
       await sendNode(waId, flow, nextNode, visited);
     }

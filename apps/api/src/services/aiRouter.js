@@ -88,6 +88,74 @@ const DETERMINISTIC_DOMAIN_INTENTS = [
   { routeId: "SVC_PEDICURE_INFO", intent: "pedicure", phrases: ["pedicure", "pedicura", "pedicure clinico", "pedicura clinica", "limpieza de pies", "limpieza podal"] },
 ];
 
+const HOURS_QUALIFIER_PHRASES = [
+  "horario",
+  "horarios",
+  "hora",
+  "horas",
+  "atienden",
+  "a que hora",
+  "en que horario",
+];
+
+const HOURS_QUALIFIED_SERVICE_INTENTS = [
+  {
+    routeId: "SVC_PODOPEDIATRIA_INFO",
+    intent: "hours_service_override_podopediatria",
+    phrases: [
+      "podopediatria",
+      "podopediatria infantil",
+      "infante",
+      "infantes",
+      "nino",
+      "nina",
+      "ninos",
+      "ninas",
+      "bebe",
+      "bebes",
+      "menor",
+      "menores",
+      "poca edad",
+    ],
+  },
+  {
+    routeId: "SVC_PODOGERIATRIA_INFO",
+    intent: "hours_service_override_podogeriatria",
+    phrases: [
+      "podogeriatria",
+      "adulta mayor",
+      "adulto mayor",
+      "adultas mayores",
+      "adultos mayores",
+      "persona adulta mayor",
+      "personas adultas mayores",
+      "tercera edad",
+      "persona mayor",
+      "personas mayores",
+      "abuelito",
+      "abuelita",
+      "anciano",
+      "anciana",
+    ],
+  },
+  {
+    routeId: "OTR_PIE_DIABETICO_INFO",
+    intent: "hours_service_override_pie_diabetico",
+    phrases: [
+      "pie diabetico",
+      "paciente diabetico",
+      "paciente diabetica",
+      "persona con diabetes",
+      "personas con diabetes",
+      "diabetico",
+      "diabetica",
+      "diabeticos",
+      "diabeticas",
+      "diabetes",
+    ],
+  },
+];
+
 const DOMAIN_META_PHRASES = [
   "precio", "precios", "costo", "costos", "tarifa", "tarifas", "cuanto cuesta", "cuanto vale",
   "horario", "horarios", "hora", "horas", "rango de hora", "rango de horas",
@@ -2459,6 +2527,32 @@ function detectDeterministicDomainIntentRoute(text) {
   const normalized = normalizeText(text || "").toLowerCase().trim();
   if (!normalized) return null;
 
+  const asksForHours = HOURS_QUALIFIER_PHRASES.some((phrase) =>
+    includesWholePhrase(normalized, phrase)
+  );
+  if (asksForHours) {
+    let prioritizedService = null;
+    for (const intent of HOURS_QUALIFIED_SERVICE_INTENTS) {
+      const phrases = Array.isArray(intent?.phrases) ? intent.phrases : [];
+      for (const phrase of phrases) {
+        if (!includesWholePhrase(normalized, phrase)) continue;
+        const p = normalizeText(phrase).toLowerCase().trim();
+        const score = (p.length * 10) + 100;
+        if (!prioritizedService || score > prioritizedService.score) {
+          prioritizedService = {
+            routeId: intent.routeId,
+            intent: intent.intent || null,
+            matchedPhrase: p,
+            score,
+          };
+        }
+      }
+    }
+    if (prioritizedService) {
+      return prioritizedService;
+    }
+  }
+
   let best = null;
   for (const intent of DETERMINISTIC_DOMAIN_INTENTS) {
     const phrases = Array.isArray(intent?.phrases) ? intent.phrases : [];
@@ -2546,6 +2640,19 @@ function buildDeterministicDecision({ text, previousQuestion, summary, knowledge
   const looksMultiIntent = /\b(y|ademas|tambien|pero)\b/.test(softenedNormalized);
   const inClarifyFlow = Boolean(previousQuestion) || Number(summary?.clarificationsAsked || 0) > 0;
   const shouldForceRoute = shouldForceKeywordRoute(raw);
+  const isPrioritizedHoursServiceRoute = deterministicIntent?.intent?.startsWith("hours_service_override_");
+
+  if (isPrioritizedHoursServiceRoute && !looksMultiIntent && !inClarifyFlow) {
+    return {
+      action: "route",
+      route_id: deterministicIntent.routeId,
+      text: "",
+      reason: `deterministic_domain_intent:${deterministicIntent.intent}`,
+      ai_used: false,
+      clear_pending: Boolean(previousQuestion),
+      reset_turns: true,
+    };
+  }
 
   if (inferredRoute && shouldForceRoute && !looksMultiIntent && !inClarifyFlow) {
     return {

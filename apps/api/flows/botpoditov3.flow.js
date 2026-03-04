@@ -476,7 +476,7 @@ module.exports = {
     {
       "id": "SERVICIOS_MENU",
       "type": "text",
-      "text": "*SELECCIONA* *EL* *SERVICIO* *QUE* *NECESITES*",
+      "text": "¿Con cuál de nuestros servicios puedo ayudarte? 👇",
       "delayMs": 2500,
       "buttons": [
         {

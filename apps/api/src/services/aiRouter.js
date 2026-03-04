@@ -214,23 +214,29 @@ function loadKnowledgeBase(flowId) {
 }
 
 /**
- * Check for urgency keywords
+ * Check for urgency keywords.
+ * flowAi: the flow.ai config object. If urgency_words is not defined, returns false (no urgency detection).
  */
-function detectUrgency(text) {
+function detectUrgency(text, flowAi) {
+  const urgencyWords = flowAi?.urgency_words;
+  if (!Array.isArray(urgencyWords) || urgencyWords.length === 0) return false;
+
   const normalized = normalizeText(text || "").toLowerCase();
-  const hasPodiatryContext = PODIATRY_CONTEXT_WORDS.some((word) => normalized.includes(word));
-  const hasExplicitDiabeticFootContext =
+  const domainWords = flowAi?.domain_words ?? [];
+  const hasDomainContext = domainWords.length > 0 && domainWords.some((word) => normalized.includes(word));
+  const hasExplicitFootContext = domainWords.length > 0 && (
     normalized.includes("diabet") ||
     normalized.includes("ulcera") ||
     normalized.includes("úlcera") ||
-    normalized.includes("herida");
+    normalized.includes("herida")
+  );
 
-  // Prevent false handoff for non-podiatry complaints like "me duele la oreja/panza"
-  if (!hasPodiatryContext && !hasExplicitDiabeticFootContext) {
+  // Prevent false handoff: only trigger if message has domain context
+  if (!hasDomainContext && !hasExplicitFootContext) {
     return false;
   }
 
-  for (const word of URGENCY_WORDS) {
+  for (const word of urgencyWords) {
     if (normalized.includes(word)) {
       return true;
     }
@@ -1116,7 +1122,7 @@ async function routeWithCloudflareRouteFirst({
   const textReply =
     cleanedCopy ||
     String(parsed.text || "").trim() ||
-    (evaluateDomainGate({ text, knowledge }).classification === "out_of_domain"
+    (evaluateDomainGate({ text, knowledge, flowAi: flow?.ai }).classification === "out_of_domain"
       ? buildOutOfDomainResponseText({ text, knowledge })
       : "Entiendo tu consulta. Te ayudo con eso.");
   logger.info("ai.router_decision", {
@@ -1526,7 +1532,7 @@ async function routeWithStandardProviderRouteFirst({
     };
   }
 
-  const fallbackText = evaluateDomainGate({ text, knowledge }).classification === "out_of_domain"
+  const fallbackText = evaluateDomainGate({ text, knowledge, flowAi: aiFlow }).classification === "out_of_domain"
     ? buildOutOfDomainResponseText({ text, knowledge })
     : "Entiendo tu consulta. Te ayudo con eso.";
 
@@ -1595,7 +1601,7 @@ async function routeWithAI({ text, flow, config, session, waId }) {
   }
 
   // URGENCY CHECK FIRST - bypass AI for urgent cases
-  const urgencyDetected = detectUrgency(text);
+  const urgencyDetected = detectUrgency(text, aiFlow);
   if (urgencyDetected) {
     logger.info("ai.router_urgency_detected", { flowId });
     return {
@@ -1621,7 +1627,7 @@ async function routeWithAI({ text, flow, config, session, waId }) {
   const history = getHistoryForAI(session?.data);
   const summary = getConversationSummary(session?.data);
   const previousQuestion = session?.data?.ai_pending?.question || null;
-  const domainGate = evaluateDomainGate({ text, knowledge });
+  const domainGate = evaluateDomainGate({ text, knowledge, flowAi: aiFlow });
 
   logger.info("ai.domain_gate", {
     flowId,
@@ -1638,6 +1644,7 @@ async function routeWithAI({ text, flow, config, session, waId }) {
     previousQuestion,
     summary,
     knowledge,
+    flowAi: aiFlow,
   });
   if (deterministicDecision?.action) {
     logger.info("ai.router_deterministic", {
@@ -2219,7 +2226,7 @@ function addTermsToDomainLexicon(targetSet, sourceText) {
   }
 }
 
-function getKnowledgeDomainLexicon(knowledge) {
+function getKnowledgeDomainLexicon(knowledge, flowAi) {
   if (!knowledge || typeof knowledge !== "object") {
     return { terms: new Set(), serviceNames: [] };
   }
@@ -2230,8 +2237,10 @@ function getKnowledgeDomainLexicon(knowledge) {
   const terms = new Set();
   const serviceNames = [];
 
-  for (const term of PODIATRY_CONTEXT_WORDS) addTermsToDomainLexicon(terms, term);
-  for (const term of PODIATRY_EXTRA_DOMAIN_WORDS) addTermsToDomainLexicon(terms, term);
+  const domainWords = flowAi?.domain_words ?? [];
+  const extraDomainWords = flowAi?.extra_domain_words ?? [];
+  for (const term of domainWords) addTermsToDomainLexicon(terms, term);
+  for (const term of extraDomainWords) addTermsToDomainLexicon(terms, term);
   for (const term of DOMAIN_META_PHRASES) addTermsToDomainLexicon(terms, term);
 
   addTermsToDomainLexicon(terms, knowledge?.clinica?.nombre);
@@ -2253,7 +2262,7 @@ function getKnowledgeDomainLexicon(knowledge) {
   return result;
 }
 
-function evaluateDomainGate({ text, knowledge }) {
+function evaluateDomainGate({ text, knowledge, flowAi }) {
   const raw = String(text || "").trim();
   if (!raw) {
     return { classification: "ambiguous", confidence: 0, normalized: "", reason: "empty" };
@@ -2264,7 +2273,10 @@ function evaluateDomainGate({ text, knowledge }) {
   const contentTokens = tokens.filter((token) => token.length >= 3 && !DOMAIN_NEUTRAL_WORDS.has(token));
   const greetingOnly = contentTokens.length === 0;
 
-  const { terms: domainTerms, serviceNames } = getKnowledgeDomainLexicon(knowledge);
+  const { terms: domainTerms, serviceNames } = getKnowledgeDomainLexicon(knowledge, flowAi);
+
+  const domainWords = flowAi?.domain_words ?? [];
+  const ambiguousHealthWords = flowAi?.ambiguous_health_words ?? [];
 
   const phraseHits = [];
   const metaPhraseHits = [];
@@ -2277,7 +2289,7 @@ function evaluateDomainGate({ text, knowledge }) {
       metaPhraseHits.push(p);
     }
   }
-  for (const phrase of PODIATRY_CONTEXT_WORDS) {
+  for (const phrase of domainWords) {
     const p = normalizeText(phrase).toLowerCase();
     if (p && includesWholePhrase(normalized, p)) {
       phraseHits.push(p);
@@ -2295,7 +2307,7 @@ function evaluateDomainGate({ text, knowledge }) {
   const tokenHits = contentTokens.filter((token) => domainTerms.has(token));
   const strongTokenHits = tokenHits.filter((token) => !DOMAIN_WEAK_SIGNAL_TERMS.has(token));
   const unknownTokens = contentTokens.filter((token) => !domainTerms.has(token));
-  const hasAmbiguousHealthSignal = DOMAIN_AMBIGUOUS_HEALTH_WORDS.some((w) =>
+  const hasAmbiguousHealthSignal = ambiguousHealthWords.length > 0 && ambiguousHealthWords.some((w) =>
     normalized.includes(normalizeText(w).toLowerCase())
   );
 
@@ -2523,16 +2535,20 @@ function normalizeOutOfScopeDecision({ parsed, flow, text, knowledge, provider, 
   };
 }
 
-function detectDeterministicDomainIntentRoute(text) {
+function detectDeterministicDomainIntentRoute(text, flowAi) {
   const normalized = normalizeText(text || "").toLowerCase().trim();
   if (!normalized) return null;
 
-  const asksForHours = HOURS_QUALIFIER_PHRASES.some((phrase) =>
+  const hoursQualifierPhrases = flowAi?.hours_qualifier_phrases ?? [];
+  const hoursQualifiedServiceIntents = flowAi?.hours_qualified_service_intents ?? [];
+  const deterministicIntents = flowAi?.deterministic_intents ?? [];
+
+  const asksForHours = hoursQualifierPhrases.some((phrase) =>
     includesWholePhrase(normalized, phrase)
   );
   if (asksForHours) {
     let prioritizedService = null;
-    for (const intent of HOURS_QUALIFIED_SERVICE_INTENTS) {
+    for (const intent of hoursQualifiedServiceIntents) {
       const phrases = Array.isArray(intent?.phrases) ? intent.phrases : [];
       for (const phrase of phrases) {
         if (!includesWholePhrase(normalized, phrase)) continue;
@@ -2554,7 +2570,7 @@ function detectDeterministicDomainIntentRoute(text) {
   }
 
   let best = null;
-  for (const intent of DETERMINISTIC_DOMAIN_INTENTS) {
+  for (const intent of deterministicIntents) {
     const phrases = Array.isArray(intent?.phrases) ? intent.phrases : [];
     for (const phrase of phrases) {
       if (!includesWholePhrase(normalized, phrase)) continue;
@@ -2614,7 +2630,7 @@ function shouldForceKeywordRoute(text) {
   return exactUtilityPrompts.has(softened);
 }
 
-function buildDeterministicDecision({ text, previousQuestion, summary, knowledge }) {
+function buildDeterministicDecision({ text, previousQuestion, summary, knowledge, flowAi }) {
   const raw = String(text || "").trim();
   if (!raw) return null;
   const normalized = normalizeText(raw).toLowerCase().trim();
@@ -2632,8 +2648,8 @@ function buildDeterministicDecision({ text, previousQuestion, summary, knowledge
     };
   }
 
-  const domainGate = evaluateDomainGate({ text: raw, knowledge });
-  const deterministicIntent = detectDeterministicDomainIntentRoute(raw);
+  const domainGate = evaluateDomainGate({ text: raw, knowledge, flowAi });
+  const deterministicIntent = detectDeterministicDomainIntentRoute(raw, flowAi);
   const inferredRoute = deterministicIntent?.routeId || fallbackKeywordRoute(raw);
 
   const tokenCount = softenedNormalized.split(/\s+/).filter(Boolean).length;

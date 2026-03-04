@@ -17,7 +17,82 @@ module.exports = {
     "allow_fallback": false,
     "handoff_node_id": "AI_HANDOFF_OFFER",
     "services_node_id": "SERVICIOS_MENU",
-    "out_of_scope_node_id": "OUT_OF_SCOPE"
+    "out_of_scope_node_id": "OUT_OF_SCOPE",
+
+    // --- Inactividad ---
+    "inactivity": {
+      "first_notice_ms": 600000,
+      "final_after_notice_ms": 300000,
+      "reminder_text": "Necesitas algo mas? Responde MENU para volver.",
+      "closing_node_id": "CIERRE_HORARIO_UBICACION"
+    },
+
+    // --- Detección de urgencia (handoff inmediato) ---
+    "urgency_words": [
+      "dolor intenso", "dolor fuerte", "mucho dolor", "me duele mucho",
+      "sangrado", "sangra", "sangrando",
+      "pus", "supura", "infectado", "infección",
+      "fiebre", "calentura",
+      "hinchado", "muy inflamado",
+      "no puedo caminar", "urgente", "emergencia",
+      "úlcera", "ulcera", "herida abierta"
+    ],
+
+    // --- Palabras de contexto del dominio (para validar urgencia y domain gate) ---
+    "domain_words": [
+      "pie", "pies", "dedo del pie", "dedos del pie", "talon", "talón", "planta",
+      "uña", "uñas", "uñero", "unero", "encarnada", "juanete", "callo", "callos",
+      "heloma", "hongo", "hongos", "onicomicosis", "pedicure", "podologia", "podología",
+      "podopediatria", "podopediatría", "podogeriatria", "podogeriatría", "tobillo"
+    ],
+
+    // --- Términos extra del dominio (para el lexicón de conocimiento) ---
+    "extra_domain_words": [
+      "matricectomia", "matricetomia", "onicocriptosis", "onicocriptosis ungueal"
+    ],
+
+    // --- Señales de salud ambiguas (sin contexto podológico = no urgencia) ---
+    "ambiguous_health_words": [
+      "dolor", "duele", "sangra", "sangrado", "hinchado", "inflamado", "pus", "supura", "infeccion",
+      "ardor", "picazon", "fiebre", "herida"
+    ],
+
+    // --- Intents determinísticos: keyword → nodo directo ---
+    "deterministic_intents": [
+      { "routeId": "PRECIOS_INFO",      "intent": "prices",         "phrases": ["precio", "precios", "costo", "costos", "tarifa", "tarifas", "cuanto cuesta", "cuanto vale", "cuanto cobran"] },
+      { "routeId": "HORARIOS_INFO",     "intent": "hours",          "phrases": ["horario", "horarios", "hora", "horas", "rango de hora", "rango de horas", "atienden"] },
+      { "routeId": "HORARIOS_INFO",     "intent": "location",       "phrases": ["ubicacion", "ubicaciones", "direccion", "sucursal", "sucursales", "como llegar", "donde estan", "donde queda", "clinica"] },
+      { "routeId": "CONTACT_METHOD",    "intent": "contact",        "phrases": ["asesor", "asesora", "humano", "recepcion", "hablar con alguien", "hablar con una persona", "llamar"] },
+      { "routeId": "SERVICIOS_MENU",    "intent": "services_menu",  "phrases": ["servicios", "que servicios", "que ofrecen", "que tienen", "que hacen", "tratamientos disponibles", "ver opciones", "con que trabajan", "en que trabajan", "con que trabajan entonces", "en que trabajan entonces"] },
+      { "routeId": "UNERO_TIPO_TRAT",   "intent": "unero",          "phrases": ["unero", "uneros", "una encarnada", "unas encarnadas", "una clavada"] },
+      { "routeId": "TRAT_MATRICECTOMIA_INFO", "intent": "matricectomia", "phrases": ["matricectomia", "matricetomia", "cirugia de unero", "operacion unero"] },
+      { "routeId": "HONGOS_TIPO_TRAT",  "intent": "hongos",         "phrases": ["hongo", "hongos", "onicomicosis"] },
+      { "routeId": "SVC_PEDICURE_INFO", "intent": "pedicure",       "phrases": ["pedicure", "pedicura", "pedicure clinico", "pedicura clinica", "limpieza de pies", "limpieza podal"] }
+    ],
+
+    // --- Calificadores de horario (detectan preguntas sobre horario de servicio específico) ---
+    "hours_qualifier_phrases": [
+      "horario", "horarios", "hora", "horas", "atienden", "a que hora", "en que horario"
+    ],
+
+    // --- Overrides de nodo cuando se pregunta horario de un servicio específico ---
+    "hours_qualified_service_intents": [
+      {
+        "routeId": "SVC_PODOPEDIATRIA_INFO",
+        "intent": "hours_service_override_podopediatria",
+        "phrases": ["podopediatria", "podopediatria infantil", "infante", "infantes", "nino", "nina", "ninos", "ninas", "bebe", "bebes", "menor", "menores", "poca edad"]
+      },
+      {
+        "routeId": "SVC_PODOGERIATRIA_INFO",
+        "intent": "hours_service_override_podogeriatria",
+        "phrases": ["podogeriatria", "adulta mayor", "adulto mayor", "adultas mayores", "adultos mayores", "persona adulta mayor", "personas adultas mayores", "tercera edad", "persona mayor", "personas mayores", "abuelito", "abuelita", "anciano", "anciana"]
+      },
+      {
+        "routeId": "OTR_PIE_DIABETICO_INFO",
+        "intent": "hours_service_override_pie_diabetico",
+        "phrases": ["pie diabetico", "paciente diabetico", "paciente diabetica", "persona con diabetes", "personas con diabetes", "diabetico", "diabetica", "diabeticos", "diabeticas", "diabetes"]
+      }
+    ]
   },
 
   flow_name: "flujogramaV3",

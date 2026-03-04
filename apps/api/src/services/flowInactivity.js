@@ -3,13 +3,7 @@ const prisma = require("../db");
 const sessionStore = require("../sessionStore");
 const { sendText, sendImage, sendVideo } = require("../whatsapp");
 const { resolveTenantContextByPhoneNumberId } = require("../tenancy/tenantResolver");
-const { getFlow } = require("../../flows");
-const {
-  BOT_FLOW_ID,
-  FIRST_NOTICE_MS,
-  FINAL_AFTER_NOTICE_MS,
-  REMINDER_TEXT,
-} = require("../config/flowInactivity");
+const { loadAllFlows } = require("../../flows");
 
 function findNodeText(flow, nodeId) {
   if (!flow || !Array.isArray(flow.nodes)) {
@@ -101,7 +95,7 @@ async function sendNodeWithTenantContext(session, node) {
   await sendWithTenantContext(session, () => sendText(session.wa_id, bodyText));
 }
 
-async function handleSession(session, now, flow, closingText, closingSequence) {
+async function handleSession(session, now, flow, closingText, closingSequence, inactivityCfg) {
   if (!session?.wa_id || !session.phone_number_id) {
     return;
   }
@@ -112,6 +106,10 @@ async function handleSession(session, now, flow, closingText, closingSequence) {
     return;
   }
 
+  const firstNoticeMs = inactivityCfg.first_notice_ms;
+  const finalAfterNoticeMs = inactivityCfg.final_after_notice_ms;
+  const reminderText = inactivityCfg.reminder_text;
+
   const noticeAt = session.inactivity_notice_at
     ? Date.parse(session.inactivity_notice_at)
     : 0;
@@ -119,13 +117,13 @@ async function handleSession(session, now, flow, closingText, closingSequence) {
   if (noticeAt && lastUserAt > noticeAt) {
     await sessionStore.updateSession(session.wa_id, session.phone_number_id, {
       inactivity_notice_at: null,
-      next_due_at: new Date(now + FIRST_NOTICE_MS),
+      next_due_at: new Date(now + firstNoticeMs),
     });
     return;
   }
 
   if (noticeAt) {
-    if (now - noticeAt >= FINAL_AFTER_NOTICE_MS) {
+    if (now - noticeAt >= finalAfterNoticeMs) {
       if (Array.isArray(closingSequence) && closingSequence.length > 0) {
         for (const node of closingSequence) {
           await sendNodeWithTenantContext(session, node);
@@ -143,40 +141,38 @@ async function handleSession(session, now, flow, closingText, closingSequence) {
     return;
   }
 
-  if (now - lastUserAt >= FIRST_NOTICE_MS) {
-    await sendWithTenantContext(session, () => sendText(session.wa_id, REMINDER_TEXT));
+  if (now - lastUserAt >= firstNoticeMs) {
+    await sendWithTenantContext(session, () => sendText(session.wa_id, reminderText));
     await sessionStore.updateSession(session.wa_id, session.phone_number_id, {
       inactivity_notice_at: new Date(now).toISOString(),
-      next_due_at: new Date(now + FINAL_AFTER_NOTICE_MS),
+      next_due_at: new Date(now + finalAfterNoticeMs),
     });
   }
 }
 
-let lastMetricsAt = 0;
+// Per-flow metrics timestamps (avoids a single shared variable)
+const lastMetricsAtByFlow = new Map();
 
-async function processBotpoditoV2Inactivity() {
-  const flow = getFlow(BOT_FLOW_ID);
-  if (!flow) {
-    logger.warn("flow_inactivity.flow_missing", { flowId: BOT_FLOW_ID });
-    return;
-  }
-  const closingText =
-    findNodeText(flow, "CIERRE_HORARIO_UBICACION") ||
-    "Gracias por escribirnos. Si necesitas algo mas, responde MENU.";
-  const closingSequence = buildLinearSequence(flow, "CIERRE_HORARIO_UBICACION");
+async function processFlowInactivity(flow, inactivityCfg) {
+  const flowId = flow.id;
+  const closingNodeId = inactivityCfg.closing_node_id || null;
+  const closingText = closingNodeId
+    ? findNodeText(flow, closingNodeId) || "Gracias por escribirnos. Si necesitas algo mas, responde MENU."
+    : "Gracias por escribirnos. Si necesitas algo mas, responde MENU.";
+  const closingSequence = closingNodeId ? buildLinearSequence(flow, closingNodeId) : [];
 
   const now = Date.now();
   let sessions = [];
   try {
     sessions = await sessionStore.listSessionsDue({
-      flowId: BOT_FLOW_ID,
+      flowId,
       dueBefore: new Date(now),
       limit: 200,
     });
   } catch (error) {
     if (error?.code === "P2021") {
       logger.warn("flow_inactivity.session_table_missing", {
-        flowId: BOT_FLOW_ID,
+        flowId,
         message: "Session table missing. Run tenant migrations.",
       });
       return;
@@ -184,43 +180,60 @@ async function processBotpoditoV2Inactivity() {
     throw error;
   }
 
+  const lastMetricsAt = lastMetricsAtByFlow.get(flowId) || 0;
+
   if (!sessions.length) {
     if (now - lastMetricsAt > 5 * 60 * 1000) {
-      lastMetricsAt = now;
+      lastMetricsAtByFlow.set(flowId, now);
       const active = await prisma.session.count({
-        where: { flow_id: BOT_FLOW_ID },
+        where: { flow_id: flowId },
       });
-      logger.info("flow_inactivity.active_sessions", {
-        flowId: BOT_FLOW_ID,
-        count: active,
-      });
+      logger.info("flow_inactivity.active_sessions", { flowId, count: active });
     }
     return;
   }
 
   for (const session of sessions) {
     try {
-      await handleSession(session, now, flow, closingText, closingSequence);
+      await handleSession(session, now, flow, closingText, closingSequence, inactivityCfg);
     } catch (error) {
       logger.error("flow_inactivity.session_failed", {
         message: error.message || error,
         wa_id: session.wa_id,
+        flowId,
       });
     }
   }
 
   if (now - lastMetricsAt > 5 * 60 * 1000) {
-    lastMetricsAt = now;
+    lastMetricsAtByFlow.set(flowId, now);
     const active = await prisma.session.count({
-      where: { flow_id: BOT_FLOW_ID },
+      where: { flow_id: flowId },
     });
-    logger.info("flow_inactivity.active_sessions", {
-      flowId: BOT_FLOW_ID,
-      count: active,
-    });
+    logger.info("flow_inactivity.active_sessions", { flowId, count: active });
   }
 }
 
+async function processAllFlowsInactivity() {
+  const flows = loadAllFlows();
+  for (const flow of Object.values(flows)) {
+    const inactivityCfg = flow?.ai?.inactivity;
+    if (!inactivityCfg) continue;
+    try {
+      await processFlowInactivity(flow, inactivityCfg);
+    } catch (error) {
+      logger.error("flow_inactivity.flow_failed", {
+        flowId: flow.id,
+        message: error.message || error,
+      });
+    }
+  }
+}
+
+// Alias para backward compat con server.js
+const processBotpoditoV2Inactivity = processAllFlowsInactivity;
+
 module.exports = {
+  processAllFlowsInactivity,
   processBotpoditoV2Inactivity,
 };

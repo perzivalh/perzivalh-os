@@ -548,3 +548,157 @@ select.dash-filter:focus {
   font-weight: 700;
   color: var(--accent);
 }
+
+.dashboard-actions-wrap {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.dash-view-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.dash-view-btn {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 0.55rem 0.8rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.dash-view-btn.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.dash-table-card {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.dash-table-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) repeat(5, minmax(140px, 1fr));
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.dash-table-search {
+  min-width: 0;
+}
+
+.dash-table-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.dash-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.dash-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+}
+
+.dash-table th,
+.dash-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+  font-size: 0.82rem;
+}
+
+.dash-table th {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.67rem;
+  color: var(--muted);
+  background: var(--panel-muted);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.dash-table-empty {
+  text-align: center !important;
+  color: var(--muted);
+  padding: 1rem !important;
+}
+
+.dash-table-empty.error {
+  color: #b91c1c;
+}
+
+.dash-bool-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.dash-bool-pill.yes {
+  color: #047857;
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.dash-bool-pill.no {
+  color: #9a3412;
+  background: rgba(249, 115, 22, 0.14);
+  border-color: rgba(249, 115, 22, 0.35);
+}
+
+.dash-table-pagination {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 1400px) {
+  .dash-table-toolbar {
+    grid-template-columns: repeat(3, minmax(180px, 1fr));
+  }
+}
+
+@media (max-width: 1100px) {
+  .dashboard-layout {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-side {
+    order: 2;
+  }
+  .dashboard-main {
+    order: 1;
+  }
+  .dash-table-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 800px) {
+  .dash-table-toolbar {
+    grid-template-columns: 1fr;
+  }
+}

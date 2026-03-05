@@ -10,6 +10,7 @@ const prisma = require("../db");
 const { getTenantContext } = require("../tenancy/tenantContext");
 const { setConversationStatus, addTagToConversation } = require("../services/conversations");
 const { routeWithAI } = require("../services/aiRouter");
+const { applyAutoTagsByWaId } = require("../services/conversationAutoTagService");
 
 const MAX_LIST_TITLE = 24;
 const BUTTON_TITLE_LIMIT = 20;
@@ -308,6 +309,34 @@ async function setConversationToPending(waId) {
   });
 }
 
+async function applyFlowAutoTags({
+  waId,
+  text,
+  routeId,
+  reason,
+} = {}) {
+  const phoneNumberId = getCurrentLineId();
+  if (!waId || !phoneNumberId) {
+    return;
+  }
+  try {
+    await applyAutoTagsByWaId({
+      waId,
+      phoneNumberId,
+      text,
+      routeId,
+      reason,
+    });
+  } catch (error) {
+    logger.warn("flow.autotag_failed", {
+      waId,
+      phoneNumberId,
+      routeId: routeId || null,
+      error: error.message || String(error),
+    });
+  }
+}
+
 async function sendNode(waId, flow, node, visited) {
   if (!node) {
     return;
@@ -511,6 +540,11 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
     const currentNode = nodeMap.get(currentNodeId);
     const match = findButtonMatch(currentNode, normalized);
     if (match && match.next && nodeMap.has(match.next)) {
+      await applyFlowAutoTags({
+        waId,
+        text,
+        routeId: match.next,
+      });
       await sendNode(waId, flow, nodeMap.get(match.next), new Set([match.next]));
       return;
     }
@@ -636,6 +670,12 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
       if (aiDecision.action === "route" && aiDecision.route_id) {
         const target = nodeMap.get(aiDecision.route_id);
         if (target) {
+          await applyFlowAutoTags({
+            waId,
+            text,
+            routeId: aiDecision.route_id,
+            reason: aiDecision.reason || null,
+          });
           logger.info("flow.route_node_sent", {
             flowId: flow.id,
             routeId: aiDecision.route_id,
@@ -726,6 +766,11 @@ async function executeDynamicInteractive(waId, selectionId, flowData, context = 
 
     const target = nodeMap.get(nextId);
     if (target) {
+      await applyFlowAutoTags({
+        waId,
+        text: selectionId,
+        routeId: nextId,
+      });
       await sendNode(waId, flow, target, new Set([nextId]));
       return;
     }

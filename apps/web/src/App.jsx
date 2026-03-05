@@ -2468,6 +2468,8 @@ function App() {
             <DashboardView
               metrics={metrics}
               channels={tenantChannels}
+              users={users}
+              tags={tags}
               selectedPeriod={dashboardPeriod}
               selectedChannel={dashboardChannel}
               onPeriodChange={(period) => {

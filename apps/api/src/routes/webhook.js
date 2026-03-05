@@ -18,6 +18,9 @@ const { getTenantContext } = require("../tenancy/tenantContext");
 const { downloadMedia } = require("../services/metaGraphApi");
 const { transcribeAudio } = require("../services/aiProviders");
 const {
+    applyAutoTagsToConversation,
+} = require("../services/conversationAutoTagService");
+const {
     resolveTenantContextByPhoneNumberId,
     resolveChannelByPhoneNumberId,
 } = require("../tenancy/tenantResolver");
@@ -341,6 +344,21 @@ router.post("/webhook", async (req, res) => {
 
                         let normalized = normalizeText(incomingText);
 
+                        if (message.type === "text") {
+                            try {
+                                await applyAutoTagsToConversation({
+                                    conversationId: conversation.id,
+                                    phoneNumberId: conversation.phone_number_id,
+                                    text: incomingText,
+                                });
+                            } catch (error) {
+                                logger.warn("autotag.text_failed", {
+                                    conversation_id: conversation.id,
+                                    error: error.message || String(error),
+                                });
+                            }
+                        }
+
                         if (isAdminPhone(waId)) {
                             if (normalized === "bot") {
                                 await setConversationStatus({
@@ -560,6 +578,22 @@ router.post("/webhook", async (req, res) => {
                             const flowText = message.type === "audio"
                                 ? String(incomingText).replace(/^\(Audio transcrito:\s*/i, "").replace(/\)\s*$/, "").trim()
                                 : incomingText;
+
+                            if (message.type === "audio") {
+                                try {
+                                    await applyAutoTagsToConversation({
+                                        conversationId: conversation.id,
+                                        phoneNumberId: conversation.phone_number_id,
+                                        text: flowText,
+                                    });
+                                } catch (error) {
+                                    logger.warn("autotag.flow_text_failed", {
+                                        conversation_id: conversation.id,
+                                        error: error.message || String(error),
+                                    });
+                                }
+                            }
+
                             if (activeFlow.flow.useLegacyHandler) {
                                 void handleIncomingText(waId, flowText);
                             } else {
@@ -572,6 +606,7 @@ router.post("/webhook", async (req, res) => {
                         if (message.type === "interactive" || message.type === "button") {
                             const selection = parseInteractiveSelection(message);
                             const selectionText = normalizeText(selection?.title || selection?.id || "");
+
                             if (isHandoffRequest(selectionText)) {
                                 await setConversationStatus({
                                     conversationId: conversation.id,
@@ -598,6 +633,18 @@ router.post("/webhook", async (req, res) => {
 
 
                             if (activeFlow.flow.useLegacyHandler) {
+                                try {
+                                    await applyAutoTagsToConversation({
+                                        conversationId: conversation.id,
+                                        phoneNumberId: conversation.phone_number_id,
+                                        text: selection?.title || selection?.id || "",
+                                    });
+                                } catch (error) {
+                                    logger.warn("autotag.interactive_failed", {
+                                        conversation_id: conversation.id,
+                                        error: error.message || String(error),
+                                    });
+                                }
                                 void handleInteractive(waId, selection?.id);
                             } else {
                                 void executeDynamicInteractive(waId, selection?.id, activeFlow);

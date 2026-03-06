@@ -43,6 +43,7 @@ function ChatView({
   onLoadMoreConversations,
   onRefreshConversations,
   handleBackToList,
+  handleBackFromInfo,
   setIsInfoOpen,
   handleChatScroll,
   handleAssignSelf,
@@ -598,7 +599,7 @@ function ChatView({
               <button
                 className="back-button info-mobile-back"
                 type="button"
-                onClick={() => setIsInfoOpen(false)}
+                onClick={handleBackFromInfo}
               >
                 Chat
               </button>

@@ -111,6 +111,22 @@ function App() {
   const conversationListRequestRef = useRef(0);
   const conversationsLoadingRef = useRef(false);
   const conversationsLoadingMoreRef = useRef(false);
+  const pendingConversationIdsRef = useRef(new Set());
+  const pendingAlertAudioRef = useRef(null);
+  const pendingAlertLoopingRef = useRef(false);
+  const pendingAlertWantsResumeRef = useRef(false);
+  const paneHistorySnapshotRef = useRef({
+    initialized: false,
+    pane: "list",
+    conversationId: null,
+  });
+  const popPaneTargetRef = useRef(null);
+  const pendingInfoOpenConversationRef = useRef(null);
+  const popLoadConversationRef = useRef(null);
+  const viewStateRef = useRef("chats");
+  const activeConversationStateRef = useRef(null);
+  const isInfoOpenStateRef = useRef(false);
+  const isSuperadminUserRef = useRef(false);
   const scrollOnLoadRef = useRef(false);
   const rolePermissionsVersion = useRef(0);
   const [settingsSection, setSettingsSection] = useState("users");
@@ -309,6 +325,117 @@ function App() {
     pruneMessageCache();
   }
 
+  function ensurePendingAlertAudio() {
+    if (pendingAlertAudioRef.current) {
+      return pendingAlertAudioRef.current;
+    }
+    const sources = [
+      "/sounds/new-notification-09-352705.wav",
+      "/sounds/new-notification-09-352705.mp3",
+    ];
+    const audio = new Audio(sources[0]);
+    audio.volume = 1;
+    audio.loop = true;
+    let sourceIndex = 0;
+    audio.addEventListener("error", () => {
+      sourceIndex += 1;
+      if (sourceIndex < sources.length) {
+        audio.src = sources[sourceIndex];
+        audio.load();
+      }
+    });
+    pendingAlertAudioRef.current = audio;
+    return audio;
+  }
+
+  function startPendingAlertLoop() {
+    if (pendingAlertLoopingRef.current) {
+      return;
+    }
+    try {
+      const audio = ensurePendingAlertAudio();
+      audio.loop = true;
+      audio.currentTime = 0;
+      void audio.play()
+        .then(() => {
+          pendingAlertLoopingRef.current = true;
+          pendingAlertWantsResumeRef.current = false;
+        })
+        .catch(() => {
+          pendingAlertWantsResumeRef.current = true;
+        });
+    } catch (error) {
+      pendingAlertWantsResumeRef.current = true;
+    }
+  }
+
+  function stopPendingAlertLoop() {
+    const audio = pendingAlertAudioRef.current;
+    if (audio) {
+      try {
+        audio.pause();
+        audio.currentTime = 0;
+      } catch (error) {
+        // ignore pause failures
+      }
+    }
+    pendingAlertLoopingRef.current = false;
+    pendingAlertWantsResumeRef.current = false;
+  }
+
+  function syncPendingAlertLoop() {
+    if (pendingConversationIdsRef.current.size > 0) {
+      startPendingAlertLoop();
+      return;
+    }
+    stopPendingAlertLoop();
+  }
+
+  function applyPendingConversationState(conversation) {
+    if (!conversation?.id) {
+      return { isPending: false, isNewPending: false };
+    }
+    const isPending =
+      conversation.status === "pending" && !conversation.assigned_user_id;
+    const set = pendingConversationIdsRef.current;
+    const alreadyPending = set.has(conversation.id);
+    if (isPending) {
+      set.add(conversation.id);
+    } else {
+      set.delete(conversation.id);
+    }
+    return {
+      isPending,
+      isNewPending: isPending && !alreadyPending,
+    };
+  }
+
+  function isMobileGestureNavigationEnabled() {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    if (!window.matchMedia("(max-width: 900px)").matches) {
+      return false;
+    }
+    if (isSuperadminUserRef.current) {
+      return false;
+    }
+    return viewStateRef.current === "chats";
+  }
+
+  function getCurrentChatPaneState() {
+    const active = activeConversationStateRef.current;
+    const pane = !active
+      ? "list"
+      : isInfoOpenStateRef.current
+        ? "info"
+        : "chat";
+    return {
+      pane,
+      conversationId: active?.id || null,
+    };
+  }
+
   const navigateTo = useCallback((nextPath, options = {}) => {
     if (typeof window === "undefined") {
       return;
@@ -433,11 +560,80 @@ function App() {
   }
 
   useEffect(() => {
+    viewStateRef.current = view;
+    activeConversationStateRef.current = activeConversation;
+    isInfoOpenStateRef.current = isInfoOpen;
+    isSuperadminUserRef.current = isSuperadminUser;
+  }, [view, activeConversation, isInfoOpen, isSuperadminUser]);
+
+  useEffect(() => {
     if (typeof window === "undefined") {
       return undefined;
     }
-    const handlePopState = () => {
+    const handlePopState = (event) => {
       setPathname(window.location.pathname || "/");
+      if (!isMobileGestureNavigationEnabled()) {
+        return;
+      }
+
+      const state = event.state || {};
+      const hasChatPaneState = Boolean(state.__chatNav && state.__chatPane);
+      if (!hasChatPaneState) {
+        const currentPane = getCurrentChatPaneState();
+        if (currentPane.pane !== "list") {
+          popPaneTargetRef.current = { pane: "list", conversationId: null };
+          pendingInfoOpenConversationRef.current = null;
+          setIsInfoOpen(false);
+          setActiveConversation(null);
+          resetMessageState();
+        }
+        return;
+      }
+
+      const targetPane = state.__chatPane;
+      const targetConversationId = state.__chatConversationId || null;
+      popPaneTargetRef.current = {
+        pane: targetPane,
+        conversationId: targetConversationId,
+      };
+      pendingInfoOpenConversationRef.current = null;
+
+      if (targetPane === "list") {
+        setIsInfoOpen(false);
+        setActiveConversation(null);
+        resetMessageState();
+        return;
+      }
+
+      if (targetPane === "chat") {
+        setIsInfoOpen(false);
+        const currentId = activeConversationStateRef.current?.id || null;
+        if (
+          targetConversationId &&
+          currentId !== targetConversationId &&
+          popLoadConversationRef.current
+        ) {
+          void popLoadConversationRef.current(targetConversationId);
+        }
+        return;
+      }
+
+      if (targetPane === "info") {
+        const currentId = activeConversationStateRef.current?.id || null;
+        if (
+          targetConversationId &&
+          currentId !== targetConversationId &&
+          popLoadConversationRef.current
+        ) {
+          pendingInfoOpenConversationRef.current = targetConversationId;
+          setIsInfoOpen(false);
+          void popLoadConversationRef.current(targetConversationId);
+          return;
+        }
+        if (activeConversationStateRef.current) {
+          setIsInfoOpen(true);
+        }
+      }
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
@@ -817,69 +1013,72 @@ function App() {
   }, [token, user?.id]);
 
   useEffect(() => {
+    pendingConversationIdsRef.current.clear();
+    stopPendingAlertLoop();
+  }, [token]);
+
+  useEffect(() => {
+    if (!token || isSuperadminUser) {
+      pendingConversationIdsRef.current.clear();
+      stopPendingAlertLoop();
+      return;
+    }
+    const pendingSet = pendingConversationIdsRef.current;
+    for (const conversation of conversations) {
+      if (!conversation?.id) {
+        continue;
+      }
+      if (conversation.status === "pending" && !conversation.assigned_user_id) {
+        pendingSet.add(conversation.id);
+      } else {
+        pendingSet.delete(conversation.id);
+      }
+    }
+    syncPendingAlertLoop();
+  }, [conversations, token, isSuperadminUser]);
+
+  useEffect(() => {
     if (!token) {
+      pendingConversationIdsRef.current.clear();
+      stopPendingAlertLoop();
       return;
     }
     if (isSuperadminUser) {
+      pendingConversationIdsRef.current.clear();
+      stopPendingAlertLoop();
       return;
     }
     const socket = connectSocket(token);
-    const pendingSoundRef = { current: null };
-    const SOUND_SOURCES = [
-      "/sounds/new-notification-09-352705.wav",
-      "/sounds/new-notification-09-352705.mp3",
-    ];
-    const ensurePendingAudio = () => {
-      if (pendingSoundRef.current) {
-        return pendingSoundRef.current;
-      }
-      const audio = new Audio(SOUND_SOURCES[0]);
-      audio.volume = 1;
-      let sourceIndex = 0;
-      audio.addEventListener("error", () => {
-        sourceIndex += 1;
-        if (sourceIndex < SOUND_SOURCES.length) {
-          audio.src = SOUND_SOURCES[sourceIndex];
-          audio.load();
-        }
-      });
-      pendingSoundRef.current = audio;
-      return audio;
-    };
     const unlockAudio = () => {
-      const audio = ensurePendingAudio();
-      audio.play().then(() => {
-        audio.pause();
-        audio.currentTime = 0;
-      }).catch(() => {
-        // ignore autoplay errors
-      });
+      const audio = ensurePendingAlertAudio();
+      void audio.play()
+        .then(() => {
+          audio.pause();
+          audio.currentTime = 0;
+          pendingAlertLoopingRef.current = false;
+          if (
+            pendingAlertWantsResumeRef.current ||
+            pendingConversationIdsRef.current.size > 0
+          ) {
+            startPendingAlertLoop();
+          }
+        })
+        .catch(() => {
+          // ignore autoplay errors
+        });
     };
     window.addEventListener("click", unlockAudio, { once: true });
     window.addEventListener("touchstart", unlockAudio, { once: true });
 
-    const playPendingSound = () => {
-      if (typeof window === "undefined") return;
-      try {
-        const audio = ensurePendingAudio();
-        audio.currentTime = 0;
-        audio.play().catch(() => {
-          // ignore autoplay errors
-        });
-      } catch (error) {
-        // ignore audio errors
-      }
-    };
-
     socket.on("conversation:update", ({ conversation }) => {
       const prevStatus = conversationStatusRef.current.get(conversation.id);
       conversationStatusRef.current.set(conversation.id, conversation.status);
-      if (
-        conversation.status === "pending" &&
-        !conversation.assigned_user_id &&
+      const pendingState = applyPendingConversationState(conversation);
+      syncPendingAlertLoop();
+      if (pendingState.isNewPending || (
+        pendingState.isPending &&
         prevStatus !== "pending"
-      ) {
-        playPendingSound();
+      )) {
         pushToast({ message: "Nueva conversación pendiente" });
       }
       setConversations((prev) => {
@@ -896,12 +1095,8 @@ function App() {
       );
     });
     socket.on("message:new", ({ conversation, message }) => {
-      if (
-        conversation.status === "pending" &&
-        !conversation.assigned_user_id
-      ) {
-        playPendingSound();
-      }
+      applyPendingConversationState(conversation);
+      syncPendingAlertLoop();
       const enrichedConversation = {
         ...conversation,
         last_message_text: message?.text || null,
@@ -922,7 +1117,8 @@ function App() {
         prev?.id === conversation.id ? { ...prev, ...enrichedConversation } : prev
       );
       setMessages((prev) => {
-        if (!activeConversation || activeConversation.id !== conversation.id) {
+        const activeId = activeConversationStateRef.current?.id || null;
+        if (!activeId || activeId !== conversation.id) {
           return prev;
         }
         markConversationRead(enrichedConversation);
@@ -931,8 +1127,9 @@ function App() {
     });
     return () => {
       socket.disconnect();
+      stopPendingAlertLoop();
     };
-  }, [token, activeConversation]);
+  }, [token, isSuperadminUser]);
 
   useEffect(() => {
     if (!user || !permissionsReady) {
@@ -1268,6 +1465,84 @@ function App() {
     }
   }
 
+  useEffect(() => {
+    popLoadConversationRef.current = loadConversation;
+  });
+
+  useEffect(() => {
+    const pendingConversationId = pendingInfoOpenConversationRef.current;
+    if (!pendingConversationId) {
+      return;
+    }
+    if (activeConversation?.id === pendingConversationId) {
+      setIsInfoOpen(true);
+      pendingInfoOpenConversationRef.current = null;
+    }
+  }, [activeConversation?.id]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    if (!isMobileGestureNavigationEnabled()) {
+      paneHistorySnapshotRef.current = {
+        initialized: false,
+        pane: "list",
+        conversationId: null,
+      };
+      popPaneTargetRef.current = null;
+      pendingInfoOpenConversationRef.current = null;
+      return;
+    }
+
+    const { pane, conversationId } = getCurrentChatPaneState();
+    const snapshot = paneHistorySnapshotRef.current;
+
+    if (popPaneTargetRef.current) {
+      const target = popPaneTargetRef.current;
+      const reachedTarget = target.pane === pane && (
+        target.pane === "list" ||
+        !target.conversationId ||
+        target.conversationId === conversationId
+      );
+      snapshot.initialized = true;
+      snapshot.pane = pane;
+      snapshot.conversationId = conversationId;
+      if (reachedTarget) {
+        popPaneTargetRef.current = null;
+      }
+      return;
+    }
+
+    const currentState = window.history.state || {};
+    const nextState = {
+      ...currentState,
+      __chatNav: true,
+      __chatPane: pane,
+      __chatConversationId: conversationId,
+    };
+
+    if (!snapshot.initialized) {
+      window.history.replaceState(nextState, "");
+      snapshot.initialized = true;
+      snapshot.pane = pane;
+      snapshot.conversationId = conversationId;
+      return;
+    }
+
+    const paneChanged = snapshot.pane !== pane;
+    const conversationChanged = snapshot.conversationId !== conversationId;
+
+    if (paneChanged) {
+      window.history.pushState(nextState, "");
+    } else if (conversationChanged && pane !== "list") {
+      window.history.replaceState(nextState, "");
+    }
+
+    snapshot.pane = pane;
+    snapshot.conversationId = conversationId;
+  }, [view, activeConversation?.id, isInfoOpen, isSuperadminUser]);
+
   async function handleLogin(event) {
     event.preventDefault();
     setLoginError("");
@@ -1296,6 +1571,8 @@ function App() {
 
   async function handleLogout() {
     void unregisterSystemPushSubscription({ silent: true });
+    pendingConversationIdsRef.current.clear();
+    stopPendingAlertLoop();
     setTokenState("");
     setToken(null);
     setUser(null);
@@ -1324,6 +1601,8 @@ function App() {
 
   async function handleImpersonateTenant(tenantId) {
     const result = await apiPost(`/api/superadmin/tenants/${tenantId}/impersonate`);
+    pendingConversationIdsRef.current.clear();
+    stopPendingAlertLoop();
     if (!superadminToken && token) {
       localStorage.setItem("superadmin_token", token);
       setSuperadminToken(token);
@@ -1346,6 +1625,8 @@ function App() {
       return;
     }
     void unregisterSystemPushSubscription({ silent: true });
+    pendingConversationIdsRef.current.clear();
+    stopPendingAlertLoop();
     localStorage.removeItem("superadmin_token");
     setSuperadminToken("");
     setTokenState(stored);
@@ -1464,6 +1745,19 @@ function App() {
     setIsInfoOpen(false);
     setActiveConversation(null);
     resetMessageState();
+  }
+
+  function handleBackFromInfo() {
+    if (
+      typeof window !== "undefined" &&
+      isMobileGestureNavigationEnabled() &&
+      isInfoOpen &&
+      window.history.state?.__chatNav
+    ) {
+      window.history.back();
+      return;
+    }
+    setIsInfoOpen(false);
   }
 
   function handleQuickAction(text) {
@@ -2657,6 +2951,7 @@ function App() {
               onLoadMoreConversations={handleLoadMoreConversations}
               onRefreshConversations={handleRefreshConversations}
               handleBackToList={handleBackToList}
+              handleBackFromInfo={handleBackFromInfo}
               setIsInfoOpen={setIsInfoOpen}
               handleChatScroll={handleChatScroll}
               handleAssignSelf={handleAssignSelf}

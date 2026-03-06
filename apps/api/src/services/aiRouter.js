@@ -193,6 +193,50 @@ const DOMAIN_GENERIC_NON_TOPIC_WORDS = new Set([
   "ir", "voy", "puedo", "podria", "hacer", "haria", "quisiera",
   "necesito", "quiero", "busco", "donde", "como", "cuando",
 ]);
+const DEFAULT_PRICE_QUALIFIER_PHRASES = [
+  "precio",
+  "precios",
+  "costo",
+  "costos",
+  "tarifa",
+  "tarifas",
+  "cuanto cuesta",
+  "cuanto vale",
+  "cuanto cobran",
+  "valor",
+  "costo aproximado",
+  "precio aproximado",
+];
+const DEFAULT_WALK_IN_ATTENTION_PHRASES = [
+  "ficha",
+  "sacar ficha",
+  "hacerse atender",
+  "hacerme atender",
+  "para hacerse atender",
+  "cita",
+  "citas",
+  "sacar cita",
+  "agendar",
+  "agenda",
+  "agendar cita",
+  "agendar una cita",
+  "turno",
+  "turnos",
+  "sacar turno",
+  "reservar",
+  "reserva",
+  "reservar cita",
+  "reservar turno",
+];
+const GENERIC_ROUTE_IDS = new Set([
+  "MAIN_MENU",
+  "PRECIOS_INFO",
+  "HORARIOS_INFO",
+  "CONTACT_METHOD",
+  "SERVICIOS_MENU",
+  "AI_HANDOFF_OFFER",
+  "OUT_OF_SCOPE",
+]);
 const KNOWLEDGE_DOMAIN_LEXICON_CACHE = new WeakMap();
 
 /**
@@ -356,19 +400,23 @@ ${ubicacionesList || "- Consultar disponibilidad"}
 1. Si existe un nodo claro para el tema podologico -> route con route_id exacto.
 2. Si saluda -> respond con saludo corto y pregunta como ayudar.
 3. Si hay dolor intenso/urgencia/sangrado/pus/infeccion/ulcera -> handoff.
-4. Si pide precios/costos/tarifas -> route PRECIOS_INFO.
-5. Si pide horarios/ubicacion/sucursal/direccion -> route HORARIOS_INFO.
-6. Si pide contacto/asesor/humano -> route CONTACT_METHOD (o handoff si hay urgencia).
-7. Si no sabe que servicio necesita -> show_services.
-8. Si el tema NO es de pies/podologia (ej: peluqueria, reposteria, barberia, maquillaje, manos) -> respond con text personalizado mencionando lo que pidio y aclarando que solo atienden pies. No repitas el mismo mensaje generico.
-9. Usa clarify solo si falta dato clave y como maximo una vez.
-10. NUNCA repitas la misma pregunta de clarificacion.
+4. Si pregunta por ficha, cita, turno, reserva o agendamiento -> respond que la atencion es por orden de llegada y no necesita cita previa.
+5. Si pregunta el precio de un tratamiento especifico -> route al nodo de ese tratamiento, NO a PRECIOS_INFO.
+6. Si pide precios/costos/tarifas generales -> route PRECIOS_INFO.
+7. Si pide horarios/ubicacion/sucursal/direccion -> route HORARIOS_INFO.
+8. Si pide contacto/asesor/humano -> route CONTACT_METHOD (o handoff si hay urgencia).
+9. Si no sabe que servicio necesita -> show_services.
+10. Si el tema NO es de pies/podologia (ej: peluqueria, reposteria, barberia, maquillaje, manos) -> respond con text personalizado mencionando lo que pidio y aclarando que solo atienden pies. No repitas el mismo mensaje generico.
+11. Usa clarify solo si falta dato clave y como maximo una vez.
+12. NUNCA repitas la misma pregunta de clarificacion.
 
 ## Rutas Directas (prioridad alta)
 - precio/costo/cuanto/tarifa -> PRECIOS_INFO
+- si precio/costo aparece junto con un servicio especifico -> route al nodo del servicio especifico
 - servicio/tratamiento/que ofrecen/que tienen -> SERVICIOS_MENU (solo si sigue siendo podologia)
 - horario/ubicacion/donde/sucursal/direccion/como llegar -> HORARIOS_INFO
 - asesor/humano/llamar/contacto/atencion personal -> CONTACT_METHOD
+- ficha/cita/agendar/turno/reservar -> respond explicando que la atencion es por orden de llegada
 - unero/una encarnada -> UNERO_TIPO_TRAT
 - hongo/onicomicosis -> HONGOS_TIPO_TRAT
 - pedicure/pedicura -> SVC_PEDICURE_INFO
@@ -651,14 +699,16 @@ Tu trabajo es decidir accion y route_id. No expliques nada, no redactes horarios
 Reglas:
 - route: si pide servicios, tratamiento, horarios, ubicacion, direccion, sucursal, precios o contacto del negocio.
 - handoff: si pide humano/asesor o hay urgencia.
-- respond: solo si es fuera de podologia.
+- respond: si es fuera de podologia o si pregunta por ficha/cita/agendar y corresponde aclarar que la atencion es por orden de llegada.
 - clarify: solo si falta contexto real y maximo una vez.
 - show_services: si es del negocio pero no identificas nodo exacto.
 
 Atajos:
 - ubicacion, direccion, sucursal, como llegar -> HORARIOS_INFO
 - precio, costo, cuanto cuesta -> PRECIOS_INFO
+- si precio/costo aparece junto con un servicio especifico -> route al nodo del servicio especifico
 - asesor, humano, recepcion -> CONTACT_METHOD
+- ficha, cita, turno, agendar, reservar, hacerse atender -> respond: atencion por orden de llegada, sin cita previa
 
 Servicios detectables:
 ${serviciosCompact || "- servicios"}
@@ -1150,6 +1200,10 @@ async function routeWithCloudflareRouteFirst({
  */
 function fallbackKeywordRoute(text, flowAi) {
   const normalized = normalizeText(text || "").toLowerCase();
+  const qualifiedServiceRoute = detectPriceQualifiedServiceRoute(normalized, flowAi);
+  if (qualifiedServiceRoute?.routeId) {
+    return qualifiedServiceRoute.routeId;
+  }
 
   const keywords = flowAi?.keyword_routes ?? {};
 
@@ -1403,17 +1457,6 @@ async function routeWithAI({ text, flow, config, session, waId }) {
   const usedTurns = Number(session?.data?.ai_turns || 0);
   const turnsExceeded = usedTurns >= maxTurns;
 
-  // If turns exceeded, try keyword routing before giving up
-  if (turnsExceeded) {
-    logger.info("ai.router_max_turns", { flowId, usedTurns, maxTurns });
-    const fallbackRoute = fallbackKeywordRoute(text, aiFlow);
-    if (fallbackRoute) {
-      return { action: "route", route_id: fallbackRoute, text: "", ai_used: false, reset_turns: true };
-    }
-    // No keyword match either - show services as last resort
-    return { action: "show_services", text: "Te muestro nuestros servicios:", ai_used: false };
-  }
-
   // URGENCY CHECK FIRST - bypass AI for urgent cases
   const urgencyDetected = detectUrgency(text, aiFlow);
   if (urgencyDetected) {
@@ -1468,6 +1511,17 @@ async function routeWithAI({ text, flow, config, session, waId }) {
       reason: deterministicDecision.reason || null,
     });
     return deterministicDecision;
+  }
+
+  // If turns exceeded, try keyword routing before giving up
+  if (turnsExceeded) {
+    logger.info("ai.router_max_turns", { flowId, usedTurns, maxTurns });
+    const fallbackRoute = fallbackKeywordRoute(text, aiFlow);
+    if (fallbackRoute) {
+      return { action: "route", route_id: fallbackRoute, text: "", ai_used: false, reset_turns: true };
+    }
+    // No keyword match either - show services as last resort
+    return { action: "show_services", text: "Te muestro nuestros servicios:", ai_used: false };
   }
 
   // If no API key, use fallback
@@ -2033,6 +2087,121 @@ function stripLeadingSoftConnector(normalizedText) {
     .trim();
 }
 
+function getConfiguredPhrases(flowAi, key, defaults) {
+  const configured = flowAi?.[key];
+  return Array.isArray(configured) && configured.length ? configured : defaults;
+}
+
+function findBestPhraseMatch(normalizedText, phrases) {
+  const normalized = String(normalizedText || "").trim();
+  if (!normalized || !Array.isArray(phrases) || phrases.length === 0) {
+    return null;
+  }
+
+  let best = null;
+  for (const phrase of phrases) {
+    if (!includesWholePhrase(normalized, phrase)) continue;
+    const normalizedPhrase = normalizeText(phrase).toLowerCase().trim();
+    const score = normalizedPhrase.length * 10;
+    if (!best || score > best.score) {
+      best = {
+        phrase: normalizedPhrase,
+        score,
+      };
+    }
+  }
+  return best;
+}
+
+function isSpecificServiceRouteId(routeId) {
+  return Boolean(routeId) && !GENERIC_ROUTE_IDS.has(String(routeId).trim());
+}
+
+function detectSpecificServiceRoute(text, flowAi) {
+  const normalized = normalizeText(text || "").toLowerCase().trim();
+  if (!normalized) return null;
+
+  const deterministicIntents = flowAi?.deterministic_intents ?? [];
+  const keywordRoutes = flowAi?.keyword_routes ?? {};
+  let best = null;
+
+  for (const intent of deterministicIntents) {
+    if (!isSpecificServiceRouteId(intent?.routeId)) continue;
+    const phrases = Array.isArray(intent?.phrases) ? intent.phrases : [];
+    for (const phrase of phrases) {
+      if (!includesWholePhrase(normalized, phrase)) continue;
+      const normalizedPhrase = normalizeText(phrase).toLowerCase().trim();
+      const score = (normalizedPhrase.length * 10) + 90;
+      if (!best || score > best.score) {
+        best = {
+          routeId: intent.routeId,
+          intent: intent.intent || null,
+          matchedPhrase: normalizedPhrase,
+          score,
+          source: "deterministic_intent",
+        };
+      }
+    }
+  }
+
+  for (const [keyword, nodeId] of Object.entries(keywordRoutes)) {
+    if (!isSpecificServiceRouteId(nodeId)) continue;
+    if (!includesWholePhrase(normalized, keyword)) continue;
+    const normalizedKeyword = normalizeText(keyword).toLowerCase().trim();
+    const routePriority = String(nodeId).endsWith("_MENU") ? 30 : 50;
+    const score = (normalizedKeyword.length * 10) + routePriority;
+    if (!best || score > best.score) {
+      best = {
+        routeId: nodeId,
+        intent: null,
+        matchedPhrase: normalizedKeyword,
+        score,
+        source: "keyword_route",
+      };
+    }
+  }
+
+  return best;
+}
+
+function detectPriceQualifiedServiceRoute(text, flowAi) {
+  const normalized = normalizeText(text || "").toLowerCase().trim();
+  if (!normalized) return null;
+
+  const priceQualifier = findBestPhraseMatch(
+    normalized,
+    getConfiguredPhrases(flowAi, "price_qualifier_phrases", DEFAULT_PRICE_QUALIFIER_PHRASES)
+  );
+  if (!priceQualifier) return null;
+
+  const serviceRoute = detectSpecificServiceRoute(text, flowAi);
+  if (!serviceRoute) return null;
+
+  return {
+    ...serviceRoute,
+    qualifierPhrase: priceQualifier.phrase,
+  };
+}
+
+function detectWalkInAttentionRequest(text, flowAi) {
+  const normalized = normalizeText(text || "").toLowerCase().trim();
+  if (!normalized) return null;
+
+  return findBestPhraseMatch(
+    normalized,
+    getConfiguredPhrases(flowAi, "walk_in_attention_phrases", DEFAULT_WALK_IN_ATTENTION_PHRASES)
+  );
+}
+
+function buildWalkInAttentionResponse({ knowledge, flowAi }) {
+  const configured = String(flowAi?.walk_in_attention_response || "").trim();
+  if (configured) {
+    return configured;
+  }
+  const clinicName = knowledge?.clinica?.nombre || "PODOPIE";
+  return `En ${clinicName} atendemos por orden de llegada, no necesitas sacar ficha ni agendar cita previa. Si quieres, te comparto horarios y ubicación para que vengas.`;
+}
+
 function addTermsToDomainLexicon(targetSet, sourceText) {
   const normalized = normalizeText(sourceText || "").toLowerCase().trim();
   if (!normalized) return;
@@ -2454,6 +2623,8 @@ function buildDeterministicDecision({ text, previousQuestion, summary, knowledge
   const normalized = normalizeText(raw).toLowerCase().trim();
   if (!normalized) return null;
   const softenedNormalized = stripLeadingSoftConnector(normalized);
+  const looksMultiIntent = /\b(y|ademas|tambien|pero)\b/.test(softenedNormalized);
+  const inClarifyFlow = Boolean(previousQuestion) || Number(summary?.clarificationsAsked || 0) > 0;
 
   if (isAiConversationRequest(raw)) {
     return {
@@ -2466,13 +2637,36 @@ function buildDeterministicDecision({ text, previousQuestion, summary, knowledge
     };
   }
 
+  const walkInAttentionMatch = detectWalkInAttentionRequest(raw, flowAi);
+  if (walkInAttentionMatch && !looksMultiIntent && !inClarifyFlow) {
+    return {
+      action: "respond",
+      text: buildWalkInAttentionResponse({ knowledge, flowAi }),
+      reason: `walk_in_attention:${walkInAttentionMatch.phrase}`,
+      ai_used: false,
+      clear_pending: Boolean(previousQuestion),
+      reset_turns: false,
+    };
+  }
+
+  const qualifiedServiceRoute = detectPriceQualifiedServiceRoute(raw, flowAi);
+  if (qualifiedServiceRoute && !looksMultiIntent && !inClarifyFlow) {
+    return {
+      action: "route",
+      route_id: qualifiedServiceRoute.routeId,
+      text: "",
+      reason: `service_qualified_price:${qualifiedServiceRoute.intent || qualifiedServiceRoute.matchedPhrase || qualifiedServiceRoute.qualifierPhrase}`,
+      ai_used: false,
+      clear_pending: Boolean(previousQuestion),
+      reset_turns: true,
+    };
+  }
+
   const domainGate = evaluateDomainGate({ text: raw, knowledge, flowAi });
   const deterministicIntent = detectDeterministicDomainIntentRoute(raw, flowAi);
   const inferredRoute = deterministicIntent?.routeId || fallbackKeywordRoute(raw, flowAi);
 
   const tokenCount = softenedNormalized.split(/\s+/).filter(Boolean).length;
-  const looksMultiIntent = /\b(y|ademas|tambien|pero)\b/.test(softenedNormalized);
-  const inClarifyFlow = Boolean(previousQuestion) || Number(summary?.clarificationsAsked || 0) > 0;
   const shouldForceRoute = shouldForceKeywordRoute(raw);
   const isPrioritizedHoursServiceRoute = deterministicIntent?.intent?.startsWith("hours_service_override_");
 

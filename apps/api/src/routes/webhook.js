@@ -132,6 +132,10 @@ function extractIncomingText(message) {
     if (message.type === "text") {
         return message.text?.body || "";
     }
+    if (message.type === "sticker") {
+        const stickerEmoji = message.sticker?.emoji || "";
+        return `Sticker${stickerEmoji ? ` ${stickerEmoji}` : ""}`.trim();
+    }
     if (message.type === "button") {
         return message.button?.text || message.button?.payload || "";
     }
@@ -427,6 +431,19 @@ router.post("/webhook", async (req, res) => {
                                 );
                                 continue;
                             }
+                            continue;
+                        }
+
+                        if (message.type === "sticker") {
+                            const activeFlow = await getActiveTenantFlow(tenantContext.tenantId);
+                            if (!activeFlow) {
+                                logger.info("bot.no_active_flow", { tenant_id: tenantContext.tenantId });
+                                continue;
+                            }
+                            const stickerFallbackText =
+                                activeFlow.flow?.ai?.sticker_fallback_text ||
+                                "Recibí tu sticker 😊 Si quieres, escríbeme tu consulta y te ayudo con servicios, precios, horarios o atención personal.";
+                            await sendText(waId, stickerFallbackText);
                             continue;
                         }
 

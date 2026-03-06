@@ -57,6 +57,23 @@ module.exports = {
       "ardor", "picazon", "fiebre", "herida"
     ],
 
+    // --- Consultas de precio ligadas a un tratamiento especifico ---
+    "price_qualifier_phrases": [
+      "precio", "precios", "costo", "costos", "tarifa", "tarifas",
+      "cuanto cuesta", "cuanto vale", "cuanto cobran", "valor", "costo aproximado", "precio aproximado"
+    ],
+
+    // --- Consultas de ficha/cita/agendamiento ---
+    "walk_in_attention_phrases": [
+      "ficha", "sacar ficha", "hacerse atender", "hacerme atender", "para hacerse atender",
+      "cita", "citas", "sacar cita", "agendar", "agenda", "agendar cita", "agendar una cita",
+      "turno", "turnos", "sacar turno", "reservar", "reserva", "reservar cita", "reservar turno"
+    ],
+    "walk_in_attention_response": "En *PODOPIE* atendemos por orden de llegada, no necesitas sacar ficha ni agendar cita previa. Si quieres, te comparto horarios y ubicación para que vengas.",
+
+    // --- Fallback amable para stickers ---
+    "sticker_fallback_text": "Recibí tu sticker 😊 Si quieres, escríbeme tu consulta y te ayudo con servicios, precios, horarios o atención personal.",
+
     // --- Intents determinísticos: keyword → nodo directo ---
     "deterministic_intents": [
       { "routeId": "PRECIOS_INFO",      "intent": "prices",         "phrases": ["precio", "precios", "costo", "costos", "tarifa", "tarifas", "cuanto cuesta", "cuanto vale", "cuanto cobran"] },

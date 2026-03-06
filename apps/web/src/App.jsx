@@ -344,6 +344,15 @@ function App() {
         audio.load();
       }
     });
+    // Fallback: algunos browsers/WAV no respetan loop nativo, reiniciar manualmente
+    audio.addEventListener("ended", () => {
+      if (pendingConversationIdsRef.current.size > 0) {
+        audio.currentTime = 0;
+        void audio.play().catch(() => {});
+      } else {
+        pendingAlertLoopingRef.current = false;
+      }
+    });
     pendingAlertAudioRef.current = audio;
     return audio;
   }

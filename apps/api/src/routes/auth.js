@@ -11,9 +11,14 @@ const { signUser } = require("../lib/auth");
 const logger = require("../lib/logger");
 const { getControlClient } = require("../control/controlClient");
 const { resolveTenantContextById } = require("../tenancy/tenantResolver");
+const { withTenantClientRetry } = require("../tenancy/tenantPrismaManager");
+
+function asyncHandler(handler) {
+    return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
+}
 
 // POST /api/auth/login
-router.post("/login", authLimiter, async (req, res) => {
+router.post("/login", authLimiter, asyncHandler(async (req, res) => {
     const email = (req.body?.email || "").toLowerCase().trim();
     const password = req.body?.password || "";
 
@@ -66,9 +71,14 @@ router.post("/login", authLimiter, async (req, res) => {
         if (!tenantContext) {
             return res.status(403).json({ error: "tenant_not_ready" });
         }
-        const tenantUser = await tenantContext.prisma.user.findUnique({
-            where: { email },
-        });
+        const tenantUser = await withTenantClientRetry(
+            controlUser.tenant_id,
+            tenantContext.dbUrl,
+            (tenantPrisma) =>
+                tenantPrisma.user.findUnique({
+                    where: { email },
+                })
+        );
         if (!tenantUser || !tenantUser.is_active) {
             return res.status(401).json({ error: "invalid_credentials" });
         }
@@ -96,7 +106,7 @@ router.post("/login", authLimiter, async (req, res) => {
     }
 
     return res.status(401).json({ error: "invalid_credentials" });
-});
+}));
 
 // GET /api/auth/me - alias (la ruta principal está en /api/me)
 router.get("/me", requireAuth, (req, res) => {

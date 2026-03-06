@@ -136,6 +136,7 @@ async function resolveTenantContextById(tenantId) {
     channelCache.set(channel.phone_number_id, { value: channel, cachedAt: Date.now() });
     return {
       tenantId,
+      dbUrl: process.env.DATABASE_URL,
       prisma: getTenantClient(tenantId, process.env.DATABASE_URL),
       channel,
     };
@@ -162,6 +163,7 @@ async function resolveTenantContextById(tenantId) {
     });
     return {
       tenantId,
+      dbUrl,
       prisma: getTenantClient(tenantId, dbUrl),
       channel: channel
         ? {
@@ -194,6 +196,7 @@ async function resolveTenantContextByPhoneNumberId(phoneNumberId) {
     channelCache.set(channel.phone_number_id, { value: channel, cachedAt: Date.now() });
     return {
       tenantId: channel.tenantId || "legacy",
+      dbUrl: process.env.DATABASE_URL,
       prisma: getTenantClient(channel.tenantId || "legacy", process.env.DATABASE_URL),
       channel,
     };
@@ -212,6 +215,7 @@ async function resolveTenantContextByPhoneNumberId(phoneNumberId) {
     }
     return {
       tenantId: channelConfig.tenantId,
+      dbUrl,
       prisma: getTenantClient(channelConfig.tenantId, dbUrl),
       channel: channelConfig,
     };

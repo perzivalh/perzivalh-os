@@ -18,6 +18,7 @@ const {
     clearTenantDbCache,
     clearChannelCache,
 } = require("../../tenancy/tenantResolver");
+const { withTenantClientRetry } = require("../../tenancy/tenantPrismaManager");
 const {
     clearOdooConfigCache,
     validateOdooCredentials,
@@ -29,6 +30,10 @@ function requireSuperAdmin(req, res, next) {
         return res.status(403).json({ error: "forbidden" });
     }
     return next();
+}
+
+function asyncHandler(handler) {
+    return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 }
 
 // Montar rutas de integracion de WhatsApp (Embedded Signup / Coexistence)
@@ -330,7 +335,7 @@ router.post("/tenants/validate", requireAuth, requireSuperAdmin, async (req, res
 });
 
 // POST /api/superadmin/tenants/:id/impersonate
-router.post("/tenants/:id/impersonate", requireAuth, requireSuperAdmin, async (req, res) => {
+router.post("/tenants/:id/impersonate", requireAuth, requireSuperAdmin, asyncHandler(async (req, res) => {
     const tenantId = req.params.id;
     const tenantContext = await resolveTenantContextById(tenantId);
     if (!tenantContext) {
@@ -338,26 +343,41 @@ router.post("/tenants/:id/impersonate", requireAuth, requireSuperAdmin, async (r
     }
     const rawEmail = req.user?.email || "superadmin@perzivalh.local";
     const email = rawEmail.toLowerCase().trim();
-    let tenantUser = await tenantContext.prisma.user.findUnique({
-        where: { email },
-    });
+    let tenantUser = await withTenantClientRetry(
+        tenantId,
+        tenantContext.dbUrl,
+        (tenantPrisma) =>
+            tenantPrisma.user.findUnique({
+                where: { email },
+            })
+    );
     if (!tenantUser) {
         const password = crypto.randomBytes(24).toString("hex");
         const passwordHash = await bcrypt.hash(password, 10);
-        tenantUser = await tenantContext.prisma.user.create({
-            data: {
-                name: req.user?.name || "Superadmin",
-                email,
-                password_hash: passwordHash,
-                role: "admin",
-                is_active: true,
-            },
-        });
+        tenantUser = await withTenantClientRetry(
+            tenantId,
+            tenantContext.dbUrl,
+            (tenantPrisma) =>
+                tenantPrisma.user.create({
+                    data: {
+                        name: req.user?.name || "Superadmin",
+                        email,
+                        password_hash: passwordHash,
+                        role: "admin",
+                        is_active: true,
+                    },
+                })
+        );
     } else if (!tenantUser.is_active) {
-        tenantUser = await tenantContext.prisma.user.update({
-            where: { id: tenantUser.id },
-            data: { is_active: true },
-        });
+        tenantUser = await withTenantClientRetry(
+            tenantId,
+            tenantContext.dbUrl,
+            (tenantPrisma) =>
+                tenantPrisma.user.update({
+                    where: { id: tenantUser.id },
+                    data: { is_active: true },
+                })
+        );
     }
 
     const token = signUser({
@@ -378,7 +398,7 @@ router.post("/tenants/:id/impersonate", requireAuth, requireSuperAdmin, async (r
         },
         tenant_id: tenantId,
     });
-});
+}));
 
 // ==========================================
 // CHANNELS

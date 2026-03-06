@@ -2,6 +2,32 @@ const { PrismaClient } = require("@prisma/client-tenant");
 
 const clientCache = new Map();
 
+function normalizeTenantDbUrl(dbUrl) {
+  if (!dbUrl) {
+    return dbUrl;
+  }
+  try {
+    const url = new URL(dbUrl);
+    if (url.hostname.includes("-pooler.") && !url.searchParams.has("pgbouncer")) {
+      url.searchParams.set("pgbouncer", "true");
+    }
+    return url.toString();
+  } catch (error) {
+    return dbUrl;
+  }
+}
+
+function isRetryableTenantClientError(error) {
+  const message = String(error?.message || "");
+  return message.includes("cached plan must not change result type");
+}
+
+function createTenantClient(dbUrl) {
+  return new PrismaClient({
+    datasources: { db: { url: normalizeTenantDbUrl(dbUrl) } },
+  });
+}
+
 function getTenantClient(tenantId, dbUrl) {
   if (!tenantId) {
     throw new Error("Tenant id missing");
@@ -12,11 +38,37 @@ function getTenantClient(tenantId, dbUrl) {
   if (!dbUrl) {
     throw new Error("Tenant database url missing");
   }
-  const client = new PrismaClient({
-    datasources: { db: { url: dbUrl } },
-  });
+  const client = createTenantClient(dbUrl);
   clientCache.set(tenantId, client);
   return client;
+}
+
+async function clearTenantClient(tenantId) {
+  if (!tenantId) {
+    return;
+  }
+  const client = clientCache.get(tenantId);
+  clientCache.delete(tenantId);
+  if (!client) {
+    return;
+  }
+  try {
+    await client.$disconnect();
+  } catch (error) {
+    // Ignore disconnect failures while recycling a stale pooled client.
+  }
+}
+
+async function withTenantClientRetry(tenantId, dbUrl, operation) {
+  try {
+    return await operation(getTenantClient(tenantId, dbUrl));
+  } catch (error) {
+    if (!isRetryableTenantClientError(error)) {
+      throw error;
+    }
+    await clearTenantClient(tenantId);
+    return operation(getTenantClient(tenantId, dbUrl));
+  }
 }
 
 async function disconnectAllTenantClients() {
@@ -32,5 +84,9 @@ async function disconnectAllTenantClients() {
 
 module.exports = {
   getTenantClient,
+  clearTenantClient,
+  withTenantClientRetry,
+  normalizeTenantDbUrl,
+  isRetryableTenantClientError,
   disconnectAllTenantClients,
 };

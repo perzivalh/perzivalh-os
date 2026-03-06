@@ -114,8 +114,11 @@ model Conversation {
   @@index([status])
   @@index([assigned_user_id])
   @@index([last_message_at])
+  @@index([last_message_at(sort: Desc), created_at(sort: Desc), id(sort: Desc)], map: "conversation_list_order_idx")
+  @@index([status, last_message_at(sort: Desc), created_at(sort: Desc), id(sort: Desc)], map: "conversation_status_order_idx")
   @@index([partner_id])
   @@index([phone_number_id])
+  @@index([phone_e164])
   @@unique([wa_id, phone_number_id])
 }
 
@@ -150,6 +153,7 @@ model ConversationTag {
   tag             Tag          @relation(fields: [tag_id], references: [id])
 
   @@id([conversation_id, tag_id])
+  @@index([tag_id])
 }
 
 model Settings {

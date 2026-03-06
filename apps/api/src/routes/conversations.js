@@ -19,7 +19,6 @@ const { sendText } = require("../whatsapp");
 const {
     getConversationById,
     formatConversation,
-    CONVERSATION_SELECT,
     setConversationStatus,
     assignConversation,
     addTagToConversation,
@@ -35,6 +34,37 @@ const {
 } = require("../services/pushNotifications");
 const audienceAutomationService = require("../services/audienceAutomationService");
 const { getRolePermissions, userHasPermission } = require("../services/rolePermissions");
+
+const CONVERSATION_LIST_SELECT = {
+    id: true,
+    wa_id: true,
+    phone_number_id: true,
+    phone_e164: true,
+    display_name: true,
+    status: true,
+    assigned_user_id: true,
+    partner_id: true,
+    patient_id: true,
+    verified_at: true,
+    verification_method: true,
+    last_message_at: true,
+    primary_tag_id: true,
+    created_at: true,
+    assigned_user: {
+        select: {
+            id: true,
+            name: true,
+            role: true,
+        },
+    },
+    primary_tag: {
+        select: {
+            id: true,
+            name: true,
+            color: true,
+        },
+    },
+};
 
 // Aplicar rate limiter a todas las rutas /api
 router.use(panelLimiter);
@@ -400,16 +430,27 @@ router.get("/conversations", requireAuth, requireModulePermission("chat", "read"
         where.phone_number_id = phoneNumberId;
     }
     if (search) {
-        where.OR = [
-            { phone_e164: { contains: search } },
-            { wa_id: { contains: search } },
-            { display_name: { contains: search, mode: "insensitive" } },
-        ];
+        const normalizedSearch = String(search).trim();
+        const digitsOnly = normalizedSearch.replace(/[^\d+]/g, "");
+        const isNumericSearch = Boolean(digitsOnly) && /^[+\d]+$/.test(normalizedSearch);
+
+        if (isNumericSearch) {
+            where.OR = [
+                { phone_e164: { startsWith: normalizedSearch } },
+                { wa_id: { startsWith: normalizedSearch } },
+            ];
+        } else {
+            where.OR = [
+                { display_name: { contains: normalizedSearch, mode: "insensitive" } },
+                { phone_e164: { startsWith: normalizedSearch } },
+                { wa_id: { startsWith: normalizedSearch } },
+            ];
+        }
     }
 
     const pagedConversations = await prisma.conversation.findMany({
         where,
-        select: CONVERSATION_SELECT,
+        select: CONVERSATION_LIST_SELECT,
         orderBy: [{ last_message_at: "desc" }, { created_at: "desc" }, { id: "desc" }],
         skip: offset,
         take: limit + 1,
@@ -442,6 +483,9 @@ router.get("/conversations", requireAuth, requireModulePermission("chat", "read"
     return res.json({
         conversations: conversations.map((entry) => {
             const formatted = formatConversation(entry);
+            if ((!formatted.tags || !formatted.tags.length) && entry.primary_tag) {
+                formatted.tags = [entry.primary_tag];
+            }
             const lastMessage = lastMessageMap.get(entry.id);
             if (!lastMessage) {
                 return formatted;

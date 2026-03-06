@@ -187,6 +187,7 @@ function App() {
     search: "",
     phone_number_id: "",
   });
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const isSuperAdminRoute = pathname.startsWith("/superadmin");
   const [conversations, setConversations] = useState([]);
   const [conversationsLoading, setConversationsLoading] = useState(false);
@@ -265,13 +266,20 @@ function App() {
 
   const MESSAGE_WINDOW_HOURS = 48;
   const CONVERSATION_PAGE_LIMIT = 40;
-  const INITIAL_MESSAGE_LIMIT = 80;
-  const LOAD_MORE_LIMIT = 60;
+  const INITIAL_MESSAGE_LIMIT = 56;
+  const LOAD_MORE_LIMIT = 42;
   const MAX_MESSAGES_IN_MEMORY = 320;
   const CACHE_MESSAGE_LIMIT = 120;
   const MAX_CACHE_CONVERSATIONS = 5;
   const CACHE_TTL_MS = 2 * 60 * 1000;
   const messageCacheRef = useRef(new Map());
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedSearch((filters.search || "").trim());
+    }, 260);
+    return () => clearTimeout(timeout);
+  }, [filters.search]);
 
   function pruneMessageCache() {
     const cache = messageCacheRef.current;
@@ -689,7 +697,17 @@ function App() {
     if (hasPermission(currentRoleAccess, "modules", "chat")) {
       void loadConversations({ reset: true });
     }
-  }, [user, permissionsReady, view, filters, currentRoleAccess]);
+  }, [
+    user,
+    permissionsReady,
+    view,
+    filters.status,
+    filters.assigned_user_id,
+    filters.tag,
+    filters.phone_number_id,
+    debouncedSearch,
+    currentRoleAccess,
+  ]);
 
   useEffect(() => {
     if (!user || !permissionsReady) {
@@ -1050,6 +1068,7 @@ function App() {
     try {
       const query = buildQuery({
         ...filters,
+        search: debouncedSearch,
         limit: CONVERSATION_PAGE_LIMIT,
         offset,
       });

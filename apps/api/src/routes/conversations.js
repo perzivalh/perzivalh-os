@@ -367,7 +367,14 @@ router.get("/conversations", requireAuth, requireModulePermission("chat", "read"
     const tag = req.query.tag;
     const phoneNumberId = req.query.phone_number_id;
     const search = (req.query.search || "").trim();
-    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const parsedLimit = Number.parseInt(req.query.limit, 10);
+    const parsedOffset = Number.parseInt(req.query.offset, 10);
+    const limit = Number.isFinite(parsedLimit) && parsedLimit > 0
+        ? Math.min(parsedLimit, 200)
+        : 50;
+    const offset = Number.isFinite(parsedOffset) && parsedOffset > 0
+        ? parsedOffset
+        : 0;
 
     const where = {};
     if (status) {
@@ -400,12 +407,17 @@ router.get("/conversations", requireAuth, requireModulePermission("chat", "read"
         ];
     }
 
-    const conversations = await prisma.conversation.findMany({
+    const pagedConversations = await prisma.conversation.findMany({
         where,
         select: CONVERSATION_SELECT,
-        orderBy: [{ last_message_at: "desc" }, { created_at: "desc" }],
-        take: limit,
+        orderBy: [{ last_message_at: "desc" }, { created_at: "desc" }, { id: "desc" }],
+        skip: offset,
+        take: limit + 1,
     });
+    const hasMore = pagedConversations.length > limit;
+    const conversations = hasMore
+        ? pagedConversations.slice(0, limit)
+        : pagedConversations;
 
     const ids = conversations.map((entry) => entry.id);
     let lastMessages = [];
@@ -442,6 +454,8 @@ router.get("/conversations", requireAuth, requireModulePermission("chat", "read"
                 last_message_at: lastMessage.created_at || formatted.last_message_at,
             };
         }),
+        has_more: hasMore,
+        next_offset: hasMore ? offset + conversations.length : null,
     });
 });
 

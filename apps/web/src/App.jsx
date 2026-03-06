@@ -108,6 +108,9 @@ function App() {
     length: 0,
   });
   const loadConversationRef = useRef(0);
+  const conversationListRequestRef = useRef(0);
+  const conversationsLoadingRef = useRef(false);
+  const conversationsLoadingMoreRef = useRef(false);
   const scrollOnLoadRef = useRef(false);
   const rolePermissionsVersion = useRef(0);
   const [settingsSection, setSettingsSection] = useState("users");
@@ -186,6 +189,11 @@ function App() {
   });
   const isSuperAdminRoute = pathname.startsWith("/superadmin");
   const [conversations, setConversations] = useState([]);
+  const [conversationsLoading, setConversationsLoading] = useState(false);
+  const [conversationsLoadingMore, setConversationsLoadingMore] = useState(false);
+  const [conversationsHasMore, setConversationsHasMore] = useState(false);
+  const [conversationsNextOffset, setConversationsNextOffset] = useState(0);
+  const [conversationsPullRefreshing, setConversationsPullRefreshing] = useState(false);
   const [activeConversation, setActiveConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [messageDraft, setMessageDraft] = useState("");
@@ -256,6 +264,7 @@ function App() {
   const [messagesCursor, setMessagesCursor] = useState(null);
 
   const MESSAGE_WINDOW_HOURS = 48;
+  const CONVERSATION_PAGE_LIMIT = 40;
   const INITIAL_MESSAGE_LIMIT = 80;
   const LOAD_MORE_LIMIT = 60;
   const MAX_MESSAGES_IN_MEMORY = 320;
@@ -678,7 +687,7 @@ function App() {
       return;
     }
     if (hasPermission(currentRoleAccess, "modules", "chat")) {
-      void loadConversations();
+      void loadConversations({ reset: true });
     }
   }, [user, permissionsReady, view, filters, currentRoleAccess]);
 
@@ -1009,14 +1018,106 @@ function App() {
     }
   }
 
-  async function loadConversations() {
-    try {
-      const query = buildQuery(filters);
-      const data = await apiGet(`/api/conversations${query}`);
-      setConversations(sortConversations(data.conversations || []));
-    } catch (error) {
-      setPageError(normalizeError(error));
+  async function loadConversations(options = {}) {
+    const { reset = false, source = "effect" } = options;
+    if (!reset && (
+      conversationsLoadingRef.current ||
+      conversationsLoadingMoreRef.current ||
+      !conversationsHasMore
+    )) {
+      return;
     }
+
+    const requestId = conversationListRequestRef.current + 1;
+    conversationListRequestRef.current = requestId;
+    const offset = reset ? 0 : conversationsNextOffset;
+
+    if (reset) {
+      conversationsLoadingRef.current = true;
+      conversationsLoadingMoreRef.current = false;
+      setConversationsLoading(true);
+      setConversationsLoadingMore(false);
+      if (source === "pull") {
+        setConversationsPullRefreshing(true);
+      } else {
+        setConversationsPullRefreshing(false);
+      }
+    } else {
+      conversationsLoadingMoreRef.current = true;
+      setConversationsLoadingMore(true);
+    }
+
+    try {
+      const query = buildQuery({
+        ...filters,
+        limit: CONVERSATION_PAGE_LIMIT,
+        offset,
+      });
+      const data = await apiGet(`/api/conversations${query}`);
+      if (conversationListRequestRef.current !== requestId) {
+        return;
+      }
+
+      const incoming = Array.isArray(data.conversations) ? data.conversations : [];
+      const existingIds = new Set((reset ? [] : conversations).map((item) => item.id));
+      const newItemsCount = incoming.reduce(
+        (count, item) => (existingIds.has(item.id) ? count : count + 1),
+        0
+      );
+      setConversations((prev) => {
+        const base = reset ? [] : prev;
+        const byId = new Map(base.map((item) => [item.id, item]));
+        incoming.forEach((item) => {
+          const existing = byId.get(item.id);
+          byId.set(item.id, existing ? { ...existing, ...item } : item);
+        });
+        return sortConversations(Array.from(byId.values()));
+      });
+      if (activeConversation?.id) {
+        const refreshedActive = incoming.find((item) => item.id === activeConversation.id);
+        if (refreshedActive) {
+          setActiveConversation((prev) =>
+            prev?.id === refreshedActive.id ? { ...prev, ...refreshedActive } : prev
+          );
+        }
+      }
+
+      const nextOffsetRaw = Number(data.next_offset);
+      const fallbackNextOffset = offset + incoming.length;
+      const resolvedHasMore = typeof data.has_more === "boolean"
+        ? data.has_more
+        : incoming.length >= CONVERSATION_PAGE_LIMIT;
+      const hasProgress = reset || newItemsCount > 0;
+      setConversationsNextOffset(
+        Number.isFinite(nextOffsetRaw) && nextOffsetRaw >= 0
+          ? nextOffsetRaw
+          : fallbackNextOffset
+      );
+      setConversationsHasMore(hasProgress && resolvedHasMore);
+    } catch (error) {
+      if (conversationListRequestRef.current === requestId) {
+        setPageError(normalizeError(error));
+      }
+    } finally {
+      if (conversationListRequestRef.current === requestId) {
+        if (reset) {
+          conversationsLoadingRef.current = false;
+          setConversationsLoading(false);
+          setConversationsPullRefreshing(false);
+        } else {
+          conversationsLoadingMoreRef.current = false;
+          setConversationsLoadingMore(false);
+        }
+      }
+    }
+  }
+
+  function handleLoadMoreConversations() {
+    void loadConversations({ reset: false, source: "scroll" });
+  }
+
+  function handleRefreshConversations() {
+    void loadConversations({ reset: true, source: "pull" });
   }
 
   async function loadConversation(conversationId) {
@@ -1168,6 +1269,14 @@ function App() {
     setToken(null);
     setUser(null);
     setConversations([]);
+    setConversationsLoading(false);
+    setConversationsLoadingMore(false);
+    setConversationsHasMore(false);
+    setConversationsNextOffset(0);
+    setConversationsPullRefreshing(false);
+    conversationListRequestRef.current = 0;
+    conversationsLoadingRef.current = false;
+    conversationsLoadingMoreRef.current = false;
     setActiveConversation(null);
     setMessages([]);
     setView("chats");
@@ -2477,6 +2586,10 @@ function App() {
             <ChatView
               activeConversation={activeConversation}
               conversations={conversations}
+              conversationsLoading={conversationsLoading}
+              conversationsLoadingMore={conversationsLoadingMore}
+              conversationsHasMore={conversationsHasMore}
+              conversationsPullRefreshing={conversationsPullRefreshing}
               channels={tenantChannels}
               brandName={displayBrandName}
               lastReadMap={lastReadMap}
@@ -2510,6 +2623,8 @@ function App() {
               setShowFilters={setShowFilters}
               setFilters={setFilters}
               loadConversation={loadConversation}
+              onLoadMoreConversations={handleLoadMoreConversations}
+              onRefreshConversations={handleRefreshConversations}
               handleBackToList={handleBackToList}
               setIsInfoOpen={setIsInfoOpen}
               handleChatScroll={handleChatScroll}

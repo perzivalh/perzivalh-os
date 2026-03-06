@@ -1,8 +1,12 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 function ChatView({
   activeConversation,
   conversations,
+  conversationsLoading,
+  conversationsLoadingMore,
+  conversationsHasMore,
+  conversationsPullRefreshing,
   channels,
   brandName,
   lastReadMap,
@@ -36,6 +40,8 @@ function ChatView({
   setShowFilters,
   setFilters,
   loadConversation,
+  onLoadMoreConversations,
+  onRefreshConversations,
   handleBackToList,
   setIsInfoOpen,
   handleChatScroll,
@@ -84,6 +90,137 @@ function ChatView({
     : isInfoOpen
       ? "info"
       : "chat";
+  const conversationListRef = useRef(null);
+  const pullStartYRef = useRef(0);
+  const pullTrackingRef = useRef(false);
+  const pullReadyRef = useRef(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [pullReady, setPullReady] = useState(false);
+  const PULL_MAX = 96;
+  const PULL_THRESHOLD = 56;
+
+  const effectivePullDistance = conversationsPullRefreshing ? PULL_THRESHOLD : pullDistance;
+  const pullLabel = conversationsPullRefreshing
+    ? "Actualizando chats..."
+    : pullReady
+      ? "Suelta para actualizar"
+      : "Desliza para recargar chats";
+
+  useEffect(() => {
+    if (
+      !onLoadMoreConversations ||
+      conversationsLoading ||
+      conversationsLoadingMore ||
+      conversationsPullRefreshing ||
+      !conversationsHasMore
+    ) {
+      return;
+    }
+    const node = conversationListRef.current;
+    if (!node) {
+      return;
+    }
+    if (node.scrollHeight <= node.clientHeight + 24) {
+      onLoadMoreConversations();
+    }
+  }, [
+    conversations,
+    conversationsLoading,
+    conversationsHasMore,
+    conversationsLoadingMore,
+    conversationsPullRefreshing,
+    onLoadMoreConversations,
+  ]);
+
+  function isMobileTouchContext() {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    if (typeof window.matchMedia !== "function") {
+      return true;
+    }
+    return window.matchMedia("(max-width: 900px)").matches;
+  }
+
+  function handleConversationListScroll(event) {
+    const node = event.currentTarget;
+    if (
+      !node ||
+      conversationsLoading ||
+      conversationsLoadingMore ||
+      conversationsPullRefreshing ||
+      !conversationsHasMore
+    ) {
+      return;
+    }
+    const distanceToBottom = node.scrollHeight - node.scrollTop - node.clientHeight;
+    if (distanceToBottom < 180) {
+      onLoadMoreConversations?.();
+    }
+  }
+
+  function handleConversationTouchStart(event) {
+    if (!onRefreshConversations || conversationsPullRefreshing || !isMobileTouchContext()) {
+      return;
+    }
+    const node = conversationListRef.current;
+    const touch = event.touches?.[0];
+    if (!node || !touch || node.scrollTop > 0) {
+      return;
+    }
+    pullTrackingRef.current = true;
+    pullStartYRef.current = touch.clientY;
+    pullReadyRef.current = false;
+    setPullDistance(0);
+    setPullReady(false);
+  }
+
+  function handleConversationTouchMove(event) {
+    if (!pullTrackingRef.current || conversationsPullRefreshing) {
+      return;
+    }
+    const node = conversationListRef.current;
+    const touch = event.touches?.[0];
+    if (!node || !touch) {
+      return;
+    }
+    if (node.scrollTop > 0) {
+      pullTrackingRef.current = false;
+      pullReadyRef.current = false;
+      setPullDistance(0);
+      setPullReady(false);
+      return;
+    }
+    const delta = touch.clientY - pullStartYRef.current;
+    if (delta <= 0) {
+      pullReadyRef.current = false;
+      setPullDistance(0);
+      setPullReady(false);
+      return;
+    }
+    const distance = Math.min(PULL_MAX, Math.round(delta * 0.45));
+    const ready = distance >= PULL_THRESHOLD;
+    pullReadyRef.current = ready;
+    setPullDistance(distance);
+    setPullReady(ready);
+    if (event.cancelable) {
+      event.preventDefault();
+    }
+  }
+
+  function handleConversationTouchEnd() {
+    if (!pullTrackingRef.current) {
+      return;
+    }
+    pullTrackingRef.current = false;
+    const shouldRefresh = pullReadyRef.current && !conversationsPullRefreshing;
+    pullReadyRef.current = false;
+    setPullDistance(0);
+    setPullReady(false);
+    if (shouldRefresh) {
+      onRefreshConversations?.();
+    }
+  }
 
   function getPreview(conversation) {
     if (!conversation) {
@@ -228,83 +365,111 @@ function ChatView({
           <span>{conversations.length}</span>
         </div>
 
-        <div className="conversation-list">
-          {conversations.map((conversation, index) => {
-            const active = activeConversation?.id === conversation.id;
-            const pendingUnassigned =
-              conversation.status === "pending" &&
-              !conversation.assigned_user_id;
-            const displayName =
-              conversation.display_name ||
-              conversation.phone_e164 ||
-              conversation.wa_id ||
-              "Sin nombre";
-            const preview =
-              getPreview(conversation);
-            const unreadCount = Number(
-              conversation.unread_count ||
-                conversation.unread_messages ||
-                conversation.unread ||
-                0
-            );
-            const topTag = conversation.tags?.[0]?.name || "";
-            const assignedName =
-              conversation.assigned_user?.name ||
-              userMap.get(conversation.assigned_user_id || "")?.name ||
-              "";
-            const assignedLabel = assignedName ? `Tomada por ${assignedName}` : "";
-            const lineLabel = conversation.phone_number_id
-              ? channelMap.get(conversation.phone_number_id) ||
-                `Linea ${String(conversation.phone_number_id).slice(-4)}`
-              : "";
-            const lastReadAt = lastReadMap?.[conversation.id] || null;
-            const lastMessageAt = conversation.last_message_at;
-            const isUnread =
-              lastMessageAt &&
-              (!lastReadAt ||
-                new Date(lastMessageAt).getTime() > new Date(lastReadAt).getTime()) &&
-              conversation.last_message_direction === "in";
-            return (
-              <button
-                key={conversation.id}
-                className={`conversation-item ${active ? "active" : ""}`}
-                onClick={() => loadConversation(conversation.id)}
-                style={{ animationDelay: `${Math.min(index, 6) * 60}ms` }}
-              >
-                <div className="avatar">
-                  <span>{getInitial(displayName)}</span>
-                  {pendingUnassigned && <span className="presence-dot" />}
-                </div>
-                <div className="conversation-body">
-                  <div className="conversation-row">
-                    <span className="conversation-name">{displayName}</span>
-                    <div className="conversation-right">
-                      <span className="conversation-time">
-                        {formatListTime(conversation.last_message_at)}
-                      </span>
-                      {unreadCount > 0 && (
-                        <span className="conversation-unread">{unreadCount}</span>
+        <div className="conversation-list-wrapper">
+          <div
+            className={`conversation-pull-indicator ${(pullReady || conversationsPullRefreshing) ? "ready" : ""}`}
+            style={{ height: `${effectivePullDistance}px` }}
+            aria-hidden={effectivePullDistance <= 0}
+          >
+            <span>{pullLabel}</span>
+          </div>
+          <div
+            className="conversation-list"
+            ref={conversationListRef}
+            onScroll={handleConversationListScroll}
+            onTouchStart={handleConversationTouchStart}
+            onTouchMove={handleConversationTouchMove}
+            onTouchEnd={handleConversationTouchEnd}
+            onTouchCancel={handleConversationTouchEnd}
+          >
+            {conversations.map((conversation, index) => {
+              const active = activeConversation?.id === conversation.id;
+              const pendingUnassigned =
+                conversation.status === "pending" &&
+                !conversation.assigned_user_id;
+              const displayName =
+                conversation.display_name ||
+                conversation.phone_e164 ||
+                conversation.wa_id ||
+                "Sin nombre";
+              const preview =
+                getPreview(conversation);
+              const unreadCount = Number(
+                conversation.unread_count ||
+                  conversation.unread_messages ||
+                  conversation.unread ||
+                  0
+              );
+              const topTag = conversation.tags?.[0]?.name || "";
+              const assignedName =
+                conversation.assigned_user?.name ||
+                userMap.get(conversation.assigned_user_id || "")?.name ||
+                "";
+              const assignedLabel = assignedName ? `Tomada por ${assignedName}` : "";
+              const lineLabel = conversation.phone_number_id
+                ? channelMap.get(conversation.phone_number_id) ||
+                  `Linea ${String(conversation.phone_number_id).slice(-4)}`
+                : "";
+              const lastReadAt = lastReadMap?.[conversation.id] || null;
+              const lastMessageAt = conversation.last_message_at;
+              const isUnread =
+                lastMessageAt &&
+                (!lastReadAt ||
+                  new Date(lastMessageAt).getTime() > new Date(lastReadAt).getTime()) &&
+                conversation.last_message_direction === "in";
+              return (
+                <button
+                  key={conversation.id}
+                  className={`conversation-item ${active ? "active" : ""}`}
+                  onClick={() => loadConversation(conversation.id)}
+                  style={{ animationDelay: `${Math.min(index, 6) * 60}ms` }}
+                >
+                  <div className="avatar">
+                    <span>{getInitial(displayName)}</span>
+                    {pendingUnassigned && <span className="presence-dot" />}
+                  </div>
+                  <div className="conversation-body">
+                    <div className="conversation-row">
+                      <span className="conversation-name">{displayName}</span>
+                      <div className="conversation-right">
+                        <span className="conversation-time">
+                          {formatListTime(conversation.last_message_at)}
+                        </span>
+                        {unreadCount > 0 && (
+                          <span className="conversation-unread">{unreadCount}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className={`conversation-preview ${isUnread ? "unread" : ""}`}>
+                      {preview}
+                    </div>
+                    <div className="conversation-meta">
+                      {lineLabel && (
+                        <span className="status-pill line-pill">{lineLabel}</span>
+                      )}
+                      {assignedLabel && (
+                        <span className="status-pill assignee-pill">{assignedLabel}</span>
+                      )}
+                      {topTag && (
+                        <span className="status-pill tag-pill">{topTag}</span>
                       )}
                     </div>
                   </div>
-                  <div className={`conversation-preview ${isUnread ? "unread" : ""}`}>
-                    {preview}
-                  </div>
-                  <div className="conversation-meta">
-                    {lineLabel && (
-                      <span className="status-pill line-pill">{lineLabel}</span>
-                    )}
-                    {assignedLabel && (
-                      <span className="status-pill assignee-pill">{assignedLabel}</span>
-                    )}
-                    {topTag && (
-                      <span className="status-pill tag-pill">{topTag}</span>
-                    )}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
+                </button>
+              );
+            })}
+            {conversationsLoading && conversations.length === 0 && (
+              <div className="conversation-list-state">Cargando chats...</div>
+            )}
+            {!conversationsLoading && conversations.length === 0 && (
+              <div className="conversation-list-state">
+                No hay chats para los filtros seleccionados.
+              </div>
+            )}
+            {conversationsLoadingMore && (
+              <div className="conversation-list-state">Cargando mas chats...</div>
+            )}
+          </div>
         </div>
       </aside>
 

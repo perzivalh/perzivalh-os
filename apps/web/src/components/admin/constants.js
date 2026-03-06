@@ -26,9 +26,16 @@ export const SETTINGS_MODULES = [
     { id: "odoo", label: "Integracion Odoo" },
 ];
 
+function formatCustomRoleLabel(role) {
+    return String(role || "")
+        .replace(/[_-]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim() || "Rol personalizado";
+}
+
 export function getRoleMeta(role) {
     return ROLE_LABELS[role] || {
-        title: role,
+        title: formatCustomRoleLabel(role),
         subtitle: "Acceso personalizado",
         tone: "info",
     };

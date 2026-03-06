@@ -5,7 +5,7 @@
 const express = require("express");
 const router = express.Router();
 const prisma = require("../db");
-const { requireAuth, requireRole } = require("../middleware/auth");
+const { requireAuth, requireModulePermission } = require("../middleware/auth");
 const logger = require("../lib/logger");
 const adminRoutes = require("./admin");
 
@@ -100,7 +100,7 @@ async function getMessageStats(campaignId) {
  * GET /api/campaigns
  * List campaigns with metrics (tenant schema)
  */
-router.get("/campaigns", async (req, res) => {
+router.get("/campaigns", requireModulePermission("campaigns", "read"), async (req, res) => {
     try {
         const { status, limit, offset, q } = req.query;
         const where = {};
@@ -162,7 +162,7 @@ router.get("/campaigns", async (req, res) => {
  * GET /api/campaigns/:id
  * Get single campaign with stats
  */
-router.get("/campaigns/:id", async (req, res) => {
+router.get("/campaigns/:id", requireModulePermission("campaigns", "read"), async (req, res) => {
     try {
         const campaignRaw = await prisma.campaign.findUnique({
             where: { id: req.params.id },
@@ -205,7 +205,7 @@ router.get("/campaigns/:id", async (req, res) => {
  * GET /api/campaigns/:id/recipients
  * Get campaign recipients with status (mapped from CampaignMessage)
  */
-router.get("/campaigns/:id/recipients", async (req, res) => {
+router.get("/campaigns/:id/recipients", requireModulePermission("campaigns", "read"), async (req, res) => {
     try {
         const { status, limit, offset } = req.query;
         const where = { campaign_id: req.params.id };
@@ -255,7 +255,7 @@ router.get("/campaigns/:id/recipients", async (req, res) => {
  * POST /api/campaigns
  * Create a new campaign (tenant schema)
  */
-router.post("/campaigns", requireRole(["admin", "marketing"]), async (req, res) => {
+router.post("/campaigns", requireModulePermission("campaigns", "write"), async (req, res) => {
     try {
         const name = (req.body?.name || "").trim();
         const templateId = req.body?.template_id;
@@ -326,7 +326,7 @@ router.post("/campaigns", requireRole(["admin", "marketing"]), async (req, res) 
  * PUT /api/campaigns/:id
  * Update a draft/scheduled campaign
  */
-router.put("/campaigns/:id", requireRole(["admin", "marketing"]), async (req, res) => {
+router.put("/campaigns/:id", requireModulePermission("campaigns", "write"), async (req, res) => {
     try {
         const name = (req.body?.name || "").trim();
         const templateId = req.body?.template_id || null;
@@ -412,7 +412,7 @@ router.put("/campaigns/:id", requireRole(["admin", "marketing"]), async (req, re
  * POST /api/campaigns/:id/launch
  * Queue campaign messages for sending
  */
-router.post("/campaigns/:id/launch", requireRole(["admin", "marketing"]), async (req, res) => {
+router.post("/campaigns/:id/launch", requireModulePermission("campaigns", "write"), async (req, res) => {
     try {
         const campaign = await prisma.campaign.findUnique({
             where: { id: req.params.id },
@@ -444,7 +444,7 @@ router.post("/campaigns/:id/launch", requireRole(["admin", "marketing"]), async 
  * POST /api/campaigns/:id/pause
  * Not supported in tenant schema
  */
-router.post("/campaigns/:id/pause", requireRole(["admin", "marketing"]), async (req, res) => {
+router.post("/campaigns/:id/pause", requireModulePermission("campaigns", "write"), async (req, res) => {
     res.status(409).json({ error: "not_supported" });
 });
 
@@ -452,7 +452,7 @@ router.post("/campaigns/:id/pause", requireRole(["admin", "marketing"]), async (
  * POST /api/campaigns/:id/resume
  * Not supported in tenant schema
  */
-router.post("/campaigns/:id/resume", requireRole(["admin", "marketing"]), async (req, res) => {
+router.post("/campaigns/:id/resume", requireModulePermission("campaigns", "write"), async (req, res) => {
     res.status(409).json({ error: "not_supported" });
 });
 
@@ -460,7 +460,7 @@ router.post("/campaigns/:id/resume", requireRole(["admin", "marketing"]), async 
  * DELETE /api/campaigns/:id
  * Delete a campaign
  */
-router.delete("/campaigns/:id", requireRole(["admin", "marketing"]), async (req, res) => {
+router.delete("/campaigns/:id", requireModulePermission("campaigns", "write"), async (req, res) => {
     try {
         const campaign = await prisma.campaign.findUnique({
             where: { id: req.params.id },
@@ -490,7 +490,7 @@ router.delete("/campaigns/:id", requireRole(["admin", "marketing"]), async (req,
  * POST /api/campaigns/:id/resend
  * Clone and relaunch a campaign
  */
-router.post("/campaigns/:id/resend", requireRole(["admin", "marketing"]), async (req, res) => {
+router.post("/campaigns/:id/resend", requireModulePermission("campaigns", "write"), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         const campaign = await prisma.campaign.findUnique({

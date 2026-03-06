@@ -8,14 +8,6 @@ datasource db {
   url      = env("TENANT_DB_URL")
 }
 
-enum UserRole {
-  admin
-  recepcion
-  caja
-  marketing
-  doctor
-}
-
 enum ConversationStatus {
   open
   pending
@@ -87,7 +79,7 @@ model User {
   name          String
   email         String     @unique
   password_hash String
-  role          UserRole   @default(recepcion)
+  role          String     @default("recepcion")
   is_active     Boolean    @default(true)
   created_at    DateTime   @default(now())
   AuditLogTenant      AuditLogTenant[]    @relation("UserAuditLogs")
@@ -218,7 +210,7 @@ model AuditLogTenant {
 
 model RolePermission {
   id               String   @id @default(cuid())
-  role             UserRole @unique
+  role             String   @unique
   permissions_json Json
   created_at       DateTime @default(now())
   updated_at       DateTime @updatedAt

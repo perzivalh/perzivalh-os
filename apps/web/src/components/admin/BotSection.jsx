@@ -18,7 +18,7 @@ const DEFAULT_AI_USAGE = {
     chats: [],
 };
 
-function BotSection() {
+function BotSection({ canManageBot = false }) {
     const [bots, setBots] = useState([]);
     const [metrics, setMetrics] = useState(null);
     const [aiQuota, setAiQuota] = useState(DEFAULT_AI_QUOTA);
@@ -56,7 +56,7 @@ function BotSection() {
     }
 
     async function handleToggleBot(botId, newActive) {
-        if (updatingBotId) {
+        if (!canManageBot || updatingBotId) {
             return;
         }
         setUpdatingBotId(botId);
@@ -80,7 +80,7 @@ function BotSection() {
     }
 
     async function handleSaveQuota() {
-        if (savingQuota) {
+        if (!canManageBot || savingQuota) {
             return;
         }
         setSavingQuota(true);
@@ -138,6 +138,9 @@ function BotSection() {
                         <p className="bot-section-subtitle">
                             Administra los flujos automatizados, metricas y la politica de IA.
                         </p>
+                        {!canManageBot ? (
+                            <p className="bot-section-subtitle">Modo solo lectura para este rol.</p>
+                        ) : null}
                     </div>
                 </div>
                 <div className="bot-section-global-toggle">
@@ -182,7 +185,7 @@ function BotSection() {
                                             <input
                                                 type="checkbox"
                                                 checked={bot.is_active}
-                                                disabled={Boolean(updatingBotId)}
+                                                disabled={!canManageBot || Boolean(updatingBotId)}
                                                 onChange={() => handleToggleBot(bot.id, !bot.is_active)}
                                             />
                                             <span className="bot-toggle-slider" />
@@ -271,6 +274,7 @@ function BotSection() {
                                         <input
                                             type="checkbox"
                                             checked={Boolean(aiQuota.enabled)}
+                                            disabled={!canManageBot}
                                             onChange={(e) => setAiQuota((prev) => ({ ...prev, enabled: e.target.checked }))}
                                         />
                                         <span>Usar IA antes del fallback keyword</span>
@@ -282,6 +286,7 @@ function BotSection() {
                                     <input
                                         className="settings-input"
                                         value={Array.isArray(aiQuota.tracked_providers) ? aiQuota.tracked_providers.join(", ") : ""}
+                                        disabled={!canManageBot}
                                         onChange={(e) => setAiQuota((prev) => ({ ...prev, tracked_providers: parseProviders(e.target.value) }))}
                                         placeholder="cerebras"
                                     />
@@ -295,6 +300,7 @@ function BotSection() {
                                         min="1"
                                         step="1"
                                         value={aiQuota.tenant_daily_token_limit ?? ""}
+                                        disabled={!canManageBot}
                                         onChange={(e) => setAiQuota((prev) => ({ ...prev, tenant_daily_token_limit: parseInt(e.target.value, 10) || 0 }))}
                                     />
                                 </label>
@@ -307,6 +313,7 @@ function BotSection() {
                                         min="1"
                                         step="1"
                                         value={aiQuota.chat_daily_token_limit ?? ""}
+                                        disabled={!canManageBot}
                                         onChange={(e) => setAiQuota((prev) => ({ ...prev, chat_daily_token_limit: parseInt(e.target.value, 10) || 0 }))}
                                     />
                                 </label>
@@ -319,6 +326,7 @@ function BotSection() {
                                         min="0"
                                         step="0.05"
                                         value={aiQuota.output_weight ?? 0.35}
+                                        disabled={!canManageBot}
                                         onChange={(e) => setAiQuota((prev) => ({ ...prev, output_weight: parseFloat(e.target.value) || 0 }))}
                                     />
                                 </label>
@@ -376,7 +384,7 @@ function BotSection() {
                                     type="button"
                                     className="btn btn-primary btn-sm"
                                     onClick={handleSaveQuota}
-                                    disabled={savingQuota}
+                                    disabled={!canManageBot || savingQuota}
                                 >
                                     {savingQuota ? "Guardando..." : "Guardar politica IA"}
                                 </button>

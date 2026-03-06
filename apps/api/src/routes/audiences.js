@@ -4,7 +4,7 @@
  */
 const express = require("express");
 const router = express.Router();
-const { requireAuth, requireRole } = require("../middleware/auth");
+const { requireAuth, requireModulePermission } = require("../middleware/auth");
 const logger = require("../lib/logger");
 
 const audienceService = require("../services/audienceService");
@@ -18,7 +18,7 @@ router.use(requireAuth);
  * GET /api/audiences
  * List all audience segments
  */
-router.get("/audiences", async (req, res) => {
+router.get("/audiences", requireModulePermission("campaigns", "read"), async (req, res) => {
     try {
         const { search } = req.query;
         const withCounts = req.query.with_counts === "true";
@@ -38,7 +38,7 @@ router.get("/audiences", async (req, res) => {
  * GET /api/audiences/automation-settings
  * Get automation settings for dynamic audiences
  */
-router.get("/audiences/automation-settings", async (req, res) => {
+router.get("/audiences/automation-settings", requireModulePermission("campaigns", "read"), async (req, res) => {
     try {
         const phoneNumberId = req.query.phone_number_id || null;
         const settings = await audienceAutomationService.getAutomationSettings({
@@ -57,7 +57,7 @@ router.get("/audiences/automation-settings", async (req, res) => {
  */
 router.post(
     "/audiences/automation-settings",
-    requireRole(["admin", "marketing"]),
+    requireModulePermission("campaigns", "write"),
     async (req, res) => {
         try {
             const userId = req.user?.id || null;
@@ -79,7 +79,7 @@ router.post(
  * GET /api/audiences/dynamic-tags
  * List dynamic audience mappings (tags + default)
  */
-router.get("/audiences/dynamic-tags", async (req, res) => {
+router.get("/audiences/dynamic-tags", requireModulePermission("campaigns", "read"), async (req, res) => {
     try {
         const phoneNumberId = req.query.phone_number_id || null;
         const lineName = req.query.line_name || null;
@@ -100,7 +100,7 @@ router.get("/audiences/dynamic-tags", async (req, res) => {
  */
 router.post(
     "/audiences/dynamic-tags",
-    requireRole(["admin", "marketing"]),
+    requireModulePermission("campaigns", "write"),
     async (req, res) => {
         try {
             const userId = req.user?.id || null;
@@ -125,7 +125,7 @@ router.post(
  */
 router.post(
     "/audiences/sync-historical",
-    requireRole(["admin", "marketing"]),
+    requireModulePermission("campaigns", "write"),
     async (req, res) => {
         try {
             const userId = req.user?.id || null;
@@ -150,7 +150,7 @@ router.post(
  */
 router.post(
     "/audiences/import-preview",
-    requireRole(["admin", "marketing"]),
+    requireModulePermission("campaigns", "write"),
     async (req, res) => {
         try {
             const { file_base64, filename } = req.body;
@@ -172,7 +172,7 @@ router.post(
  */
 router.post(
     "/audiences/import-excel",
-    requireRole(["admin", "marketing"]),
+    requireModulePermission("campaigns", "write"),
     async (req, res) => {
         try {
             const userId = req.user?.id || null;
@@ -196,7 +196,7 @@ router.post(
  * GET /api/audiences/:id
  * Get single audience segment
  */
-router.get("/audiences/:id", async (req, res) => {
+router.get("/audiences/:id", requireModulePermission("campaigns", "read"), async (req, res) => {
     try {
         const segment = await audienceService.getSegmentById(req.params.id);
         if (!segment) {
@@ -213,7 +213,7 @@ router.get("/audiences/:id", async (req, res) => {
  * GET /api/audiences/:id/preview
  * Preview recipients for a segment
  */
-router.get("/audiences/:id/preview", async (req, res) => {
+router.get("/audiences/:id/preview", requireModulePermission("campaigns", "read"), async (req, res) => {
     try {
         const limit = parseInt(req.query.limit || "50", 10);
         const preview = await audienceService.previewSegmentRecipients(req.params.id, limit);
@@ -228,7 +228,7 @@ router.get("/audiences/:id/preview", async (req, res) => {
  * POST /api/audiences
  * Create a new audience segment
  */
-router.post("/audiences", requireRole(["admin", "marketing"]), async (req, res) => {
+router.post("/audiences", requireModulePermission("campaigns", "write"), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         const segment = await audienceService.createSegment(req.body, userId);
@@ -243,7 +243,7 @@ router.post("/audiences", requireRole(["admin", "marketing"]), async (req, res) 
  * PUT /api/audiences/:id
  * Update an audience segment
  */
-router.put("/audiences/:id", requireRole(["admin", "marketing"]), async (req, res) => {
+router.put("/audiences/:id", requireModulePermission("campaigns", "write"), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         const segment = await audienceService.updateSegment(req.params.id, req.body, userId);
@@ -258,7 +258,7 @@ router.put("/audiences/:id", requireRole(["admin", "marketing"]), async (req, re
  * DELETE /api/audiences/:id
  * Soft delete an audience segment
  */
-router.delete("/audiences/:id", requireRole(["admin", "marketing"]), async (req, res) => {
+router.delete("/audiences/:id", requireModulePermission("campaigns", "write"), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         await audienceService.deleteSegment(req.params.id, userId);
@@ -273,7 +273,7 @@ router.delete("/audiences/:id", requireRole(["admin", "marketing"]), async (req,
  * POST /api/audiences/refresh-counts
  * Refresh estimated counts for all segments
  */
-router.post("/audiences/refresh-counts", requireRole(["admin", "marketing"]), async (req, res) => {
+router.post("/audiences/refresh-counts", requireModulePermission("campaigns", "write"), async (req, res) => {
     try {
         await audienceService.refreshAllSegmentCounts();
         res.json({ refreshed: true });

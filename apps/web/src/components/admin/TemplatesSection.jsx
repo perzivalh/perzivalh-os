@@ -35,6 +35,7 @@ function TemplatesSection({
     handleSyncTemplates,
     onLoadTemplates,
     brandName = "",
+    canManageTemplates = false,
 }) {
     const brandLabel = (brandName || "PODOPIE").trim();
     const [view, setView] = useState("list"); // 'list' | 'editor'
@@ -69,6 +70,9 @@ function TemplatesSection({
 
 
     const handleSync = async () => {
+        if (!canManageTemplates) {
+            return;
+        }
         setSyncing(true);
         try {
             await handleSyncTemplates();
@@ -78,6 +82,9 @@ function TemplatesSection({
     };
 
     const handleCreateNew = () => {
+        if (!canManageTemplates) {
+            return;
+        }
         setEditingTemplate(null);
         setEditorForm({
             name: "",
@@ -94,6 +101,9 @@ function TemplatesSection({
     };
 
     const handleSelectTemplate = (template) => {
+        if (!canManageTemplates) {
+            return;
+        }
         setEditingTemplate(template);
         setEditorForm({
             name: template.name || "",
@@ -110,7 +120,7 @@ function TemplatesSection({
     };
 
     const handleDeleteTemplate = async (template) => {
-        if (!template?.id || !handleTemplateDelete) {
+        if (!canManageTemplates || !template?.id || !handleTemplateDelete) {
             return;
         }
         const confirmed = window.confirm(
@@ -124,6 +134,9 @@ function TemplatesSection({
 
     const handleSaveTemplate = async (e) => {
         e.preventDefault();
+        if (!canManageTemplates) {
+            return;
+        }
         const formData = {
             ...editorForm,
             id: editingTemplate?.id,
@@ -142,7 +155,7 @@ function TemplatesSection({
     };
 
     const handleSubmitTemplate = async () => {
-        if (!handleTemplateSubmitToMeta) {
+        if (!canManageTemplates || !handleTemplateSubmitToMeta) {
             return;
         }
         setSubmitting(true);
@@ -219,6 +232,9 @@ function TemplatesSection({
                             CONECTADO A META API
                         </span>
                     </div>
+                    {!canManageTemplates ? (
+                        <p className="templates-subtitle">Modo solo lectura para este rol.</p>
+                    ) : null}
                     <div className="templates-actions">
                         <div className="search-input-wrap">
                             <input
@@ -242,11 +258,15 @@ function TemplatesSection({
                         <button
                             className="btn-sync"
                             onClick={handleSync}
-                            disabled={syncing}
+                            disabled={!canManageTemplates || syncing}
                         >
                             {syncing ? "⟳ Sincronizando..." : "⟳ Sincronizar"}
                         </button>
-                        <button className="btn-create-template" onClick={handleCreateNew}>
+                        <button
+                            className="btn-create-template"
+                            onClick={handleCreateNew}
+                            disabled={!canManageTemplates}
+                        >
                             <span>+</span> Crear Nueva Plantilla
                         </button>
                     </div>
@@ -295,7 +315,7 @@ function TemplatesSection({
                                     <button className="btn-preview danger" onClick={(e) => {
                                         e.stopPropagation();
                                         handleDeleteTemplate(template);
-                                    }}>
+                                    }} disabled={!canManageTemplates}>
                                         Eliminar
                                     </button>
                                 </div>
@@ -304,11 +324,13 @@ function TemplatesSection({
                     })}
 
                     {/* Create new card */}
-                    <div className="template-card template-card-create" onClick={handleCreateNew}>
+                    {canManageTemplates ? (
+                        <div className="template-card template-card-create" onClick={handleCreateNew}>
                         <div className="create-icon">+</div>
                         <h3>Crear nueva plantilla</h3>
                         <p>Empieza a diseñar tu flujo de WhatsApp</p>
-                    </div>
+                        </div>
+                    ) : null}
                 </div>
 
                 {filteredTemplates.length === 0 && !search && (

@@ -374,6 +374,7 @@ router.post("/tenants/:id/impersonate", requireAuth, requireSuperAdmin, async (r
             name: tenantUser.name,
             email: tenantUser.email,
             role: tenantUser.role,
+            tenant_id: tenantId,
         },
         tenant_id: tenantId,
     });

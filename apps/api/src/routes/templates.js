@@ -4,10 +4,18 @@
  */
 const express = require("express");
 const router = express.Router();
-const { requireAuth, requireRole } = require("../middleware/auth");
+const {
+    requireAuth,
+    requireAnyPermission,
+    requireSettingPermission,
+} = require("../middleware/auth");
 const logger = require("../lib/logger");
 
 const templateService = require("../services/templateService");
+const TEMPLATE_READ_ACCESS = [
+    { group: "settings", key: "templates" },
+    { group: "modules", key: "campaigns" },
+];
 
 // All routes require authentication
 router.use(requireAuth);
@@ -16,7 +24,7 @@ router.use(requireAuth);
  * GET /api/templates
  * List all templates from local DB
  */
-router.get("/templates", async (req, res) => {
+router.get("/templates", requireAnyPermission(TEMPLATE_READ_ACCESS), async (req, res) => {
     try {
         const { status, category, search } = req.query;
         const templates = await templateService.getAllTemplates({
@@ -35,7 +43,7 @@ router.get("/templates", async (req, res) => {
  * GET /api/templates/sync
  * Force sync templates from Meta API
  */
-router.get("/templates/sync", requireRole(["admin", "marketing"]), async (req, res) => {
+router.get("/templates/sync", requireSettingPermission("templates", "write"), async (req, res) => {
     try {
         const result = await templateService.syncTemplatesFromMeta();
         res.json(result);
@@ -49,7 +57,7 @@ router.get("/templates/sync", requireRole(["admin", "marketing"]), async (req, r
  * GET /api/templates/:id
  * Get single template with variable mappings
  */
-router.get("/templates/:id", async (req, res) => {
+router.get("/templates/:id", requireAnyPermission(TEMPLATE_READ_ACCESS), async (req, res) => {
     try {
         const template = await templateService.getTemplateById(req.params.id);
         if (!template) {
@@ -66,7 +74,7 @@ router.get("/templates/:id", async (req, res) => {
  * POST /api/templates/draft
  * Create a local draft template
  */
-router.post("/templates/draft", requireRole(["admin", "marketing"]), async (req, res) => {
+router.post("/templates/draft", requireSettingPermission("templates", "write"), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         const template = await templateService.createDraft(req.body, userId);
@@ -81,7 +89,7 @@ router.post("/templates/draft", requireRole(["admin", "marketing"]), async (req,
  * PUT /api/templates/:id
  * Update a draft template
  */
-router.put("/templates/:id", requireRole(["admin", "marketing"]), async (req, res) => {
+router.put("/templates/:id", requireSettingPermission("templates", "write"), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         const template = await templateService.updateDraft(req.params.id, req.body, userId);
@@ -96,7 +104,7 @@ router.put("/templates/:id", requireRole(["admin", "marketing"]), async (req, re
  * PUT /api/templates/:id/mappings
  * Update variable mappings for a template
  */
-router.put("/templates/:id/mappings", requireRole(["admin", "marketing"]), async (req, res) => {
+router.put("/templates/:id/mappings", requireSettingPermission("templates", "write"), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         const { mappings } = req.body;
@@ -116,7 +124,7 @@ router.put("/templates/:id/mappings", requireRole(["admin", "marketing"]), async
  * POST /api/templates/:id/submit
  * Submit a draft template to Meta for review
  */
-router.post("/templates/:id/submit", requireRole(["admin", "marketing"]), async (req, res) => {
+router.post("/templates/:id/submit", requireSettingPermission("templates", "write"), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         const template = await templateService.submitToMeta(req.params.id, userId);
@@ -131,7 +139,7 @@ router.post("/templates/:id/submit", requireRole(["admin", "marketing"]), async 
  * DELETE /api/templates/:id
  * Soft delete a template
  */
-router.delete("/templates/:id", requireRole(["admin"]), async (req, res) => {
+router.delete("/templates/:id", requireSettingPermission("templates", "write"), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         await templateService.deleteTemplateLocal(req.params.id, userId);
@@ -146,7 +154,7 @@ router.delete("/templates/:id", requireRole(["admin"]), async (req, res) => {
  * POST /api/templates/:id/restore
  * Restore a soft-deleted template
  */
-router.post("/templates/:id/restore", requireRole(["admin", "marketing"]), async (req, res) => {
+router.post("/templates/:id/restore", requireSettingPermission("templates", "write"), async (req, res) => {
     try {
         const userId = req.user?.id || null;
         const template = await templateService.restoreTemplateLocal(req.params.id, userId);

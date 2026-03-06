@@ -42,6 +42,7 @@ function GeneralSection({
     handleChannelSelect,
     handleChannelSubmit,
     handleChannelQuickUpdate,
+    canManageGeneral = false,
 }) {
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
@@ -158,11 +159,17 @@ function GeneralSection({
     }
 
     async function handleMarkPrimary(channel) {
+        if (!canManageGeneral) {
+            return;
+        }
         await handleChannelQuickUpdate(channel.id, { is_default: true });
         setOpenMenuId("");
     }
 
     async function handleToggleActive(channel) {
+        if (!canManageGeneral) {
+            return;
+        }
         await handleChannelQuickUpdate(channel.id, { is_active: !channel.is_active });
         setOpenMenuId("");
     }
@@ -179,6 +186,9 @@ function GeneralSection({
                     <p className="general-lines-description">
                         Gestiona nombres visibles, estado operativo y linea principal para tus conversaciones.
                     </p>
+                    {!canManageGeneral ? (
+                        <p className="general-lines-description">Modo solo lectura para este rol.</p>
+                    ) : null}
                 </div>
                 <div className="general-lines-stats">
                     <div className="line-stat">
@@ -285,7 +295,7 @@ function GeneralSection({
                                                 type="button"
                                                 className="line-actions-menu-item"
                                                 onClick={() => handleMarkPrimary(channel)}
-                                                disabled={channel.is_default}
+                                                disabled={!canManageGeneral || channel.is_default}
                                             >
                                                 Marcar principal
                                             </button>
@@ -293,6 +303,7 @@ function GeneralSection({
                                                 type="button"
                                                 className="line-actions-menu-item danger"
                                                 onClick={() => handleToggleActive(channel)}
+                                                disabled={!canManageGeneral}
                                             >
                                                 {channel.is_active ? "Desactivar" : "Activar"}
                                             </button>
@@ -325,7 +336,7 @@ function GeneralSection({
                                     }))
                                 }
                                 placeholder="Ej: Linea principal"
-                                disabled={!channelForm.id}
+                                disabled={!canManageGeneral || !channelForm.id}
                             />
                         </label>
                         <label className="field">
@@ -347,7 +358,7 @@ function GeneralSection({
                                         is_default: event.target.checked,
                                     }))
                                 }
-                                disabled={!channelForm.id}
+                                disabled={!canManageGeneral || !channelForm.id}
                             />
                             Marcar como principal
                         </label>
@@ -361,18 +372,22 @@ function GeneralSection({
                                         is_active: event.target.checked,
                                     }))
                                 }
-                                disabled={!channelForm.id}
+                                disabled={!canManageGeneral || !channelForm.id}
                             />
                             Linea activa
                         </label>
                         <div className="form-actions">
-                            <button className="primary" type="submit" disabled={!channelForm.id}>
+                            <button
+                                className="primary"
+                                type="submit"
+                                disabled={!canManageGeneral || !channelForm.id}
+                            >
                                 Guardar cambios
                             </button>
                             <button
                                 className="ghost"
                                 type="button"
-                                disabled={!channelForm.id}
+                                disabled={!canManageGeneral || !channelForm.id}
                                 onClick={resetChannelForm}
                             >
                                 Cancelar

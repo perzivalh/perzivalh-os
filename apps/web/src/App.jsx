@@ -56,6 +56,7 @@ function App() {
       : ""
   );
   const [user, setUser] = useState(null);
+  const isSuperadminUser = user?.role === "superadmin" && !user?.tenant_id;
   const [branding, setBranding] = useState(null);
   const [tenantMeta, setTenantMeta] = useState(null);
   const [tenantChannels, setTenantChannels] = useState([]);
@@ -117,12 +118,64 @@ function App() {
   const [rolePermissionsLoaded, setRolePermissionsLoaded] = useState(false);
   const [rolePermissionsDirty, setRolePermissionsDirty] = useState(false);
   const [rolePermissionsSaving, setRolePermissionsSaving] = useState(false);
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [userForm, setUserForm] = useState({
+    id: "",
+    name: "",
+    email: "",
+    role: "recepcion",
+    password: "",
+    is_active: true,
+  });
   const roleOptions = useMemo(() => {
-    const extras = Object.keys(rolePermissions || {}).filter(
-      (role) => !BASE_ROLE_OPTIONS.includes(role)
-    );
+    const discoveredRoles = new Set([
+      ...Object.keys(rolePermissions || {}),
+      ...(adminUsers || []).map((entry) => entry.role),
+      user?.role,
+    ]);
+    const extras = Array.from(discoveredRoles)
+      .filter((role) => role && !BASE_ROLE_OPTIONS.includes(role))
+      .sort((left, right) => left.localeCompare(right, "es"));
     return [...BASE_ROLE_OPTIONS, ...extras];
-  }, [rolePermissions]);
+  }, [adminUsers, rolePermissions, user]);
+  const currentRoleAccess = useMemo(() => {
+    if (!user || isSuperadminUser) {
+      return null;
+    }
+    return (
+      rolePermissions?.[user.role] ||
+      DEFAULT_ROLE_PERMISSIONS[user.role] || {
+        modules: {},
+        settings: {},
+      }
+    );
+  }, [isSuperadminUser, user, rolePermissions]);
+  const permissionsReady = !user || isSuperadminUser || rolePermissionsLoaded;
+  const canLoadUsersDirectory = Boolean(currentRoleAccess) && (
+    hasPermission(currentRoleAccess, "modules", "chat") ||
+    hasPermission(currentRoleAccess, "modules", "campaigns") ||
+    hasPermission(currentRoleAccess, "settings", "users")
+  );
+  const canLoadTagsDirectory = Boolean(currentRoleAccess) && (
+    hasPermission(currentRoleAccess, "modules", "chat") ||
+    hasPermission(currentRoleAccess, "modules", "campaigns")
+  );
+
+  function getFirstAccessibleView(access) {
+    if (hasPermission(access, "modules", "chat")) {
+      return "chats";
+    }
+    if (hasPermission(access, "modules", "dashboard")) {
+      return "dashboard";
+    }
+    if (hasPermission(access, "modules", "campaigns")) {
+      return "campaigns";
+    }
+    if (hasPermission(access, "modules", "settings")) {
+      return "admin";
+    }
+    return "forbidden";
+  }
 
   const [filters, setFilters] = useState({
     status: "",
@@ -183,16 +236,6 @@ function App() {
     verified_only: false,
     segment_id: "",
     segment_name: "",
-  });
-
-  const [adminUsers, setAdminUsers] = useState([]);
-  const [userForm, setUserForm] = useState({
-    id: "",
-    name: "",
-    email: "",
-    role: "recepcion",
-    password: "",
-    is_active: true,
   });
 
   const [settings, setSettings] = useState(null);
@@ -283,7 +326,7 @@ function App() {
     if (
       !token ||
       !user ||
-      user.role === "superadmin" ||
+      isSuperadminUser ||
       !isAndroidPushSupported()
     ) {
       return false;
@@ -329,7 +372,7 @@ function App() {
       !resolvedPublicKey ||
       !token ||
       !user ||
-      user.role === "superadmin" ||
+      isSuperadminUser ||
       !isAndroidPushSupported()
     ) {
       return false;
@@ -532,7 +575,7 @@ function App() {
   }, [token]);
 
   useEffect(() => {
-    if (!user || user.role === "superadmin") {
+    if (!user || isSuperadminUser) {
       setBranding(null);
       setTenantChannels([]);
       applyBrandingToCss(null);
@@ -591,7 +634,7 @@ function App() {
     if (!user) {
       return;
     }
-    if (user.role === "superadmin") {
+    if (isSuperadminUser) {
       if (!isSuperAdminRoute) {
         navigateTo("/superadmin", { replace: true });
       }
@@ -603,58 +646,63 @@ function App() {
   }, [user, isSuperAdminRoute, navigateTo]);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !permissionsReady) {
       return;
     }
-    if (user.role === "superadmin") {
+    if (isSuperadminUser) {
       return;
     }
-    void loadUsers();
-    void loadTags();
-  }, [user]);
+    if (canLoadUsersDirectory) {
+      void loadUsers();
+    }
+    if (canLoadTagsDirectory) {
+      void loadTags();
+    }
+  }, [user, permissionsReady, canLoadUsersDirectory, canLoadTagsDirectory]);
 
   useEffect(() => {
     if (!user) {
       return;
     }
-    if (user.role === "superadmin") {
+    if (isSuperadminUser) {
       return;
     }
     void loadRolePermissions();
   }, [user]);
 
   useEffect(() => {
-    if (!user || view !== "chats") {
+    if (!user || !permissionsReady || view !== "chats") {
       return;
     }
-    if (user.role === "superadmin") {
+    if (isSuperadminUser) {
       return;
     }
-    void loadConversations();
-  }, [user, view, filters]);
+    if (hasPermission(currentRoleAccess, "modules", "chat")) {
+      void loadConversations();
+    }
+  }, [user, permissionsReady, view, filters, currentRoleAccess]);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !permissionsReady) {
       return;
     }
-    if (user.role === "superadmin") {
+    if (isSuperadminUser) {
       return;
     }
-    if (view === "dashboard") {
+    if (view === "dashboard" && hasPermission(currentRoleAccess, "modules", "dashboard")) {
       void loadMetrics(dashboardPeriod, dashboardChannel);
     }
-    if (view === "campaigns") {
+    if (view === "campaigns" && hasPermission(currentRoleAccess, "modules", "campaigns")) {
       void loadTemplates();
       void loadCampaigns(1, 6);
     }
-  }, [user, view, dashboardPeriod, dashboardChannel]);
+  }, [user, permissionsReady, view, dashboardPeriod, dashboardChannel, currentRoleAccess]);
 
   useEffect(() => {
-    if (!user || view !== "admin") {
+    if (!user || !permissionsReady || view !== "admin") {
       return;
     }
-    const roleAccess =
-      rolePermissions?.[user.role] || DEFAULT_ROLE_PERMISSIONS[user.role];
+    const roleAccess = currentRoleAccess;
     const canUsers = hasPermission(roleAccess, "settings", "users");
     const canBot = hasPermission(roleAccess, "settings", "bot");
     const canGeneral = hasPermission(roleAccess, "settings", "general");
@@ -676,29 +724,34 @@ function App() {
     if (settingsSection === "audit" && canAudit) {
       void loadAuditLogs();
     }
-  }, [user, view, settingsSection, rolePermissions]);
+  }, [user, permissionsReady, view, settingsSection, currentRoleAccess]);
 
   useEffect(() => {
-    if (!user || view !== "admin") {
+    if (!user || !permissionsReady || view !== "admin") {
       return;
     }
-    const roleAccess =
-      rolePermissions?.[user.role] || DEFAULT_ROLE_PERMISSIONS[user.role];
+    const roleAccess = currentRoleAccess;
     const sections = ["general", "users", "bot", "company", "templates", "audit", "odoo"];
     const allowed = sections.filter((section) =>
       hasPermission(roleAccess, "settings", section)
     );
     if (!allowed.length) {
-      setView(result.user.role === "superadmin" ? "superadmin" : "chats");
+      setView(getFirstAccessibleView({
+        modules: {
+          ...(roleAccess?.modules || {}),
+          settings: { read: false, write: false },
+        },
+        settings: roleAccess?.settings || {},
+      }));
       return;
     }
     if (!allowed.includes(settingsSection)) {
       setSettingsSection(allowed[0]);
     }
-  }, [user, view, settingsSection, rolePermissions]);
+  }, [user, permissionsReady, view, settingsSection, currentRoleAccess]);
 
   useEffect(() => {
-    if (!token || !user || user.role === "superadmin") {
+    if (!token || !user || isSuperadminUser) {
       setPushPublicKey("");
       pushSubscriptionEndpointRef.current = "";
       return;
@@ -740,7 +793,7 @@ function App() {
     if (!token) {
       return;
     }
-    if (user?.role === "superadmin") {
+    if (isSuperadminUser) {
       return;
     }
     const socket = connectSocket(token);
@@ -855,37 +908,44 @@ function App() {
   }, [token, activeConversation]);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !permissionsReady) {
       return;
     }
-    if (user.role === "superadmin") {
+    if (isSuperadminUser) {
       if (view !== "superadmin") {
         setView("superadmin");
       }
       return;
     }
-    const roleAccess =
-      rolePermissions?.[user.role] || DEFAULT_ROLE_PERMISSIONS[user.role];
+    const roleAccess = currentRoleAccess;
     const canChat = hasPermission(roleAccess, "modules", "chat");
     const canDashboard = hasPermission(roleAccess, "modules", "dashboard");
     const canCampaigns = hasPermission(roleAccess, "modules", "campaigns");
     const canSettings = hasPermission(roleAccess, "modules", "settings");
+    const fallbackView = getFirstAccessibleView(roleAccess);
     if (view === "chats" && !canChat) {
-      setView(canDashboard ? "dashboard" : canCampaigns ? "campaigns" : "admin");
+      setView(fallbackView);
     }
     if (view === "dashboard" && !canDashboard) {
-      setView(canChat ? "chats" : canCampaigns ? "campaigns" : "admin");
+      setView(fallbackView);
     }
     if (view === "campaigns" && !canCampaigns) {
-      setView(canChat ? "chats" : canDashboard ? "dashboard" : "admin");
+      setView(fallbackView);
     }
     if (view === "admin" && !canSettings) {
-      setView(canChat ? "chats" : canDashboard ? "dashboard" : "campaigns");
+      setView(fallbackView);
     }
-  }, [user, view, rolePermissions]);
+    if (view === "forbidden" && fallbackView !== "forbidden") {
+      setView(fallbackView);
+    }
+  }, [user, permissionsReady, view, currentRoleAccess]);
 
   useEffect(() => {
-    if (!user || user.role !== "admin") {
+    if (
+      !user ||
+      !permissionsReady ||
+      !hasPermission(currentRoleAccess, "settings", "users", "write")
+    ) {
       return;
     }
     if (!rolePermissionsLoaded || !rolePermissionsDirty || rolePermissionsSaving) {
@@ -1089,7 +1149,8 @@ function App() {
       setUser(result.user);
       setSuperadminToken("");
       localStorage.removeItem("superadmin_token");
-      const isSuperAdmin = result.user.role === "superadmin";
+      const isSuperAdmin =
+        result.user.role === "superadmin" && !result.user.tenant_id;
       setView(isSuperAdmin ? "superadmin" : "chats");
       if (isSuperAdmin) {
         navigateTo("/superadmin", { replace: true });
@@ -1643,13 +1704,13 @@ function App() {
   async function loadCampaigns(page = 1, pageSize = 6, query = "") {
     try {
       const qs = new URLSearchParams({
-        page: String(page),
-        page_size: String(pageSize),
+        limit: String(pageSize),
+        offset: String((Math.max(page, 1) - 1) * pageSize),
       });
       if (query) {
         qs.set("q", query);
       }
-      const data = await apiGet(`/api/admin/campaigns?${qs.toString()}`);
+      const data = await apiGet(`/api/campaigns?${qs.toString()}`);
       setCampaigns(data.campaigns || []);
       setCampaignsTotal(
         Number.isFinite(data.total) ? data.total : (data.campaigns || []).length
@@ -1662,8 +1723,8 @@ function App() {
   async function loadCampaignMessages(campaignId) {
     setSelectedCampaignId(campaignId);
     try {
-      const data = await apiGet(`/api/admin/campaigns/${campaignId}/messages`);
-      setCampaignMessages(data.messages || []);
+      const data = await apiGet(`/api/campaigns/${campaignId}/recipients?limit=500`);
+      setCampaignMessages(data.recipients || []);
     } catch (error) {
       setPageError(normalizeError(error));
     }
@@ -1994,6 +2055,13 @@ function App() {
     if (!role || pendingRoleDeletesRef.current.has(role)) {
       return;
     }
+    if (BASE_ROLE_OPTIONS.includes(role)) {
+      pushToast({
+        type: "error",
+        message: "Los roles base no se pueden eliminar",
+      });
+      return;
+    }
     try {
       setRolePermissions((prev) => {
         const next = { ...prev };
@@ -2216,7 +2284,7 @@ function App() {
     );
   }
 
-  if (user?.role === "superadmin" && isSuperAdminRoute) {
+  if (isSuperadminUser && isSuperAdminRoute) {
     return (
       <main className="superadmin-page">
         <SuperAdminView
@@ -2229,14 +2297,16 @@ function App() {
     );
   }
 
-  const roleAccess =
-    rolePermissions?.[user.role] || DEFAULT_ROLE_PERMISSIONS[user.role];
+  const roleAccess = currentRoleAccess || { modules: {}, settings: {} };
   const canViewChats = hasPermission(roleAccess, "modules", "chat");
   const canViewDashboard = hasPermission(roleAccess, "modules", "dashboard");
   const canViewCampaigns = hasPermission(roleAccess, "modules", "campaigns");
   const canViewAdmin = hasPermission(roleAccess, "modules", "settings");
+  const hasAnyAppAccess =
+    canViewChats || canViewDashboard || canViewCampaigns || canViewAdmin;
   const isAdmin = hasRole(user, ["admin"]);
   const canManageStatus = hasPermission(roleAccess, "modules", "chat", "write");
+  const canManageCampaigns = hasPermission(roleAccess, "modules", "campaigns", "write");
   const quickActions = [];
   const statusLabels = {
     open: "Bot activo",
@@ -2304,7 +2374,7 @@ function App() {
     );
   });
 
-  const canReturnToSuperadmin = Boolean(superadminToken) && user.role !== "superadmin";
+  const canReturnToSuperadmin = Boolean(superadminToken) && !isSuperadminUser;
   const pushPermission = getNotificationPermission();
   const showPushEnableBanner =
     Boolean(pushPublicKey) &&
@@ -2394,6 +2464,15 @@ function App() {
         <main
           className={`content ${view === "chats" ? "content-chats" : "content-page"}`}
         >
+          {(view === "forbidden" || !hasAnyAppAccess) && (
+            <div className="panel">
+              <div className="panel-title">Acceso no configurado</div>
+              <div className="empty-state">
+                Tu rol no tiene ningun modulo habilitado todavia. Configura permisos
+                desde Gestion de Usuarios o asigna otro rol.
+              </div>
+            </div>
+          )}
           {view === "chats" && (
             <ChatView
               activeConversation={activeConversation}
@@ -2504,8 +2583,12 @@ function App() {
               onLoadCampaigns={loadCampaigns}
               onLoadCampaignMessages={loadCampaignMessages}
               onSendCampaign={handleSendCampaign}
+              onUpdateCampaign={handleUpdateCampaign}
+              onDeleteCampaign={handleDeleteCampaign}
+              onResendCampaign={handleResendCampaign}
               formatDate={formatDate}
               brandName={displayBrandName}
+              canManageCampaigns={canManageCampaigns}
             />
           )}
 

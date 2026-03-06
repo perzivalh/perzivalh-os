@@ -9,7 +9,7 @@ const { Prisma } = require("@prisma/client-tenant");
 
 const router = express.Router();
 
-const { requireAuth } = require("../middleware/auth");
+const { requireAuth, requireModulePermission } = require("../middleware/auth");
 const prisma = require("../db");
 const { getControlClient } = require("../control/controlClient");
 
@@ -682,7 +682,7 @@ async function buildDashboardTablePayload({
 }
 
 // GET /api/dashboard/metrics
-router.get("/dashboard/metrics", requireAuth, async (req, res) => {
+router.get("/dashboard/metrics", requireAuth, requireModulePermission("dashboard", "read"), async (req, res) => {
   try {
     const period = req.query.period || "30d";
     const channel = req.query.channel ? String(req.query.channel).trim() : "";
@@ -698,7 +698,7 @@ router.get("/dashboard/metrics", requireAuth, async (req, res) => {
 });
 
 // GET /api/dashboard/table
-router.get("/dashboard/table", requireAuth, async (req, res) => {
+router.get("/dashboard/table", requireAuth, requireModulePermission("dashboard", "read"), async (req, res) => {
   try {
     const payload = await buildDashboardTablePayload({
       user: req.user,
@@ -713,7 +713,7 @@ router.get("/dashboard/table", requireAuth, async (req, res) => {
 });
 
 // GET /api/dashboard/table/export
-router.get("/dashboard/table/export", requireAuth, async (req, res) => {
+router.get("/dashboard/table/export", requireAuth, requireModulePermission("dashboard", "read"), async (req, res) => {
   try {
     const payload = await buildDashboardTablePayload({
       user: req.user,
@@ -728,7 +728,7 @@ router.get("/dashboard/table/export", requireAuth, async (req, res) => {
 });
 
 // GET /api/dashboard/report - text report download
-router.get("/dashboard/report", requireAuth, async (req, res) => {
+router.get("/dashboard/report", requireAuth, requireModulePermission("dashboard", "read"), async (req, res) => {
   try {
     const period = req.query.period || "30d";
     const channel = req.query.channel ? String(req.query.channel).trim() : "";

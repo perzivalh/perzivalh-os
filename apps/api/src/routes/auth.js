@@ -56,6 +56,7 @@ router.post("/login", authLimiter, async (req, res) => {
                     name: controlUser.email,
                     email: controlUser.email,
                     role: controlUser.role,
+                    tenant_id: null,
                 },
             });
         }
@@ -70,6 +71,9 @@ router.post("/login", authLimiter, async (req, res) => {
         });
         if (!tenantUser || !tenantUser.is_active) {
             return res.status(401).json({ error: "invalid_credentials" });
+        }
+        if (tenantUser.role === "superadmin") {
+            return res.status(403).json({ error: "invalid_role" });
         }
 
         const token = signUser({
@@ -86,6 +90,7 @@ router.post("/login", authLimiter, async (req, res) => {
                 name: tenantUser.name,
                 email: tenantUser.email,
                 role: tenantUser.role,
+                tenant_id: controlUser.tenant_id,
             },
         });
     }

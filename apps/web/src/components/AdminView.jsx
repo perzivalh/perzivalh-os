@@ -93,6 +93,10 @@ function AdminView({
     return Boolean(roleAccess?.settings?.[section]?.read);
   }
 
+  function canWriteSection(section) {
+    return Boolean(roleAccess?.settings?.[section]?.write);
+  }
+
   function handleSectionClick(section) {
     if (!hasSettingsAccess(section)) {
       return;
@@ -149,6 +153,7 @@ function AdminView({
             rolePermissions={rolePermissions}
             setRolePermissions={setRolePermissions}
             isAdmin={isAdmin}
+            canManageUsers={canWriteSection("users")}
             adminUsers={adminUsers}
             userForm={userForm}
             setUserForm={setUserForm}
@@ -168,6 +173,7 @@ function AdminView({
             handleChannelSelect={handleChannelSelect}
             handleChannelSubmit={handleChannelSubmit}
             handleChannelQuickUpdate={handleChannelQuickUpdate}
+            canManageGeneral={canWriteSection("general")}
           />
         )}
 
@@ -176,6 +182,7 @@ function AdminView({
             settings={settings}
             setSettings={setSettings}
             handleSaveSettings={handleSaveSettings}
+            canManageBot={canWriteSection("bot")}
           />
         )}
 
@@ -189,6 +196,7 @@ function AdminView({
             handleTemplateDelete={handleTemplateDelete}
             handleSyncTemplates={handleSyncTemplates}
             brandName={brandName}
+            canManageTemplates={canWriteSection("templates")}
           />
         )}
 
@@ -199,7 +207,9 @@ function AdminView({
           />
         )}
 
-        {settingsSection === "company" && <CompanySection />}
+        {settingsSection === "company" && (
+          <CompanySection canManageCompany={canWriteSection("company")} />
+        )}
 
         {settingsSection === "odoo" && <OdooSection />}
 

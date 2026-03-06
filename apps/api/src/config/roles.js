@@ -1,8 +1,19 @@
 /**
- * Configuración de roles y permisos por defecto
+ * Configuracion de roles y permisos por defecto
  */
 
 const ROLE_OPTIONS = ["admin", "recepcion", "caja", "marketing", "doctor"];
+const RESERVED_ROLE_OPTIONS = ["superadmin"];
+const MODULE_PERMISSION_KEYS = ["chat", "dashboard", "campaigns", "settings"];
+const SETTINGS_PERMISSION_KEYS = [
+    "general",
+    "users",
+    "bot",
+    "company",
+    "templates",
+    "audit",
+    "odoo",
+];
 
 const DEFAULT_ROLE_PERMISSIONS = {
     admin: {
@@ -92,7 +103,84 @@ const DEFAULT_ROLE_PERMISSIONS = {
     },
 };
 
+function createEmptyPermissions() {
+    return {
+        modules: Object.fromEntries(
+            MODULE_PERMISSION_KEYS.map((key) => [key, { read: false, write: false }])
+        ),
+        settings: Object.fromEntries(
+            SETTINGS_PERMISSION_KEYS.map((key) => [key, { read: false, write: false }])
+        ),
+    };
+}
+
+function normalizeRoleKey(role) {
+    return String(role || "").trim();
+}
+
+function isReservedRole(role) {
+    return RESERVED_ROLE_OPTIONS.includes(normalizeRoleKey(role));
+}
+
+function isBaseRole(role) {
+    return ROLE_OPTIONS.includes(normalizeRoleKey(role));
+}
+
+function normalizePermissionEntry(value) {
+    const write = Boolean(value?.write);
+    const read = Boolean(value?.read) || write;
+    return { read, write };
+}
+
+function mergePermissionGroup(baseGroup, inputGroup, keys) {
+    return keys.reduce((acc, key) => {
+        acc[key] = normalizePermissionEntry(inputGroup?.[key] ?? baseGroup?.[key]);
+        return acc;
+    }, {});
+}
+
+function clonePermissions(permissions) {
+    return {
+        modules: { ...(permissions?.modules || {}) },
+        settings: { ...(permissions?.settings || {}) },
+    };
+}
+
+function getDefaultPermissionsForRole(role) {
+    const normalizedRole = normalizeRoleKey(role);
+    const base = DEFAULT_ROLE_PERMISSIONS[normalizedRole] || createEmptyPermissions();
+    return {
+        modules: mergePermissionGroup(base.modules, base.modules, MODULE_PERMISSION_KEYS),
+        settings: mergePermissionGroup(base.settings, base.settings, SETTINGS_PERMISSION_KEYS),
+    };
+}
+
+function normalizeRolePermissions(input, role) {
+    const base = getDefaultPermissionsForRole(role);
+    if (!input || typeof input !== "object") {
+        return clonePermissions(base);
+    }
+    return {
+        modules: mergePermissionGroup(base.modules, input.modules, MODULE_PERMISSION_KEYS),
+        settings: mergePermissionGroup(base.settings, input.settings, SETTINGS_PERMISSION_KEYS),
+    };
+}
+
+function hasPermission(permissions, group, key, action = "read") {
+    return Boolean(permissions?.[group]?.[key]?.[action]);
+}
+
 module.exports = {
     ROLE_OPTIONS,
+    RESERVED_ROLE_OPTIONS,
+    MODULE_PERMISSION_KEYS,
+    SETTINGS_PERMISSION_KEYS,
     DEFAULT_ROLE_PERMISSIONS,
+    createEmptyPermissions,
+    normalizeRoleKey,
+    isReservedRole,
+    isBaseRole,
+    normalizeRolePermissions,
+    getDefaultPermissionsForRole,
+    hasPermission,
 };

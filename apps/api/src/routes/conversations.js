@@ -4,7 +4,12 @@
 const express = require("express");
 const router = express.Router();
 
-const { requireAuth, requireRole } = require("../middleware/auth");
+const {
+    requireAuth,
+    requireAnyPermission,
+    requireModulePermission,
+    requireSettingPermission,
+} = require("../middleware/auth");
 const { panelLimiter } = require("../middleware/rateLimit");
 const prisma = require("../db");
 const { getControlClient } = require("../control/controlClient");
@@ -29,6 +34,7 @@ const {
     removePushSubscription,
 } = require("../services/pushNotifications");
 const audienceAutomationService = require("../services/audienceAutomationService");
+const { getRolePermissions, userHasPermission } = require("../services/rolePermissions");
 
 // Aplicar rate limiter a todas las rutas /api
 router.use(panelLimiter);
@@ -115,7 +121,16 @@ router.get("/branding", requireAuth, async (req, res) => {
 });
 
 // GET /api/channels
-router.get("/channels", requireAuth, async (req, res) => {
+router.get(
+    "/channels",
+    requireAuth,
+    requireAnyPermission([
+        { group: "modules", key: "chat" },
+        { group: "modules", key: "dashboard" },
+        { group: "modules", key: "campaigns" },
+        { group: "settings", key: "general" },
+    ]),
+    async (req, res) => {
     if (!req.user?.tenant_id) {
         return res.status(403).json({ error: "missing_tenant" });
     }
@@ -141,7 +156,7 @@ router.get("/channels", requireAuth, async (req, res) => {
 });
 
 // PATCH /api/channels/:id
-router.patch("/channels/:id", requireAuth, async (req, res) => {
+router.patch("/channels/:id", requireAuth, requireSettingPermission("general", "write"), async (req, res) => {
     if (!req.user?.tenant_id) {
         return res.status(403).json({ error: "missing_tenant" });
     }
@@ -198,23 +213,44 @@ router.patch("/channels/:id", requireAuth, async (req, res) => {
 
 // GET /api/role-permissions
 router.get("/role-permissions", requireAuth, async (req, res) => {
-    const entries = await prisma.rolePermission.findMany();
-    const permissions = entries.reduce((acc, entry) => {
-        acc[entry.role] = entry.permissions_json || {};
-        return acc;
-    }, {});
-    if (req.user.role !== "admin") {
+    if (!userHasPermission(req.user, "settings", "users", "read")) {
         return res.json({
             permissions: {
-                [req.user.role]: permissions[req.user.role] || null,
+                [req.user.role]: await getRolePermissions(prisma, req.user.role),
             },
         });
+    }
+    const [entries, users] = await Promise.all([
+        prisma.rolePermission.findMany({
+            select: { role: true, permissions_json: true },
+        }),
+        prisma.user.findMany({
+            distinct: ["role"],
+            select: { role: true },
+        }),
+    ]);
+    const roleSet = new Set([
+        req.user.role,
+        ...entries.map((entry) => entry.role),
+        ...users.map((entry) => entry.role),
+    ]);
+    const permissions = {};
+    for (const role of roleSet) {
+        permissions[role] = await getRolePermissions(prisma, role);
     }
     return res.json({ permissions });
 });
 
 // GET /api/users
-router.get("/users", requireAuth, async (req, res) => {
+router.get(
+    "/users",
+    requireAuth,
+    requireAnyPermission([
+        { group: "modules", key: "chat" },
+        { group: "modules", key: "campaigns" },
+        { group: "settings", key: "users" },
+    ]),
+    async (req, res) => {
     const users = await prisma.user.findMany({
         where: { is_active: true },
         select: { id: true, name: true, email: true, role: true },
@@ -224,7 +260,14 @@ router.get("/users", requireAuth, async (req, res) => {
 });
 
 // GET /api/tags
-router.get("/tags", requireAuth, async (req, res) => {
+router.get(
+    "/tags",
+    requireAuth,
+    requireAnyPermission([
+        { group: "modules", key: "chat" },
+        { group: "modules", key: "campaigns" },
+    ]),
+    async (req, res) => {
     const tags = await prisma.tag.findMany({
         select: { id: true, name: true, color: true },
         orderBy: { name: "asc" },
@@ -233,7 +276,14 @@ router.get("/tags", requireAuth, async (req, res) => {
 });
 
 // POST /api/tags
-router.post("/tags", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.post(
+    "/tags",
+    requireAuth,
+    requireAnyPermission([
+        { group: "modules", key: "chat", action: "write" },
+        { group: "modules", key: "campaigns", action: "write" },
+    ]),
+    async (req, res) => {
     const name = (req.body?.name || "").trim();
     const color = (req.body?.color || "").trim() || null;
     if (!name) {
@@ -253,7 +303,14 @@ router.post("/tags", requireAuth, requireRole(["admin", "marketing"]), async (re
 });
 
 // PATCH /api/tags/:id
-router.patch("/tags/:id", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.patch(
+    "/tags/:id",
+    requireAuth,
+    requireAnyPermission([
+        { group: "modules", key: "chat", action: "write" },
+        { group: "modules", key: "campaigns", action: "write" },
+    ]),
+    async (req, res) => {
     const updates = {};
     if (req.body?.name !== undefined) {
         const name = String(req.body.name || "").trim();
@@ -281,7 +338,14 @@ router.patch("/tags/:id", requireAuth, requireRole(["admin", "marketing"]), asyn
 });
 
 // DELETE /api/tags/:id
-router.delete("/tags/:id", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.delete(
+    "/tags/:id",
+    requireAuth,
+    requireAnyPermission([
+        { group: "modules", key: "chat", action: "write" },
+        { group: "modules", key: "campaigns", action: "write" },
+    ]),
+    async (req, res) => {
     const tagId = req.params.id;
     try {
         await prisma.conversationTag.deleteMany({
@@ -297,7 +361,7 @@ router.delete("/tags/:id", requireAuth, requireRole(["admin", "marketing"]), asy
 });
 
 // GET /api/conversations
-router.get("/conversations", requireAuth, async (req, res) => {
+router.get("/conversations", requireAuth, requireModulePermission("chat", "read"), async (req, res) => {
     const status = req.query.status;
     const assignedUser = req.query.assigned_user_id;
     const tag = req.query.tag;
@@ -382,7 +446,7 @@ router.get("/conversations", requireAuth, async (req, res) => {
 });
 
 // GET /api/conversations/:id
-router.get("/conversations/:id", requireAuth, async (req, res) => {
+router.get("/conversations/:id", requireAuth, requireModulePermission("chat", "read"), async (req, res) => {
     const conversationId = req.params.id;
     const conversation = await getConversationById(conversationId);
     if (!conversation) {
@@ -477,7 +541,7 @@ router.get("/conversations/:id", requireAuth, async (req, res) => {
 });
 
 // PATCH /api/conversations/:id/status
-router.patch("/conversations/:id/status", requireAuth, async (req, res) => {
+router.patch("/conversations/:id/status", requireAuth, requireModulePermission("chat", "write"), async (req, res) => {
     const status = req.body?.status;
     const ALLOWED_STATUS = new Set(["open", "pending", "assigned"]);
     if (!status || !ALLOWED_STATUS.has(status)) {
@@ -510,7 +574,7 @@ router.patch("/conversations/:id/status", requireAuth, async (req, res) => {
 });
 
 // PATCH /api/conversations/:id/assign
-router.patch("/conversations/:id/assign", requireAuth, async (req, res) => {
+router.patch("/conversations/:id/assign", requireAuth, requireModulePermission("chat", "write"), async (req, res) => {
     const userId = req.body?.user_id || null;
     try {
         const existing = await prisma.conversation.findUnique({
@@ -523,7 +587,7 @@ router.patch("/conversations/:id/assign", requireAuth, async (req, res) => {
         if (
             existing.assigned_user_id &&
             existing.assigned_user_id !== req.user.id &&
-            req.user.role !== "admin"
+            !userHasPermission(req.user, "settings", "users", "write")
         ) {
             return res.status(409).json({ error: "already_assigned" });
         }
@@ -553,7 +617,7 @@ router.patch("/conversations/:id/assign", requireAuth, async (req, res) => {
 });
 
 // POST /api/conversations/:id/tags
-router.post("/conversations/:id/tags", requireAuth, async (req, res) => {
+router.post("/conversations/:id/tags", requireAuth, requireModulePermission("chat", "write"), async (req, res) => {
     const adds = Array.isArray(req.body?.add) ? req.body.add : [];
     const removes = Array.isArray(req.body?.remove) ? req.body.remove : [];
     const normalizedAdds = adds.map((name) => String(name || "").trim()).filter(Boolean);
@@ -613,7 +677,7 @@ router.post("/conversations/:id/tags", requireAuth, async (req, res) => {
 });
 
 // POST /api/conversations/:id/messages
-router.post("/conversations/:id/messages", requireAuth, async (req, res) => {
+router.post("/conversations/:id/messages", requireAuth, requireModulePermission("chat", "write"), async (req, res) => {
     const text = (req.body?.text || "").trim();
     const type = req.body?.type || "text";
     if (!text) {

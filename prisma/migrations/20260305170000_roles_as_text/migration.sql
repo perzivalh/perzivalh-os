@@ -1,0 +1,6 @@
+ALTER TABLE "User" ALTER COLUMN "role" DROP DEFAULT;
+ALTER TABLE "RolePermission" ALTER COLUMN "role" TYPE TEXT USING "role"::text;
+ALTER TABLE "User" ALTER COLUMN "role" TYPE TEXT USING "role"::text;
+ALTER TABLE "User" ALTER COLUMN "role" SET DEFAULT 'recepcion';
+
+DROP TYPE "UserRole";

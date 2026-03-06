@@ -119,6 +119,7 @@ function CampaignsView({
   campaignsTotal,
   formatDate,
   brandName,
+  canManageCampaigns = false,
 }) {
   const brandLabel = (brandName || "Perzivalh").trim();
   const [templateSearch, setTemplateSearch] = useState("");
@@ -292,6 +293,14 @@ function CampaignsView({
     window.history.replaceState({}, "", nextUrl);
   }, [activeTab]);
 
+  function ensureCampaignWriteAccess() {
+    if (canManageCampaigns) {
+      return true;
+    }
+    pushToast({ type: "error", message: "No tienes permisos para realizar esta acción." });
+    return false;
+  }
+
   async function loadSegments() {
     try {
       const res = await apiGet("/api/audiences?with_counts=true");
@@ -349,6 +358,7 @@ function CampaignsView({
   }
 
   async function handleSaveAutomation(nextEnabled = automationSettings.enabled) {
+    if (!ensureCampaignWriteAccess()) return;
     try {
       const res = await apiPost("/api/audiences/automation-settings", {
         enabled: nextEnabled,
@@ -363,11 +373,13 @@ function CampaignsView({
   }
 
   async function handleToggleAutomation(nextEnabled) {
+    if (!ensureCampaignWriteAccess()) return;
     setAutomationSettings((prev) => ({ ...prev, enabled: nextEnabled }));
     await handleSaveAutomation(nextEnabled);
   }
 
   async function handleSyncHistorical() {
+    if (!ensureCampaignWriteAccess()) return;
     setSyncingDynamic(true);
     try {
       await apiPost("/api/audiences/sync-historical", {
@@ -385,6 +397,7 @@ function CampaignsView({
   }
 
   async function handleCreateDynamicTag() {
+    if (!ensureCampaignWriteAccess()) return;
     const name = newTagName.trim();
     if (!name) return;
     try {
@@ -416,6 +429,7 @@ function CampaignsView({
   }
 
   async function handleRefreshOdoo() {
+    if (!ensureCampaignWriteAccess()) return;
     setRefreshingOdoo(true);
     setOdooSyncResult(null);
     try {
@@ -444,6 +458,7 @@ function CampaignsView({
   }
 
   async function handleFileSelect(event) {
+    if (!canManageCampaigns) return;
     const file = event.target.files?.[0];
     if (!file) return;
     setImportFile(file);
@@ -473,6 +488,7 @@ function CampaignsView({
   }
 
   async function handleImportExcel() {
+    if (!ensureCampaignWriteAccess()) return;
     if (!importFile || !importFileBase64) {
       pushToast({ type: "error", message: "Selecciona un archivo válido" });
       return;
@@ -583,6 +599,7 @@ function CampaignsView({
   }
 
   async function handleRefreshAudienceCounts() {
+    if (!ensureCampaignWriteAccess()) return;
     try {
       await apiPost("/api/audiences/refresh-counts", {});
       await loadSegments();
@@ -599,6 +616,7 @@ function CampaignsView({
   }
 
   async function handleDeleteAudience(segment) {
+    if (!ensureCampaignWriteAccess()) return;
     if (!segment || segment.type === "odoo" || segment.isDefault) return;
     const confirmed = window.confirm(
       `¿Eliminar la audiencia "${segment.name}"? Esta acción la desactiva y no borra contactos.`
@@ -618,6 +636,7 @@ function CampaignsView({
   }
 
   async function handleRenameAudience(segment) {
+    if (!ensureCampaignWriteAccess()) return;
     if (!segment || segment.type === "odoo" || segment.isDefault) return;
     const nextName = window.prompt("Nuevo nombre de la audiencia:", segment.name);
     if (!nextName || !nextName.trim()) return;
@@ -892,6 +911,7 @@ function CampaignsView({
   }
 
   async function handleBulkAction(action) {
+    if (!ensureCampaignWriteAccess()) return;
     if (!selectedContacts.length || bulkActionLoading) return;
     const targetNeeded = action === "add" || action === "move";
     if (targetNeeded && !targetTagName) {
@@ -1094,7 +1114,7 @@ function CampaignsView({
   }
 
   function handleEditCampaign(campaign) {
-    if (!campaign) return;
+    if (!canManageCampaigns || !campaign) return;
     setEditingCampaign(campaign);
     setCampaignLaunchOpen(true);
     setLaunchTemplateSearch("");
@@ -1120,6 +1140,7 @@ function CampaignsView({
   }
 
   function handleDeleteCampaignClick(campaign) {
+    if (!canManageCampaigns) return;
     if (!campaign?.id || !onDeleteCampaign) return;
     const confirmed = window.confirm(`¿Eliminar la campaña "${campaign.name}"?`);
     if (!confirmed) return;
@@ -1127,6 +1148,7 @@ function CampaignsView({
   }
 
   function handleResendCampaignClick(campaign) {
+    if (!canManageCampaigns) return;
     if (!campaign?.id || !onResendCampaign) return;
     const confirmed = window.confirm(`¿Reenviar la campaña "${campaign.name}"?`);
     if (!confirmed) return;
@@ -1149,6 +1171,9 @@ function CampaignsView({
   }
 
   function handleOpenContactEdit(contact) {
+    if (!canManageCampaigns) {
+      return;
+    }
     if (!contact?.id) {
       return;
     }
@@ -1165,6 +1190,7 @@ function CampaignsView({
 
   async function handleSaveContact(event) {
     event.preventDefault();
+    if (!ensureCampaignWriteAccess()) return;
     if (!contactEditForm.id) {
       return;
     }
@@ -1195,6 +1221,7 @@ function CampaignsView({
   }
 
   async function handleDeleteContact(contact) {
+    if (!ensureCampaignWriteAccess()) return;
     if (!contact?.id) {
       return;
     }
@@ -1218,6 +1245,7 @@ function CampaignsView({
 
   function handleSubmitCampaign(event) {
     event.preventDefault();
+    if (!ensureCampaignWriteAccess()) return;
     if (!campaignForm.name.trim() || !campaignForm.template_id) {
       return;
     }
@@ -1312,26 +1340,29 @@ function CampaignsView({
                 >
                   {audienceFlowTab === "excel" ? "Cancelar" : "Descartar"}
                 </button>
-                <button
-                  className="campaigns-primary"
-                  type="button"
-                  onClick={handleAudiencePrimaryAction}
-                  disabled={
-                    (audienceFlowTab === "excel" &&
-                      (importingExcel ||
-                        !importFileBase64 ||
-                        (importOptions.targetMode === "new" &&
-                          !importOptions.listName.trim()) ||
-                        (importOptions.targetMode === "existing" &&
-                          !importOptions.targetSegmentId))) ||
-                    (audienceFlowTab === "odoo" && refreshingOdoo)
-                  }
-                >
-                  {activeAudienceMeta.actionLabel}
-                </button>
+                {canManageCampaigns && (
+                  <button
+                    className="campaigns-primary"
+                    type="button"
+                    onClick={handleAudiencePrimaryAction}
+                    disabled={
+                      (audienceFlowTab === "excel" &&
+                        (importingExcel ||
+                          !importFileBase64 ||
+                          (importOptions.targetMode === "new" &&
+                            !importOptions.listName.trim()) ||
+                          (importOptions.targetMode === "existing" &&
+                            !importOptions.targetSegmentId))) ||
+                      (audienceFlowTab === "odoo" && refreshingOdoo)
+                    }
+                  >
+                    {activeAudienceMeta.actionLabel}
+                  </button>
+                )}
               </>
             )}
             {!audienceFlowOpen && activeTab === "audiences" && (
+              canManageCampaigns && (
                 <button
                   className="campaigns-primary campaigns-primary--dropdown"
                   type="button"
@@ -1343,8 +1374,10 @@ function CampaignsView({
                   <span className="campaigns-primary-icon">+</span>
                   Nueva Audiencia
                 </button>
+              )
             )}
             {!audienceFlowOpen && activeTab === "new" && (
+              canManageCampaigns && (
               <>
                 {campaignLaunchOpen ? (
                   <>
@@ -1377,6 +1410,7 @@ function CampaignsView({
                   </button>
                 )}
               </>
+              )
             )}
           </div>
         </header>
@@ -1458,7 +1492,9 @@ function CampaignsView({
                           type="checkbox"
                           checked={automationSettings.enabled}
                           onChange={(event) => handleToggleAutomation(event.target.checked)}
-                          disabled={loadingAutomation || !availableLines.length}
+                          disabled={
+                            !canManageCampaigns || loadingAutomation || !availableLines.length
+                          }
                         />
                         <span>{automationSettings.enabled ? "ACTIVO" : "INACTIVO"}</span>
                       </label>
@@ -1490,7 +1526,7 @@ function CampaignsView({
                           className="campaigns-ghost"
                           type="button"
                           onClick={handleSyncHistorical}
-                          disabled={syncingDynamic}
+                          disabled={!canManageCampaigns || syncingDynamic}
                         >
                           {syncingDynamic
                             ? "Sincronizando..."
@@ -1500,7 +1536,7 @@ function CampaignsView({
                           className="campaigns-primary"
                           type="button"
                           onClick={handleCreateDynamicTag}
-                          disabled={!newTagName.trim()}
+                          disabled={!canManageCampaigns || !newTagName.trim()}
                         >
                           Nueva Etiqueta / Audiencia
                         </button>
@@ -1556,12 +1592,13 @@ function CampaignsView({
                             placeholder="Crear nueva etiqueta"
                             value={newTagName}
                             onChange={(event) => setNewTagName(event.target.value)}
+                            disabled={!canManageCampaigns}
                           />
                           <button
                             type="button"
                             className="campaigns-primary"
                             onClick={handleCreateDynamicTag}
-                            disabled={!newTagName.trim()}
+                            disabled={!canManageCampaigns || !newTagName.trim()}
                           >
                             Crear
                           </button>
@@ -1588,6 +1625,7 @@ function CampaignsView({
                                 type="file"
                                 accept=".csv,.xlsx"
                                 onChange={handleFileSelect}
+                                disabled={!canManageCampaigns}
                               />
                             </label>
                           </div>
@@ -1610,6 +1648,7 @@ function CampaignsView({
                               type="file"
                               accept=".csv,.xlsx"
                               onChange={handleFileSelect}
+                              disabled={!canManageCampaigns}
                             />
                           </label>
                           <button
@@ -1787,12 +1826,12 @@ function CampaignsView({
                       >
                         {checkingOdoo ? "Validando..." : "Validar Conexión"}
                       </button>
-                      <button
-                        className="campaigns-primary"
-                        type="button"
-                        onClick={handleRefreshOdoo}
-                        disabled={refreshingOdoo}
-                      >
+                        <button
+                          className="campaigns-primary"
+                          type="button"
+                          onClick={handleRefreshOdoo}
+                          disabled={!canManageCampaigns || refreshingOdoo}
+                        >
                         {refreshingOdoo ? "Actualizando..." : "Actualizar Lista Odoo"}
                       </button>
                     </div>
@@ -1949,7 +1988,7 @@ function CampaignsView({
                             <span className="audience-count">
                               {segment.count?.toLocaleString("es-PE") || 0}
                             </span>
-                        {!segment.isDefault && segment.type !== "odoo" && (
+                        {canManageCampaigns && !segment.isDefault && segment.type !== "odoo" && (
                           <div className="audience-menu-wrapper">
                             <button
                               className="audience-menu"
@@ -2051,6 +2090,7 @@ function CampaignsView({
                         type="button"
                         aria-label="Actualizar"
                         onClick={handleRefreshAudienceCounts}
+                        disabled={!canManageCampaigns}
                       >
                         {"\u21bb"}
                       </button>
@@ -2081,6 +2121,7 @@ function CampaignsView({
                       className="audiences-bulk-select"
                       value={bulkTargetAudienceId}
                       onChange={(event) => setBulkTargetAudienceId(event.target.value)}
+                      disabled={!canManageCampaigns}
                     >
                       <option value="">Selecciona audiencia destino...</option>
                       {tagSegments.map((segment) => (
@@ -2093,6 +2134,7 @@ function CampaignsView({
                       className="audiences-bulk-btn"
                       type="button"
                       disabled={
+                        !canManageCampaigns ||
                         bulkActionLoading ||
                         !selectedContacts.length ||
                         !targetTagName ||
@@ -2106,6 +2148,7 @@ function CampaignsView({
                       className="audiences-bulk-btn"
                       type="button"
                       disabled={
+                        !canManageCampaigns ||
                         bulkActionLoading ||
                         !selectedContacts.length ||
                         !targetTagName ||
@@ -2118,7 +2161,12 @@ function CampaignsView({
                     <button
                       className="audiences-bulk-btn danger"
                       type="button"
-                      disabled={bulkActionLoading || !selectedContacts.length || !currentAudienceTagName}
+                      disabled={
+                        !canManageCampaigns ||
+                        bulkActionLoading ||
+                        !selectedContacts.length ||
+                        !currentAudienceTagName
+                      }
                       onClick={() => handleBulkAction("remove")}
                     >
                       Eliminar
@@ -2141,6 +2189,7 @@ function CampaignsView({
                             selectedContactKeys.size === selectableContacts.length
                           }
                           onChange={(event) => toggleSelectAllContacts(event.target.checked)}
+                          disabled={!canManageCampaigns}
                         />
                       </span>
                       <span>CONTACTO</span>
@@ -2176,7 +2225,7 @@ function CampaignsView({
                               aria-label="Seleccionar contacto"
                               checked={selectedContactKeys.has(contactKey)}
                               onChange={() => toggleSelectContact(contact)}
-                              disabled={!contactKey}
+                              disabled={!canManageCampaigns || !contactKey}
                             />
                             <div className="audiences-contact">
                               <div className="audiences-avatar">{initials}</div>
@@ -2203,34 +2252,36 @@ function CampaignsView({
                             <div className="audiences-status">
                               {(contact.status || "ACTIVO").toUpperCase()}
                             </div>
-                            <div className="audiences-menu-wrapper">
-                              <button
-                                className="audiences-menu"
-                                type="button"
-                                aria-label="Opciones"
-                                onClick={() => toggleContactMenu(contact.id)}
-                                disabled={!contact.id}
-                              >
-                                ...
-                              </button>
-                              {openContactMenuId === contact.id && (
-                                <div className="audiences-menu-dropdown">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenContactEdit(contact)}
-                                  >
-                                    Editar
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="danger"
-                                    onClick={() => handleDeleteContact(contact)}
-                                  >
-                                    Eliminar
-                                  </button>
-                                </div>
-                              )}
-                            </div>
+                            {canManageCampaigns && (
+                              <div className="audiences-menu-wrapper">
+                                <button
+                                  className="audiences-menu"
+                                  type="button"
+                                  aria-label="Opciones"
+                                  onClick={() => toggleContactMenu(contact.id)}
+                                  disabled={!contact.id}
+                                >
+                                  ...
+                                </button>
+                                {openContactMenuId === contact.id && (
+                                  <div className="audiences-menu-dropdown">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenContactEdit(contact)}
+                                    >
+                                      Editar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="danger"
+                                      onClick={() => handleDeleteContact(contact)}
+                                    >
+                                      Eliminar
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -2424,58 +2475,60 @@ function CampaignsView({
                               {statusLabel}
                             </div>
                             <div className="campaigns-row-actions">
-                              <div className="campaigns-row-menu">
-                                <button
-                                  className="campaigns-row-menu-btn"
-                                  type="button"
-                                  aria-label="Opciones"
-                                  onClick={(event) => toggleCampaignMenu(campaign.id, event)}
-                                >
-                                  ...
-                                </button>
-                                {openCampaignMenuId === campaign.id && (
-                                  <div
-                                    className={`campaigns-row-dropdown ${
-                                      campaignMenuPlacement === "up" ? "drop-up" : ""
-                                    }`}
+                              {canManageCampaigns && (
+                                <div className="campaigns-row-menu">
+                                  <button
+                                    className="campaigns-row-menu-btn"
+                                    type="button"
+                                    aria-label="Opciones"
+                                    onClick={(event) => toggleCampaignMenu(campaign.id, event)}
                                   >
-                                    {canEdit && (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          handleEditCampaign(campaign);
-                                          setOpenCampaignMenuId(null);
-                                        }}
-                                      >
-                                        Editar
-                                      </button>
-                                    )}
-                                    {canResend && (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          handleResendCampaignClick(campaign);
-                                          setOpenCampaignMenuId(null);
-                                        }}
-                                      >
-                                        Reenviar
-                                      </button>
-                                    )}
-                                    {canDelete && (
-                                      <button
-                                        type="button"
-                                        className="danger"
-                                        onClick={() => {
-                                          handleDeleteCampaignClick(campaign);
-                                          setOpenCampaignMenuId(null);
-                                        }}
-                                      >
-                                        Eliminar
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
+                                    ...
+                                  </button>
+                                  {openCampaignMenuId === campaign.id && (
+                                    <div
+                                      className={`campaigns-row-dropdown ${
+                                        campaignMenuPlacement === "up" ? "drop-up" : ""
+                                      }`}
+                                    >
+                                      {canEdit && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            handleEditCampaign(campaign);
+                                            setOpenCampaignMenuId(null);
+                                          }}
+                                        >
+                                          Editar
+                                        </button>
+                                      )}
+                                      {canResend && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            handleResendCampaignClick(campaign);
+                                            setOpenCampaignMenuId(null);
+                                          }}
+                                        >
+                                          Reenviar
+                                        </button>
+                                      )}
+                                      {canDelete && (
+                                        <button
+                                          type="button"
+                                          className="danger"
+                                          onClick={() => {
+                                            handleDeleteCampaignClick(campaign);
+                                            setOpenCampaignMenuId(null);
+                                          }}
+                                        >
+                                          Eliminar
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
@@ -2906,6 +2959,7 @@ function CampaignsView({
                   onChange={(event) =>
                     setContactEditForm((prev) => ({ ...prev, name: event.target.value }))
                   }
+                  disabled={!canManageCampaigns}
                 />
               </label>
               <label className="field">
@@ -2916,6 +2970,7 @@ function CampaignsView({
                   onChange={(event) =>
                     setContactEditForm((prev) => ({ ...prev, phone: event.target.value }))
                   }
+                  disabled={!canManageCampaigns}
                 />
               </label>
               <label className="field">
@@ -2926,6 +2981,7 @@ function CampaignsView({
                   onChange={(event) =>
                     setContactEditForm((prev) => ({ ...prev, email: event.target.value }))
                   }
+                  disabled={!canManageCampaigns}
                 />
               </label>
               <label className="field">
@@ -2936,6 +2992,7 @@ function CampaignsView({
                   onChange={(event) =>
                     setContactEditForm((prev) => ({ ...prev, vat: event.target.value }))
                   }
+                  disabled={!canManageCampaigns}
                 />
               </label>
               <div className="modal-actions">
@@ -2946,7 +3003,11 @@ function CampaignsView({
                 >
                   Cancelar
                 </button>
-                <button className="btn-primary" type="submit" disabled={contactSaving}>
+                <button
+                  className="btn-primary"
+                  type="submit"
+                  disabled={!canManageCampaigns || contactSaving}
+                >
                   {contactSaving ? "Guardando..." : "Guardar"}
                 </button>
               </div>

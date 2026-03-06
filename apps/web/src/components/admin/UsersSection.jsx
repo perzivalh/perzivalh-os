@@ -10,6 +10,7 @@ function UsersSection({
     rolePermissions,
     setRolePermissions,
     isAdmin,
+    canManageUsers = false,
     adminUsers,
     userForm,
     setUserForm,
@@ -27,6 +28,7 @@ function UsersSection({
     const [roleModalMode, setRoleModalMode] = useState("create");
     const [roleFormRole, setRoleFormRole] = useState("recepcion");
     const [roleDraft, setRoleDraft] = useState({ modules: {}, settings: {} });
+    const isSystemRole = Boolean(defaultRolePermissions?.[roleFormRole]);
 
     const filteredUsers = useMemo(() => {
         const query = userSearch.trim().toLowerCase();
@@ -52,6 +54,9 @@ function UsersSection({
     }
 
     function handleOpenRoleModal(roleKey, mode = "edit") {
+        if (!canManageUsers) {
+            return;
+        }
         setRoleModalMode(mode);
         setRoleFormRole(roleKey);
         setRoleDraft(normalizePermissions(roleKey));
@@ -78,25 +83,26 @@ function UsersSection({
     }
 
     function handleSaveRoleDraft() {
-        if (!roleFormRole) {
+        const normalizedRole = roleFormRole.trim();
+        if (!canManageUsers || !normalizedRole) {
             return;
         }
         setRolePermissions((prev) => ({
             ...prev,
-            [roleFormRole]: roleDraft,
+            [normalizedRole]: roleDraft,
         }));
         setRoleModalOpen(false);
     }
 
     function handleDeleteRoleDraft() {
-        if (roleFormRole && handleRoleDelete) {
+        if (canManageUsers && roleFormRole && handleRoleDelete) {
             handleRoleDelete(roleFormRole);
         }
         setRoleModalOpen(false);
     }
 
     function handlePermissionToggle(role, group, key, action) {
-        if (!isAdmin) {
+        if (!canManageUsers) {
             return;
         }
         setRolePermissions((prev) => {
@@ -135,6 +141,9 @@ function UsersSection({
     }
 
     function handleEditUser(user) {
+        if (!canManageUsers) {
+            return;
+        }
         setUserForm({
             id: user.id,
             name: user.name,
@@ -147,6 +156,9 @@ function UsersSection({
     }
 
     function handleNewUser() {
+        if (!canManageUsers) {
+            return;
+        }
         setUserForm({
             id: "",
             name: "",
@@ -182,20 +194,22 @@ function UsersSection({
                                     onChange={(event) => setUserSearch(event.target.value)}
                                 />
                             </div>
-                            <button
-                                className="settings-primary"
-                                type="button"
-                                onClick={handleNewUser}
-                            >
-                                Nuevo Usuario
-                            </button>
+                            {canManageUsers && (
+                                <button
+                                    className="settings-primary"
+                                    type="button"
+                                    onClick={handleNewUser}
+                                >
+                                    Nuevo Usuario
+                                </button>
+                            )}
                         </>
                     )}
-                    {settingsTab === "roles" && (
+                    {settingsTab === "roles" && canManageUsers && (
                         <button
                             className="settings-primary"
                             type="button"
-                            onClick={() => handleOpenRoleModal("recepcion", "create")}
+                            onClick={() => handleOpenRoleModal("", "create")}
                         >
                             + Nuevo Rol
                         </button>
@@ -254,38 +268,42 @@ function UsersSection({
                             </div>
                             <div className="users-cell">
                                 <div className="users-actions-menu">
-                                    <button
-                                        className="users-action"
-                                        type="button"
-                                        onClick={() =>
-                                            setActiveUserMenu((prev) =>
-                                                prev === user.id ? "" : user.id
-                                            )
-                                        }
-                                    >
-                                        ...
-                                    </button>
-                                    {activeUserMenu === user.id && (
-                                        <div className="users-menu">
+                                    {canManageUsers && (
+                                        <>
                                             <button
+                                                className="users-action"
                                                 type="button"
-                                                onClick={() => {
-                                                    setActiveUserMenu("");
-                                                    handleEditUser(user);
-                                                }}
+                                                onClick={() =>
+                                                    setActiveUserMenu((prev) =>
+                                                        prev === user.id ? "" : user.id
+                                                    )
+                                                }
                                             >
-                                                Editar
+                                                ...
                                             </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setActiveUserMenu("");
-                                                    setUserToDelete(user);
-                                                }}
-                                            >
-                                                Eliminar
-                                            </button>
-                                        </div>
+                                            {activeUserMenu === user.id && (
+                                                <div className="users-menu">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setActiveUserMenu("");
+                                                            handleEditUser(user);
+                                                        }}
+                                                    >
+                                                        Editar
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setActiveUserMenu("");
+                                                            setUserToDelete(user);
+                                                        }}
+                                                    >
+                                                        Eliminar
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             </div>
@@ -301,7 +319,9 @@ function UsersSection({
                 <div className="roles-grid">
                     {roleOptions.map((role) => {
                         const meta = getRoleMeta(role);
-                        const permissions = rolePermissions?.[role];
+                        const permissions =
+                            rolePermissions?.[role] ||
+                            defaultRolePermissions?.[role] || { modules: {}, settings: {} };
                         return (
                             <div className="role-card" key={role}>
                                 <div className="role-header">
@@ -311,13 +331,15 @@ function UsersSection({
                                             {meta.subtitle}
                                         </div>
                                     </div>
-                                    <button
-                                        className="role-edit"
-                                        type="button"
-                                        onClick={() => handleOpenRoleModal(role, "edit")}
-                                    >
-                                        edit
-                                    </button>
+                                    {canManageUsers && (
+                                        <button
+                                            className="role-edit"
+                                            type="button"
+                                            onClick={() => handleOpenRoleModal(role, "edit")}
+                                        >
+                                            edit
+                                        </button>
+                                    )}
                                 </div>
                                 <div className="role-permissions">
                                     <div className="perm-head">
@@ -334,7 +356,7 @@ function UsersSection({
                                                     checked={
                                                         permissions?.modules?.[module.id]?.read || false
                                                     }
-                                                    disabled={!isAdmin}
+                                                    disabled={!canManageUsers}
                                                     onChange={() =>
                                                         handlePermissionToggle(
                                                             role,
@@ -352,7 +374,7 @@ function UsersSection({
                                                     checked={
                                                         permissions?.modules?.[module.id]?.write || false
                                                     }
-                                                    disabled={!isAdmin}
+                                                    disabled={!canManageUsers}
                                                     onChange={() =>
                                                         handlePermissionToggle(
                                                             role,
@@ -378,7 +400,7 @@ function UsersSection({
                                                     checked={
                                                         permissions?.settings?.[module.id]?.read || false
                                                     }
-                                                    disabled={!isAdmin}
+                                                    disabled={!canManageUsers}
                                                     onChange={() =>
                                                         handlePermissionToggle(
                                                             role,
@@ -396,7 +418,7 @@ function UsersSection({
                                                     checked={
                                                         permissions?.settings?.[module.id]?.write || false
                                                     }
-                                                    disabled={!isAdmin}
+                                                    disabled={!canManageUsers}
                                                     onChange={() =>
                                                         handlePermissionToggle(
                                                             role,
@@ -418,7 +440,7 @@ function UsersSection({
             )}
 
             {/* User Form Modal */}
-            {showUserForm && (
+            {showUserForm && canManageUsers && (
                 <div className="modal-overlay">
                     <div className="modal-card">
                         <div className="modal-header">
@@ -529,7 +551,7 @@ function UsersSection({
             )}
 
             {/* Delete User Modal */}
-            {userToDelete && (
+            {userToDelete && canManageUsers && (
                 <div className="modal-overlay">
                     <div className="modal-card">
                         <div className="modal-header">
@@ -569,7 +591,7 @@ function UsersSection({
             )}
 
             {/* Role Modal */}
-            {roleModalOpen && (
+            {roleModalOpen && canManageUsers && (
                 <div className="modal-overlay">
                     <div className="modal-card modal-lg">
                         <div className="modal-header">
@@ -678,7 +700,7 @@ function UsersSection({
                             </div>
                         </div>
                         <div className="form-actions">
-                            {roleModalMode === "edit" && (
+                            {roleModalMode === "edit" && !isSystemRole && (
                                 <button className="danger" type="button" onClick={handleDeleteRoleDraft}>
                                     Eliminar rol
                                 </button>
@@ -687,7 +709,7 @@ function UsersSection({
                                 className="primary"
                                 type="button"
                                 onClick={handleSaveRoleDraft}
-                                disabled={!roleFormRole}
+                                disabled={!roleFormRole.trim()}
                             >
                                 Guardar
                             </button>

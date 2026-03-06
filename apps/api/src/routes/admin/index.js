@@ -7,7 +7,11 @@ const bcrypt = require("bcryptjs");
 const axios = require("axios");
 const router = express.Router();
 
-const { requireAuth, requireRole } = require("../../middleware/auth");
+const {
+    requireAuth,
+    requireModulePermission,
+    requireSettingPermission,
+} = require("../../middleware/auth");
 const prisma = require("../../db");
 const logger = require("../../lib/logger");
 const { getControlClient } = require("../../control/controlClient");
@@ -15,7 +19,13 @@ const { getTenantContext } = require("../../tenancy/tenantContext");
 const { resolveChannelByPhoneNumberId } = require("../../tenancy/tenantResolver");
 const { logAudit, createMessage } = require("../../services/conversations");
 const { getSegmentRecipients } = require("../../services/audienceService");
-const { ROLE_OPTIONS } = require("../../config/roles");
+const {
+    ROLE_OPTIONS,
+    normalizeRoleKey,
+    isBaseRole,
+    isReservedRole,
+    normalizeRolePermissions,
+} = require("../../config/roles");
 const { invalidateKnowledgeCache } = require("../../services/knowledgeService");
 const {
     normalizeAiQuotaConfig,
@@ -31,7 +41,7 @@ const settingsCache = new Map();
 // ==========================================
 
 // GET /api/admin/users
-router.get("/users", requireAuth, requireRole("admin"), async (req, res) => {
+router.get("/users", requireAuth, requireSettingPermission("users", "read"), async (req, res) => {
     const users = await prisma.user.findMany({
         orderBy: { created_at: "desc" },
     });
@@ -39,13 +49,16 @@ router.get("/users", requireAuth, requireRole("admin"), async (req, res) => {
 });
 
 // POST /api/admin/users
-router.post("/users", requireAuth, requireRole("admin"), async (req, res) => {
+router.post("/users", requireAuth, requireSettingPermission("users", "write"), async (req, res) => {
     const name = (req.body?.name || "").trim();
     const email = (req.body?.email || "").toLowerCase().trim();
-    const role = req.body?.role || "recepcion";
+    const role = normalizeRoleKey(req.body?.role || "recepcion");
     const password = req.body?.password || "";
     if (!name || !email || !password) {
         return res.status(400).json({ error: "missing_fields" });
+    }
+    if (!role || isReservedRole(role)) {
+        return res.status(400).json({ error: "invalid_role" });
     }
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
@@ -90,13 +103,17 @@ router.post("/users", requireAuth, requireRole("admin"), async (req, res) => {
 });
 
 // PATCH /api/admin/users/:id
-router.patch("/users/:id", requireAuth, requireRole("admin"), async (req, res) => {
+router.patch("/users/:id", requireAuth, requireSettingPermission("users", "write"), async (req, res) => {
     const updates = {};
     if (req.body?.name) {
         updates.name = req.body.name.trim();
     }
     if (req.body?.role) {
-        updates.role = req.body.role;
+        const normalizedRole = normalizeRoleKey(req.body.role);
+        if (!normalizedRole || isReservedRole(normalizedRole)) {
+            return res.status(400).json({ error: "invalid_role" });
+        }
+        updates.role = normalizedRole;
     }
     if (req.body?.is_active !== undefined) {
         updates.is_active = Boolean(req.body.is_active);
@@ -149,7 +166,7 @@ router.patch("/users/:id", requireAuth, requireRole("admin"), async (req, res) =
 });
 
 // DELETE /api/admin/users/:id
-router.delete("/users/:id", requireAuth, requireRole("admin"), async (req, res) => {
+router.delete("/users/:id", requireAuth, requireSettingPermission("users", "write"), async (req, res) => {
     const userId = req.params.id;
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
@@ -203,7 +220,7 @@ router.delete("/users/:id", requireAuth, requireRole("admin"), async (req, res) 
 // ==========================================
 
 // PATCH /api/admin/role-permissions
-router.patch("/role-permissions", requireAuth, requireRole("admin"), async (req, res) => {
+router.patch("/role-permissions", requireAuth, requireSettingPermission("users", "write"), async (req, res) => {
     const permissions = req.body?.permissions;
     if (!permissions || typeof permissions !== "object") {
         return res.status(400).json({ error: "invalid_permissions" });
@@ -211,17 +228,19 @@ router.patch("/role-permissions", requireAuth, requireRole("admin"), async (req,
     const updates = [];
     const savedRoles = [];
     for (const [role, payload] of Object.entries(permissions)) {
-        if (!ROLE_OPTIONS.includes(role)) {
-            continue;
+        const normalizedRole = normalizeRoleKey(role);
+        if (!normalizedRole || isReservedRole(normalizedRole)) {
+            return res.status(400).json({ error: "invalid_role" });
         }
+        const normalizedPermissions = normalizeRolePermissions(payload, normalizedRole);
         updates.push(
             prisma.rolePermission.upsert({
-                where: { role },
-                update: { permissions_json: payload || {} },
-                create: { role, permissions_json: payload || {} },
+                where: { role: normalizedRole },
+                update: { permissions_json: normalizedPermissions },
+                create: { role: normalizedRole, permissions_json: normalizedPermissions },
             })
         );
-        savedRoles.push(role);
+        savedRoles.push(normalizedRole);
     }
     if (updates.length) {
         await prisma.$transaction(updates);
@@ -235,10 +254,19 @@ router.patch("/role-permissions", requireAuth, requireRole("admin"), async (req,
 });
 
 // DELETE /api/admin/role-permissions/:role
-router.delete("/role-permissions/:role", requireAuth, requireRole("admin"), async (req, res) => {
-    const role = String(req.params.role || "").trim();
-    if (!ROLE_OPTIONS.includes(role)) {
+router.delete("/role-permissions/:role", requireAuth, requireSettingPermission("users", "write"), async (req, res) => {
+    const role = normalizeRoleKey(req.params.role);
+    if (!role || isReservedRole(role)) {
         return res.status(400).json({ error: "invalid_role" });
+    }
+    if (isBaseRole(role)) {
+        return res.status(400).json({ error: "protected_role" });
+    }
+    const usersWithRole = await prisma.user.count({
+        where: { role },
+    });
+    if (usersWithRole > 0) {
+        return res.status(409).json({ error: "role_in_use" });
     }
     await prisma.rolePermission.deleteMany({ where: { role } });
     await logAudit({
@@ -254,13 +282,13 @@ router.delete("/role-permissions/:role", requireAuth, requireRole("admin"), asyn
 // ==========================================
 
 // GET /api/admin/settings
-router.get("/settings", requireAuth, requireRole("admin"), async (req, res) => {
+router.get("/settings", requireAuth, requireSettingPermission("bot", "read"), async (req, res) => {
     const settings = await prisma.settings.findUnique({ where: { id: 1 } });
     return res.json({ settings });
 });
 
 // PATCH /api/admin/settings
-router.patch("/settings", requireAuth, requireRole("admin"), async (req, res) => {
+router.patch("/settings", requireAuth, requireSettingPermission("bot", "write"), async (req, res) => {
     const settings = await prisma.settings.upsert({
         where: { id: 1 },
         update: {
@@ -293,7 +321,7 @@ router.patch("/settings", requireAuth, requireRole("admin"), async (req, res) =>
 // ==========================================
 
 // GET /api/admin/company-profile
-router.get("/company-profile", requireAuth, requireRole(["admin"]), async (req, res) => {
+router.get("/company-profile", requireAuth, requireSettingPermission("company", "read"), async (req, res) => {
     const settings = await prisma.settings.findUnique({ where: { id: 1 } });
     return res.json({
         company: settings?.company_json || null,
@@ -302,7 +330,7 @@ router.get("/company-profile", requireAuth, requireRole(["admin"]), async (req, 
 });
 
 // PATCH /api/admin/company-profile
-router.patch("/company-profile", requireAuth, requireRole(["admin"]), async (req, res) => {
+router.patch("/company-profile", requireAuth, requireSettingPermission("company", "write"), async (req, res) => {
     const { company, botIdentity } = req.body || {};
     const currentSettings = await prisma.settings.findUnique({ where: { id: 1 } });
     const updateData = {};
@@ -341,7 +369,7 @@ router.patch("/company-profile", requireAuth, requireRole(["admin"]), async (req
 // ==========================================
 
 // GET /api/admin/branches
-router.get("/branches", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.get("/branches", requireAuth, requireSettingPermission("company", "read"), async (req, res) => {
     const branches = await prisma.branch.findMany({
         orderBy: { name: "asc" },
     });
@@ -349,7 +377,7 @@ router.get("/branches", requireAuth, requireRole(["admin", "marketing"]), async 
 });
 
 // POST /api/admin/branches
-router.post("/branches", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.post("/branches", requireAuth, requireSettingPermission("company", "write"), async (req, res) => {
     try {
         const data = {
             code: (req.body?.code || "").trim(),
@@ -383,7 +411,7 @@ router.post("/branches", requireAuth, requireRole(["admin", "marketing"]), async
 });
 
 // PATCH /api/admin/branches/:id
-router.patch("/branches/:id", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.patch("/branches/:id", requireAuth, requireSettingPermission("company", "write"), async (req, res) => {
     try {
         const branch = await prisma.branch.update({
             where: { id: req.params.id },
@@ -417,7 +445,7 @@ router.patch("/branches/:id", requireAuth, requireRole(["admin", "marketing"]), 
 });
 
 // DELETE /api/admin/branches/:id
-router.delete("/branches/:id", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.delete("/branches/:id", requireAuth, requireSettingPermission("company", "write"), async (req, res) => {
     const branch = await prisma.branch.update({
         where: { id: req.params.id },
         data: { is_active: false },
@@ -436,7 +464,7 @@ router.delete("/branches/:id", requireAuth, requireRole(["admin", "marketing"]),
 // ==========================================
 
 // GET /api/admin/services
-router.get("/services", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.get("/services", requireAuth, requireSettingPermission("company", "read"), async (req, res) => {
     const services = await prisma.service.findMany({
         include: {
             branches: {
@@ -451,7 +479,7 @@ router.get("/services", requireAuth, requireRole(["admin", "marketing"]), async 
 });
 
 // POST /api/admin/services
-router.post("/services", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.post("/services", requireAuth, requireSettingPermission("company", "write"), async (req, res) => {
     const data = {
         code: (req.body?.code || "").trim(),
         name: (req.body?.name || "").trim(),
@@ -478,7 +506,7 @@ router.post("/services", requireAuth, requireRole(["admin", "marketing"]), async
 });
 
 // PATCH /api/admin/services/:id
-router.patch("/services/:id", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.patch("/services/:id", requireAuth, requireSettingPermission("company", "write"), async (req, res) => {
     const service = await prisma.service.update({
         where: { id: req.params.id },
         data: {
@@ -507,7 +535,7 @@ router.patch("/services/:id", requireAuth, requireRole(["admin", "marketing"]), 
 });
 
 // DELETE /api/admin/services/:id
-router.delete("/services/:id", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.delete("/services/:id", requireAuth, requireSettingPermission("company", "write"), async (req, res) => {
     const service = await prisma.service.update({
         where: { id: req.params.id },
         data: { is_active: false },
@@ -522,7 +550,7 @@ router.delete("/services/:id", requireAuth, requireRole(["admin", "marketing"]),
 });
 
 // POST /api/admin/services/:id/branches
-router.post("/services/:id/branches", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.post("/services/:id/branches", requireAuth, requireSettingPermission("company", "write"), async (req, res) => {
     const branchId = req.body?.branch_id;
     const isAvailable = req.body?.is_available !== false;
     if (!branchId) {
@@ -596,7 +624,7 @@ async function syncTemplatesFromWhatsApp({ wabaId, waToken }) {
 }
 
 // GET /api/admin/templates
-router.get("/templates", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.get("/templates", requireAuth, requireSettingPermission("templates", "read"), async (req, res) => {
     const templates = await prisma.template.findMany({
         orderBy: { name: "asc" },
     });
@@ -604,7 +632,7 @@ router.get("/templates", requireAuth, requireRole(["admin", "marketing"]), async
 });
 
 // POST /api/admin/templates
-router.post("/templates", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.post("/templates", requireAuth, requireSettingPermission("templates", "write"), async (req, res) => {
     const template = await prisma.template.create({
         data: {
             name: req.body?.name,
@@ -624,7 +652,7 @@ router.post("/templates", requireAuth, requireRole(["admin", "marketing"]), asyn
 });
 
 // PATCH /api/admin/templates/:id
-router.patch("/templates/:id", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.patch("/templates/:id", requireAuth, requireSettingPermission("templates", "write"), async (req, res) => {
     const template = await prisma.template.update({
         where: { id: req.params.id },
         data: {
@@ -645,7 +673,7 @@ router.patch("/templates/:id", requireAuth, requireRole(["admin", "marketing"]),
 });
 
 // POST /api/admin/templates/sync
-router.post("/templates/sync", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.post("/templates/sync", requireAuth, requireSettingPermission("templates", "write"), async (req, res) => {
     try {
         const requestedPhoneNumberId = (req.body?.phone_number_id || "").trim();
         const tenantId = getTenantContext().tenantId;
@@ -810,7 +838,7 @@ async function queueCampaignMessages(campaign, userId) {
 }
 
 // GET /api/admin/campaigns
-router.get("/campaigns", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.get("/campaigns", requireAuth, requireModulePermission("campaigns", "read"), async (req, res) => {
     const pageSize = Math.min(Math.max(Number(req.query.page_size) || 10, 5), 100);
     const page = Math.max(Number(req.query.page) || 1, 1);
     const offset = (page - 1) * pageSize;
@@ -836,7 +864,7 @@ router.get("/campaigns", requireAuth, requireRole(["admin", "marketing"]), async
 });
 
 // POST /api/admin/campaigns
-router.post("/campaigns", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.post("/campaigns", requireAuth, requireModulePermission("campaigns", "write"), async (req, res) => {
     const name = (req.body?.name || "").trim();
     const templateId = req.body?.template_id;
     const audienceFilter = req.body?.audience_filter || {};
@@ -894,7 +922,7 @@ router.post("/campaigns", requireAuth, requireRole(["admin", "marketing"]), asyn
 });
 
 // POST /api/admin/campaigns/:id/send
-router.post("/campaigns/:id/send", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.post("/campaigns/:id/send", requireAuth, requireModulePermission("campaigns", "write"), async (req, res) => {
     const campaign = await prisma.campaign.findUnique({
         where: { id: req.params.id },
     });
@@ -917,7 +945,7 @@ router.post("/campaigns/:id/send", requireAuth, requireRole(["admin", "marketing
 
 
 // PUT /api/admin/campaigns/:id
-router.put("/campaigns/:id", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.put("/campaigns/:id", requireAuth, requireModulePermission("campaigns", "write"), async (req, res) => {
     const name = (req.body?.name || "").trim();
     const templateId = req.body?.template_id || null;
     const audienceFilter = req.body?.audience_filter || null;
@@ -988,7 +1016,7 @@ router.put("/campaigns/:id", requireAuth, requireRole(["admin", "marketing"]), a
 });
 
 // DELETE /api/admin/campaigns/:id
-router.delete("/campaigns/:id", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.delete("/campaigns/:id", requireAuth, requireModulePermission("campaigns", "write"), async (req, res) => {
     const campaign = await prisma.campaign.findUnique({ where: { id: req.params.id } });
     if (!campaign) {
         return res.status(404).json({ error: "not_found" });
@@ -1009,7 +1037,7 @@ router.delete("/campaigns/:id", requireAuth, requireRole(["admin", "marketing"])
 });
 
 // GET /api/admin/campaigns/:id/messages
-router.get("/campaigns/:id/messages", requireAuth, requireRole(["admin", "marketing"]), async (req, res) => {
+router.get("/campaigns/:id/messages", requireAuth, requireModulePermission("campaigns", "read"), async (req, res) => {
     const messages = await prisma.campaignMessage.findMany({
         where: { campaign_id: req.params.id },
         orderBy: { sent_at: "desc" },
@@ -1023,7 +1051,7 @@ router.get("/campaigns/:id/messages", requireAuth, requireRole(["admin", "market
 // ==========================================
 
 // GET /api/admin/audit
-router.get("/audit", requireAuth, requireRole("admin"), async (req, res) => {
+router.get("/audit", requireAuth, requireSettingPermission("audit", "read"), async (req, res) => {
     const pageSize = Math.min(Math.max(Number(req.query.page_size) || 10, 5), 100);
     const page = Math.max(Number(req.query.page) || 1, 1);
     const action = req.query.action ? String(req.query.action) : "";
@@ -1073,7 +1101,7 @@ const { getBotMetrics } = require("../../services/botMetrics");
 
 // GET /api/admin/bots
 // Returns bots assigned to this tenant by SuperAdmin
-router.get("/bots", requireAuth, requireRole("admin"), async (req, res) => {
+router.get("/bots", requireAuth, requireSettingPermission("bot", "read"), async (req, res) => {
     const tenantId = req.user.tenant_id;
     if (!tenantId) {
         return res.status(400).json({ error: "tenant_not_found" });
@@ -1089,7 +1117,7 @@ router.get("/bots", requireAuth, requireRole("admin"), async (req, res) => {
 
 // PATCH /api/admin/bots/ai-quota
 // Updates per-tenant AI quota policy stored in Settings.bot_identity_json.ai_quota
-router.patch("/bots/ai-quota", requireAuth, requireRole("admin"), async (req, res) => {
+router.patch("/bots/ai-quota", requireAuth, requireSettingPermission("bot", "write"), async (req, res) => {
     const tenantId = req.user.tenant_id || getTenantContext().tenantId || "legacy";
     try {
         const nextConfig = normalizeAiQuotaConfig(req.body || {});
@@ -1143,7 +1171,7 @@ router.patch("/bots/ai-quota", requireAuth, requireRole("admin"), async (req, re
 
 // PATCH /api/admin/bots/:id
 // Toggle bot active/inactive for this tenant
-router.patch("/bots/:id", requireAuth, requireRole("admin"), async (req, res) => {
+router.patch("/bots/:id", requireAuth, requireSettingPermission("bot", "write"), async (req, res) => {
     const tenantId = req.user.tenant_id;
     if (!tenantId) {
         return res.status(400).json({ error: "tenant_not_found" });
@@ -1170,7 +1198,7 @@ router.patch("/bots/:id", requireAuth, requireRole("admin"), async (req, res) =>
 
 // GET /api/admin/bots/metrics
 // Returns performance metrics for the tenant's bots
-router.get("/bots/metrics", requireAuth, requireRole("admin"), async (req, res) => {
+router.get("/bots/metrics", requireAuth, requireSettingPermission("bot", "read"), async (req, res) => {
     const tenantId = req.user.tenant_id;
     if (!tenantId) {
         return res.status(400).json({ error: "tenant_not_found" });
@@ -1194,7 +1222,7 @@ router.get("/bots/metrics", requireAuth, requireRole("admin"), async (req, res) 
 
 // GET /api/admin/bots/ai-quota
 // Returns quota config + today's usage snapshot
-router.get("/bots/ai-quota", requireAuth, requireRole("admin"), async (req, res) => {
+router.get("/bots/ai-quota", requireAuth, requireSettingPermission("bot", "read"), async (req, res) => {
     const tenantId = req.user.tenant_id || getTenantContext().tenantId || "legacy";
     try {
         const snapshot = await getDailyAiQuotaSnapshot({ tenantId });

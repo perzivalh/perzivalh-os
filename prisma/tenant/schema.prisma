@@ -103,6 +103,9 @@ model Conversation {
   verified_at      DateTime?
   verification_method VerificationMethod?
   last_message_at  DateTime?
+  last_message_text String?
+  last_message_type String?
+  last_message_direction String?
   primary_tag_id   String?
   created_at       DateTime            @default(now())
   messages         Message[]

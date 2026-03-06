@@ -48,6 +48,9 @@ const CONVERSATION_LIST_SELECT = {
     verified_at: true,
     verification_method: true,
     last_message_at: true,
+    last_message_text: true,
+    last_message_type: true,
+    last_message_direction: true,
     primary_tag_id: true,
     created_at: true,
     assigned_user: {
@@ -460,43 +463,13 @@ router.get("/conversations", requireAuth, requireModulePermission("chat", "read"
         ? pagedConversations.slice(0, limit)
         : pagedConversations;
 
-    const ids = conversations.map((entry) => entry.id);
-    let lastMessages = [];
-    if (ids.length) {
-        lastMessages = await prisma.message.findMany({
-            where: { conversation_id: { in: ids } },
-            select: {
-                conversation_id: true,
-                text: true,
-                type: true,
-                direction: true,
-                created_at: true,
-            },
-            orderBy: { created_at: "desc" },
-            distinct: ["conversation_id"],
-        });
-    }
-    const lastMessageMap = new Map(
-        lastMessages.map((message) => [message.conversation_id, message])
-    );
-
     return res.json({
         conversations: conversations.map((entry) => {
             const formatted = formatConversation(entry);
             if ((!formatted.tags || !formatted.tags.length) && entry.primary_tag) {
                 formatted.tags = [entry.primary_tag];
             }
-            const lastMessage = lastMessageMap.get(entry.id);
-            if (!lastMessage) {
-                return formatted;
-            }
-            return {
-                ...formatted,
-                last_message_text: lastMessage.text,
-                last_message_type: lastMessage.type,
-                last_message_direction: lastMessage.direction,
-                last_message_at: lastMessage.created_at || formatted.last_message_at,
-            };
+            return formatted;
         }),
         has_more: hasMore,
         next_offset: hasMore ? offset + conversations.length : null,

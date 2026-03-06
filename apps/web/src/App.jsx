@@ -266,8 +266,8 @@ function App() {
 
   const MESSAGE_WINDOW_HOURS = 48;
   const CONVERSATION_PAGE_LIMIT = 40;
-  const INITIAL_MESSAGE_LIMIT = 56;
-  const LOAD_MORE_LIMIT = 42;
+  const INITIAL_MESSAGE_LIMIT = 42;
+  const LOAD_MORE_LIMIT = 30;
   const MAX_MESSAGES_IN_MEMORY = 320;
   const CACHE_MESSAGE_LIMIT = 120;
   const MAX_CACHE_CONVERSATIONS = 5;
@@ -1166,30 +1166,8 @@ function App() {
       if (loadConversationRef.current !== requestId) {
         return;
       }
-      let conversation = data.conversation;
+      const conversation = data.conversation;
       const messages = data.messages || [];
-
-      if (
-        conversation?.status === "pending" &&
-        !conversation.assigned_user_id &&
-        user?.id
-      ) {
-        try {
-          const assigned = await apiPatch(`/api/conversations/${conversationId}/assign`, {});
-          conversation = assigned.conversation;
-          setConversations((prev) =>
-            sortConversations(
-              prev.map((item) =>
-                item.id === conversationId ? { ...item, ...conversation } : item
-              )
-            )
-          );
-        } catch (error) {
-          if (String(normalizeError(error)).includes("already_assigned")) {
-            pushToast({ type: "error", message: "Conversación tomada por otro operador" });
-          }
-        }
-      }
 
       setActiveConversation(conversation);
       setMessages(messages);
@@ -1201,6 +1179,40 @@ function App() {
         hasMore: Boolean(data.has_more),
       });
       markConversationRead(conversation);
+
+      if (
+        conversation?.status === "pending" &&
+        !conversation.assigned_user_id &&
+        user?.id
+      ) {
+        void (async () => {
+          try {
+            const assigned = await apiPatch(`/api/conversations/${conversationId}/assign`, {});
+            if (loadConversationRef.current !== requestId) {
+              return;
+            }
+            const assignedConversation = assigned.conversation;
+            setActiveConversation((prev) =>
+              prev?.id === conversationId
+                ? { ...prev, ...assignedConversation }
+                : prev
+            );
+            setConversations((prev) =>
+              sortConversations(
+                prev.map((item) =>
+                  item.id === conversationId
+                    ? { ...item, ...assignedConversation }
+                    : item
+                )
+              )
+            );
+          } catch (error) {
+            if (String(normalizeError(error)).includes("already_assigned")) {
+              pushToast({ type: "error", message: "Conversación tomada por otro operador" });
+            }
+          }
+        })();
+      }
     } catch (error) {
       setPageError(normalizeError(error));
     } finally {

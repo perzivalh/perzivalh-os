@@ -15,6 +15,9 @@ const CONVERSATION_SELECT = {
   verified_at: true,
   verification_method: true,
   last_message_at: true,
+  last_message_text: true,
+  last_message_type: true,
+  last_message_direction: true,
   primary_tag_id: true,
   created_at: true,
   assigned_user: {
@@ -144,7 +147,12 @@ async function createMessage({
 
   const conversation = await prisma.conversation.update({
     where: { id: conversationId },
-    data: { last_message_at: message.created_at },
+    data: {
+      last_message_at: message.created_at,
+      last_message_text: message.text || null,
+      last_message_type: message.type || null,
+      last_message_direction: message.direction || null,
+    },
     select: CONVERSATION_SELECT,
   });
 

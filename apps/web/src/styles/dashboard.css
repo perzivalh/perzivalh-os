@@ -603,7 +603,7 @@ select.dash-filter:focus {
 }
 
 .dash-table-wrap {
-  overflow: auto;
+  overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: 12px;
 }
@@ -611,16 +611,29 @@ select.dash-filter:focus {
 .dash-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 900px;
+  table-layout: fixed;
 }
 
 .dash-table th,
 .dash-table td {
   border-bottom: 1px solid var(--border);
-  padding: 0.65rem 0.75rem;
+  padding: 0.5rem 0.6rem;
   text-align: left;
-  font-size: 0.82rem;
+  font-size: 0.79rem;
+  word-break: break-word;
+  overflow: hidden;
 }
+
+/* Anchos proporcionales para que entren en pantalla sin scroll */
+.dash-table th:nth-child(1), .dash-table td:nth-child(1) { width: 14%; } /* Paciente */
+.dash-table th:nth-child(2), .dash-table td:nth-child(2) { width: 11%; } /* Numero */
+.dash-table th:nth-child(3), .dash-table td:nth-child(3) { width: 8%;  } /* Fecha */
+.dash-table th:nth-child(4), .dash-table td:nth-child(4) { width: 7%;  } /* Llamada */
+.dash-table th:nth-child(5), .dash-table td:nth-child(5) { width: 7%;  } /* Mensaje */
+.dash-table th:nth-child(6), .dash-table td:nth-child(6) { width: 18%; } /* Etiquetas */
+.dash-table th:nth-child(7), .dash-table td:nth-child(7) { width: 14%; } /* Operador */
+.dash-table th:nth-child(8), .dash-table td:nth-child(8) { width: 12%; } /* Linea */
+.dash-table th:nth-child(9), .dash-table td:nth-child(9) { width: 9%;  } /* Remarketing */
 
 .dash-table th {
   text-transform: uppercase;
@@ -641,6 +654,38 @@ select.dash-filter:focus {
 
 .dash-table-empty.error {
   color: #b91c1c;
+}
+
+.dash-td-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.dash-tag-chip {
+  display: inline-block;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash-remarketing-select {
+  width: 100%;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.78rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
 }
 
 .dash-bool-pill {

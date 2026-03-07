@@ -67,6 +67,17 @@ const CONVERSATION_LIST_SELECT = {
             color: true,
         },
     },
+    tags: {
+        select: {
+            tag: {
+                select: {
+                    id: true,
+                    name: true,
+                    color: true,
+                },
+            },
+        },
+    },
 };
 
 // Aplicar rate limiter a todas las rutas /api

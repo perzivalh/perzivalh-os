@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
-import { apiGet } from "../api";
+import { apiGet, apiPatch } from "../api";
 
 const PERIOD_OPTIONS = [
   { value: "24h", label: "Ultimas 24h" },
@@ -46,6 +46,13 @@ function formatTableDate(value) {
     month: "2-digit",
     day: "2-digit",
   });
+}
+
+// Elimina emojis y caracteres especiales, solo letras, números y puntuación básica
+function sanitizeName(name) {
+  if (!name) return "-";
+  const cleaned = name.replace(/[^\p{L}\p{N}\s.\-,'()]/gu, "").trim();
+  return cleaned || "-";
 }
 
 function formatChange(value, suffix = "%") {
@@ -107,6 +114,8 @@ function DashboardView({
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportMeta, setExportMeta] = useState(null);
   const [tableReloadSeq, setTableReloadSeq] = useState(0);
+  const [remarketingMap, setRemarketingMap] = useState({});
+  const remarketingPending = useRef({});
 
   const activeConversations = metrics?.active_conversations?.value ?? 0;
   const activeChange = metrics?.active_conversations?.change ?? null;
@@ -194,8 +203,18 @@ function DashboardView({
         });
         const data = await apiGet(`/api/dashboard/table?${params.toString()}`);
         if (!active) return;
-        setTableRows(data?.rows || []);
+        const rows = data?.rows || [];
+        setTableRows(rows);
         setTableTotal(data?.total || 0);
+        setRemarketingMap((prev) => {
+          const next = { ...prev };
+          rows.forEach((row) => {
+            if (!(row.id in next)) {
+              next[row.id] = row.remarketing ?? false;
+            }
+          });
+          return next;
+        });
       } catch (error) {
         if (!active) return;
         setTableRows([]);
@@ -300,6 +319,20 @@ function DashboardView({
     } finally {
       setExportingPdf(false);
     }
+  }
+
+  function handleRemarketingChange(rowId, value) {
+    const boolVal = value === "true";
+    setRemarketingMap((prev) => ({ ...prev, [rowId]: boolVal }));
+    clearTimeout(remarketingPending.current[rowId]);
+    remarketingPending.current[rowId] = setTimeout(async () => {
+      try {
+        await apiPatch(`/api/dashboard/table/row/${rowId}`, { remarketing: boolVal });
+      } catch {
+        // revert on error
+        setRemarketingMap((prev) => ({ ...prev, [rowId]: !boolVal }));
+      }
+    }, 500);
   }
 
   const tableRangeStart = tableTotal === 0 ? 0 : (tableQuery.page - 1) * tableQuery.page_size + 1;
@@ -657,30 +690,31 @@ function DashboardView({
                     <th>Fecha</th>
                     <th>Llamada</th>
                     <th>Mensaje</th>
-                    <th>Etiqueta</th>
+                    <th>Etiquetas</th>
                     <th>Operador</th>
                     <th>Linea</th>
+                    <th>Remarketing</th>
                   </tr>
                 </thead>
                 <tbody>
                   {tableLoading && (
                     <tr>
-                      <td colSpan="8" className="dash-table-empty">Cargando filas...</td>
+                      <td colSpan="9" className="dash-table-empty">Cargando filas...</td>
                     </tr>
                   )}
                   {!tableLoading && tableError && (
                     <tr>
-                      <td colSpan="8" className="dash-table-empty error">{tableError}</td>
+                      <td colSpan="9" className="dash-table-empty error">{tableError}</td>
                     </tr>
                   )}
                   {!tableLoading && !tableError && tableRows.length === 0 && (
                     <tr>
-                      <td colSpan="8" className="dash-table-empty">Sin resultados</td>
+                      <td colSpan="9" className="dash-table-empty">Sin resultados</td>
                     </tr>
                   )}
                   {!tableLoading && !tableError && tableRows.map((row) => (
                     <tr key={row.id}>
-                      <td>{row.patient || "-"}</td>
+                      <td className="dash-td-name">{sanitizeName(row.patient)}</td>
                       <td>{row.number || "-"}</td>
                       <td>{formatTableDate(row.date)}</td>
                       <td>
@@ -693,9 +727,26 @@ function DashboardView({
                           {row.message ? "Si" : "No"}
                         </span>
                       </td>
-                      <td>{row.tag || "-"}</td>
-                      <td>{row.operator || "-"}</td>
-                      <td>{row.line || "-"}</td>
+                      <td className="dash-td-tags">
+                        {(row.tags || (row.tag ? [row.tag] : [])).length > 0
+                          ? (row.tags || [row.tag]).map((t) => (
+                            <span className="dash-tag-chip" key={t}>{t}</span>
+                          ))
+                          : <span className="dash-muted">-</span>
+                        }
+                      </td>
+                      <td>{row.operator || <span className="dash-muted">Sin asignar</span>}</td>
+                      <td>{row.line || <span className="dash-muted">-</span>}</td>
+                      <td>
+                        <select
+                          className="dash-remarketing-select"
+                          value={String(remarketingMap[row.id] ?? row.remarketing ?? false)}
+                          onChange={(e) => handleRemarketingChange(row.id, e.target.value)}
+                        >
+                          <option value="false">No</option>
+                          <option value="true">Si</option>
+                        </select>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

@@ -107,6 +107,7 @@ model Conversation {
   last_message_type String?
   last_message_direction String?
   primary_tag_id   String?
+  remarketing      Boolean             @default(false)
   created_at       DateTime            @default(now())
   messages         Message[]
   tags             ConversationTag[]

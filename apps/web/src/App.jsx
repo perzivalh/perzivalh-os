@@ -335,7 +335,6 @@ function App() {
     ];
     const audio = new Audio(sources[0]);
     audio.volume = 1;
-    audio.loop = true;
     let sourceIndex = 0;
     audio.addEventListener("error", () => {
       sourceIndex += 1;
@@ -344,7 +343,7 @@ function App() {
         audio.load();
       }
     });
-    // Fallback: algunos browsers/WAV no respetan loop nativo, reiniciar manualmente
+    // Reinicio manual al terminar el audio — más confiable que audio.loop con WAV
     audio.addEventListener("ended", () => {
       if (pendingConversationIdsRef.current.size > 0) {
         audio.currentTime = 0;
@@ -363,7 +362,6 @@ function App() {
     }
     try {
       const audio = ensurePendingAlertAudio();
-      audio.loop = true;
       audio.currentTime = 0;
       void audio.play()
         .then(() => {

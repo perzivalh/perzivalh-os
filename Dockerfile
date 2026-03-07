@@ -26,4 +26,4 @@ ENV NODE_ENV=production
 
 EXPOSE 8080
 
-CMD ["node", "server.js"]
+CMD ["sh", "-c", "npx prisma db push --schema ../../prisma/tenant/schema.prisma && node server.js"]

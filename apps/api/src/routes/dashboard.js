@@ -596,13 +596,13 @@ async function buildDashboardTablePayload({
         },
         tags: {
           orderBy: { created_at: "desc" },
-          take: 1,
           select: {
             tag: {
               select: { name: true },
             },
           },
         },
+        remarketing: true,
       },
     }),
   ]);
@@ -635,10 +635,11 @@ async function buildDashboardTablePayload({
   const callSet = new Set(callRows.map((row) => row.conversation_id));
 
   const rows = conversations.map((conversation) => {
-    const latestTag = conversation.tags?.[0]?.tag?.name || null;
-    const tagName = conversation.primary_tag?.name || latestTag || null;
+    const allTagNames = (conversation.tags || [])
+      .map((t) => t.tag?.name)
+      .filter(Boolean);
     const lineId = conversation.phone_number_id || null;
-    const lineName = lineId ? (lineNameMap.get(lineId) || lineId) : "Sin línea";
+    const lineName = lineId ? (lineNameMap.get(lineId) || null) : null;
     const phone = conversation.phone_e164 || conversation.wa_id || "-";
 
     return {
@@ -648,11 +649,13 @@ async function buildDashboardTablePayload({
       date: conversation.created_at,
       call: callSet.has(conversation.id),
       message: outboundSet.has(conversation.id),
-      tag: tagName,
+      tags: allTagNames,
+      tag: allTagNames[0] || null,
       operator: conversation.assigned_user?.name || null,
       operator_id: conversation.assigned_user?.id || null,
       line: lineName,
       line_id: lineId,
+      remarketing: conversation.remarketing ?? false,
     };
   });
 
@@ -769,6 +772,25 @@ router.get("/dashboard/report", requireAuth, requireModulePermission("dashboard"
   } catch (error) {
     console.error("[dashboard.report] Error:", error.message, error.stack);
     return res.status(500).json({ error: "report_generation_failed", details: error.message });
+  }
+});
+
+// PATCH /api/dashboard/table/row/:id — actualizar remarketing
+router.patch("/dashboard/table/row/:id", requireAuth, requireModulePermission("dashboard", "read"), async (req, res) => {
+  const { id } = req.params;
+  const remarketing = req.body?.remarketing;
+  if (typeof remarketing !== "boolean") {
+    return res.status(400).json({ error: "remarketing must be boolean" });
+  }
+  try {
+    await prisma.conversation.update({
+      where: { id },
+      data: { remarketing },
+    });
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("[dashboard.table.row.patch] Error:", error.message);
+    return res.status(500).json({ error: "update_failed" });
   }
 });
 

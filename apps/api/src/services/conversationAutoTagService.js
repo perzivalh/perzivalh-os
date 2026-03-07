@@ -3,74 +3,64 @@ const { normalizeText } = require("../lib/normalize");
 const { addTagToConversation } = require("./conversations");
 const audienceAutomationService = require("./audienceAutomationService");
 
-const PIE_ATLETA_TAG = "pie de atleta";
-const HONGOS_TAG = "hongos";
-
-const PIE_ATLETA_PHRASES = [
-  "pie de atleta",
-  "pie atleta",
-  "hongo entre los dedos",
-  "hongos entre los dedos",
-  "picazon entre los dedos",
-  "picazón entre los dedos",
-  "picazon en los pies",
-  "picazón en los pies",
-  "tinea pedis",
-  "tiña pedis",
-];
-
-const HONGOS_PHRASES = [
-  "onicomicosis",
-  "hongo en la una",
-  "hongo en la uña",
-  "hongo en unas",
-  "hongo en uñas",
-  "hongos en las unas",
-  "hongos en las uñas",
-  "unas con hongo",
-  "uñas con hongo",
-  "hongo",
-  "hongos",
-];
-
-const HONGOS_ROUTE_IDS = new Set([
-  "HONGOS_TIPO_TRAT",
-  "TRAT_TOPICO_INFO",
-  "TRAT_LASER_INFO",
-  "TRAT_SISTEMICO_INFO",
-]);
+const SERVICE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+let servicesCache = null;
+let servicesCacheAt = 0;
 
 function normalizeValue(value) {
   return normalizeText(value || "").toLowerCase().trim();
 }
 
-function includesAny(text, phrases) {
-  if (!text) return false;
-  return phrases.some((phrase) => text.includes(phrase));
+async function loadActiveServices() {
+  const now = Date.now();
+  if (servicesCache && now - servicesCacheAt < SERVICE_CACHE_TTL) {
+    return servicesCache;
+  }
+  try {
+    const services = await prisma.service.findMany({
+      where: { is_active: true },
+      select: { name: true, keywords: true },
+    });
+    servicesCache = services;
+    servicesCacheAt = now;
+    return services;
+  } catch (_) {
+    return servicesCache || [];
+  }
 }
 
-function deriveServiceTags({ text, routeId, reason } = {}) {
+async function deriveServiceTags({ text, routeId } = {}) {
   const normalizedText = normalizeValue(text);
-  const normalizedRouteId = String(routeId || "").trim();
-  const normalizedReason = String(reason || "").toLowerCase();
-
+  const normalizedRouteId = String(routeId || "").trim().toLowerCase();
   const tags = [];
 
-  if (
-    normalizedRouteId === "OTR_PIE_ATLETA_INFO" ||
-    includesAny(normalizedText, PIE_ATLETA_PHRASES)
-  ) {
-    tags.push(PIE_ATLETA_TAG);
-  }
+  const services = await loadActiveServices();
+  for (const svc of services) {
+    const tagName = svc.name.trim().toLowerCase();
+    if (!tagName) continue;
 
-  if (
-    normalizedRouteId === "HONGOS_TIPO_TRAT" ||
-    HONGOS_ROUTE_IDS.has(normalizedRouteId) ||
-    normalizedReason.includes("deterministic_domain_intent:hongos") ||
-    includesAny(normalizedText, HONGOS_PHRASES)
-  ) {
-    if (!tags.includes(HONGOS_TAG)) {
-      tags.push(HONGOS_TAG);
+    // Match by routeId containing part of the service name
+    if (normalizedRouteId && normalizedRouteId.includes(normalizeValue(svc.name))) {
+      if (!tags.includes(tagName)) tags.push(tagName);
+      continue;
+    }
+
+    // Match by service name in the message text
+    const nameNorm = normalizeValue(svc.name);
+    if (nameNorm && normalizedText.includes(nameNorm)) {
+      if (!tags.includes(tagName)) tags.push(tagName);
+      continue;
+    }
+
+    // Match by keywords (comma or semicolon separated)
+    if (svc.keywords) {
+      const kws = svc.keywords
+        .split(/[,;\n]+/)
+        .map((k) => normalizeValue(k))
+        .filter(Boolean);
+      if (kws.some((k) => k && normalizedText.includes(k))) {
+        if (!tags.includes(tagName)) tags.push(tagName);
+      }
     }
   }
 
@@ -114,7 +104,7 @@ async function applyAutoTagsToConversation({
     return { tags: [] };
   }
 
-  const tags = deriveServiceTags({ text, routeId, reason });
+  const tags = await deriveServiceTags({ text, routeId, reason });
   if (!tags.length) {
     return { tags: [] };
   }
@@ -172,4 +162,5 @@ module.exports = {
   deriveServiceTags,
   applyAutoTagsToConversation,
   applyAutoTagsByWaId,
+  invalidateServicesCache() { servicesCache = null; servicesCacheAt = 0; },
 };

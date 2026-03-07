@@ -735,7 +735,12 @@ function DashboardView({
                           : <span className="dash-muted">-</span>
                         }
                       </td>
-                      <td>{row.operator || <span className="dash-muted">Sin asignar</span>}</td>
+                      <td>
+                        {(row.operators && row.operators.length > 0)
+                          ? row.operators.join(", ")
+                          : (row.operator || <span className="dash-muted">Sin asignar</span>)
+                        }
+                      </td>
                       <td>{row.line || <span className="dash-muted">-</span>}</td>
                       <td>
                         <select

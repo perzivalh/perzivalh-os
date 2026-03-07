@@ -661,6 +661,7 @@ select.dash-filter:focus {
   flex-wrap: wrap;
   gap: 0.25rem;
   align-items: center;
+  min-width: 130px;
 }
 
 .dash-tag-chip {

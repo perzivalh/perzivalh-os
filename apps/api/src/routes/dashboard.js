@@ -608,7 +608,7 @@ async function buildDashboardTablePayload({
   ]);
 
   const conversationIds = conversations.map((conversation) => conversation.id);
-  const [outboundRows, callRows] = await Promise.all([
+  const [outboundRows, callRows, manualOpRows] = await Promise.all([
     conversationIds.length
       ? prisma.message.findMany({
         where: {
@@ -629,10 +629,41 @@ async function buildDashboardTablePayload({
         distinct: ["conversation_id"],
       })
       : [],
+    conversationIds.length
+      ? prisma.$queryRaw`
+          SELECT m.conversation_id, m.raw_json->>'by_user_id' AS user_id
+          FROM "Message" m
+          WHERE m.conversation_id = ANY(${conversationIds})
+            AND m.direction = 'out'
+            AND m.raw_json->>'source' = 'panel'
+            AND m.raw_json->>'by_user_id' IS NOT NULL
+          GROUP BY m.conversation_id, m.raw_json->>'by_user_id'
+        `
+      : [],
   ]);
 
   const outboundSet = new Set(outboundRows.map((row) => row.conversation_id));
   const callSet = new Set(callRows.map((row) => row.conversation_id));
+
+  // Build per-conversation operator list from manual messages
+  const manualUserIds = [...new Set((manualOpRows || []).map((r) => r.user_id).filter(Boolean))];
+  const manualUsers = manualUserIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: manualUserIds } },
+        select: { id: true, name: true },
+      })
+    : [];
+  const userNameById = new Map(manualUsers.map((u) => [u.id, u.name]));
+
+  const convManualOps = new Map();
+  for (const row of manualOpRows || []) {
+    const name = userNameById.get(row.user_id);
+    if (!name) continue;
+    if (!convManualOps.has(row.conversation_id)) convManualOps.set(row.conversation_id, []);
+    if (!convManualOps.get(row.conversation_id).includes(name)) {
+      convManualOps.get(row.conversation_id).push(name);
+    }
+  }
 
   const rows = conversations.map((conversation) => {
     const allTagNames = (conversation.tags || [])
@@ -641,6 +672,12 @@ async function buildDashboardTablePayload({
     const lineId = conversation.phone_number_id || null;
     const lineName = lineId ? (lineNameMap.get(lineId) || null) : null;
     const phone = conversation.phone_e164 || conversation.wa_id || "-";
+
+    const manualOps = convManualOps.get(conversation.id) || [];
+    const assignedName = conversation.assigned_user?.name;
+    const allOperators = assignedName && !manualOps.includes(assignedName)
+      ? [...manualOps, assignedName]
+      : manualOps;
 
     return {
       id: conversation.id,
@@ -651,8 +688,9 @@ async function buildDashboardTablePayload({
       message: outboundSet.has(conversation.id),
       tags: allTagNames,
       tag: allTagNames[0] || null,
-      operator: conversation.assigned_user?.name || null,
+      operator: allOperators[0] || conversation.assigned_user?.name || null,
       operator_id: conversation.assigned_user?.id || null,
+      operators: allOperators,
       line: lineName,
       line_id: lineId,
       remarketing: conversation.remarketing ?? false,

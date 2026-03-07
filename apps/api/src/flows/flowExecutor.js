@@ -2,7 +2,7 @@
  * Flow Executor Dynamic
  * Ejecuta flows definidos en JSON/JS sin logica hardcodeada
  */
-const { sendText, sendButtons, sendList, sendImage, sendVideo, sendLocation, sendTypingIndicator } = require("../whatsapp");
+const { sendText, sendButtons, sendList, sendImage, sendVideo, sendLocation } = require("../whatsapp");
 const logger = require("../lib/logger");
 const { normalizeText } = require("../lib/normalize");
 const sessionStore = require("../sessionStore");
@@ -349,7 +349,6 @@ async function sendNode(waId, flow, node, visited) {
         ? Math.round(node.delaySeconds * 1000)
         : 0;
   if (delayMs > 0) {
-    void sendTypingIndicator(waId, delayMs);
     await sleep(delayMs);
   }
 
@@ -400,7 +399,6 @@ async function sendNode(waId, flow, node, visited) {
     // Some WhatsApp mobile clients render multiline video captions with broken layout.
     sendResult = await sendVideo(waId, mediaUrl, null);
     if (nodeText.trim().length > 0) {
-      void sendTypingIndicator(waId, VIDEO_TEXT_FOLLOWUP_DELAY_MS);
       await sleep(VIDEO_TEXT_FOLLOWUP_DELAY_MS);
       const followupResult = await sendText(waId, nodeText);
       if (!followupResult?.ok) {
@@ -473,7 +471,6 @@ async function sendNode(waId, flow, node, visited) {
       }
       const autoAdvanceDelayMs = getAutoAdvanceDelayMs(node, mediaType);
       if (autoAdvanceDelayMs > 0) {
-        void sendTypingIndicator(waId, autoAdvanceDelayMs);
         await sleep(autoAdvanceDelayMs);
       }
       await sendNode(waId, flow, nextNode, visited);
@@ -667,7 +664,6 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
         await sessionStore.updateSession(waId, lineId, {
           data: { last_sent_text: aiText },
         });
-        void sendTypingIndicator(waId, 800);
         await sleep(800);
       }
 

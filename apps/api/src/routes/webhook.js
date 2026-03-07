@@ -10,7 +10,7 @@ const prisma = require("../db");
 const logger = require("../lib/logger");
 const { redactObject } = require("../lib/sanitize");
 const { normalizeText, digitsOnly, toPhoneE164 } = require("../lib/normalize");
-const { parseInteractiveSelection, sendText } = require("../whatsapp");
+const { parseInteractiveSelection, sendText, markAsRead } = require("../whatsapp");
 const { handleIncomingText, handleInteractive } = require("../flows");
 const { executeDynamicFlow, executeDynamicInteractive } = require("../flows/flowExecutor");
 const sessionStore = require("../sessionStore");
@@ -398,6 +398,9 @@ router.post("/webhook", async (req, res) => {
                         if (settings && (!settings.bot_enabled || !settings.auto_reply_enabled)) {
                             continue;
                         }
+
+                        // Mark message as read so user sees blue ticks while bot processes
+                        void markAsRead(message.id);
 
                         if (conversation.status === "pending" || conversation.status === "assigned") {
                             if (normalized === "bot") {

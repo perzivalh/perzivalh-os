@@ -110,6 +110,41 @@ function getWhatsAppUrl(phoneNumberId) {
   return `https://graph.facebook.com/v22.0/${phoneNumberId}/messages`;
 }
 
+async function markAsRead(messageId, options = {}) {
+  const { token, phoneNumberId } = getWhatsAppConfig(options);
+  const url = getWhatsAppUrl(phoneNumberId);
+  if (!token || !url || !messageId) return;
+  try {
+    await axios.post(
+      url,
+      { messaging_product: "whatsapp", status: "read", message_id: messageId },
+      { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, timeout: 4000 }
+    );
+  } catch (_) {
+    // fire-and-forget
+  }
+}
+
+async function sendTypingIndicator(to, durationMs = 5000, options = {}) {
+  const { token, phoneNumberId } = getWhatsAppConfig(options);
+  const url = getWhatsAppUrl(phoneNumberId);
+  if (!token || !url || !to) return;
+  try {
+    await axios.post(
+      url,
+      {
+        messaging_product: "whatsapp",
+        to,
+        type: "text",
+        typing_indicator: { type: "text", duration: Math.min(durationMs, 10000) },
+      },
+      { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, timeout: 4000 }
+    );
+  } catch (_) {
+    // fire-and-forget — silently ignore if API doesn't support it
+  }
+}
+
 async function sendWhatsAppMessage(payload, options = {}) {
   const { token, phoneNumberId } = getWhatsAppConfig(options);
   const url = getWhatsAppUrl(phoneNumberId);
@@ -475,4 +510,6 @@ module.exports = {
   sendTemplate,
   parseInteractiveSelection,
   sendInteractiveList: sendList,
+  markAsRead,
+  sendTypingIndicator,
 };

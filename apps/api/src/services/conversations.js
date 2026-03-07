@@ -46,7 +46,7 @@ function formatConversation(record) {
   }
   return {
     ...record,
-    tags: (record.tags || []).map((entry) => entry.tag),
+    tags: (record.tags || []).map((entry) => entry.tag).filter(Boolean),
   };
 }
 

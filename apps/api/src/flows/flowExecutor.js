@@ -337,9 +337,29 @@ async function applyFlowAutoTags({
   }
 }
 
+async function applyNodeTag(waId, tagName) {
+  const phoneNumberId = getCurrentLineId();
+  if (!waId || !phoneNumberId || !tagName) return;
+  try {
+    const conversation = await prisma.conversation.findUnique({
+      where: { wa_id_phone_number_id: { wa_id: waId, phone_number_id: phoneNumberId } },
+      select: { id: true },
+    });
+    if (!conversation) return;
+    await addTagToConversation({ conversationId: conversation.id, tagName });
+  } catch (error) {
+    logger.warn("flow.node_tag_failed", { waId, tagName, error: error.message || String(error) });
+  }
+}
+
 async function sendNode(waId, flow, node, visited) {
   if (!node) {
     return;
+  }
+
+  // Apply node-specific tag if defined (fire-and-forget)
+  if (node.tag) {
+    void applyNodeTag(waId, String(node.tag).trim().toLowerCase());
   }
 
   const delayMs =

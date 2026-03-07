@@ -345,6 +345,7 @@ module.exports = {
     {
       "id": "HORARIOS_INFO",
       "type": "text",
+      "tags": ["horas", "ubicacion"],
       "text": "*CENTRAL*",
       "next": "HORARIOS_CENTRAL_HORARIO_IMG"
     },
@@ -430,6 +431,7 @@ module.exports = {
     {
       "id": "PRECIOS_INFO",
       "type": "text",
+      "tags": ["precios"],
       "text": "💰 Precios *PODOPIE*\n\nTe comparto nuestro tarifario general.\n\n*¿Quieres que te ayude a elegir el servicio adecuado?*",
       "next": "PRECIOS_IMG_1"
     },
@@ -493,6 +495,7 @@ module.exports = {
     {
       "id": "SERVICIOS_MENU",
       "type": "text",
+      "tags": [],
       "text": "¿Con cuál de nuestros servicios puedo ayudarte? 👇",
       "delayMs": 2500,
       "buttons": [
@@ -525,6 +528,7 @@ module.exports = {
     {
       "id": "UNERO_TIPO_TRAT",
       "type": "text",
+      "tags": ["unero"],
       "text": "Información de Uñero",
       "next": "UNERO_INFO_1"
     },
@@ -586,6 +590,7 @@ module.exports = {
     {
       "id": "HONGOS_TIPO_TRAT",
       "type": "text",
+      "tags": ["hongos"],
       "text": "Información de Hongos",
       "next": "HONGOS_INFO_1"
     },
@@ -660,6 +665,7 @@ module.exports = {
     {
       "id": "TRAT_MATRICECTOMIA_INFO",
       "type": "text",
+      "tags": ["unero", "matricectomia"],
       "text": "Información de tratamiento: Matricectomía",
       "next": "TRAT_MATRICECTOMIA_STEP_1"
     },
@@ -717,6 +723,7 @@ module.exports = {
     {
       "id": "TRAT_ORTESIS_INFO",
       "type": "text",
+      "tags": ["unero", "ortesis"],
       "text": "Información de tratamiento: Ortesis",
       "next": "TRAT_ORTESIS_STEP_1"
     },
@@ -761,6 +768,7 @@ module.exports = {
     {
       "id": "TRAT_TOPICO_INFO",
       "type": "text",
+      "tags": ["hongos", "topico"],
       "text": "Información de tratamiento: Tópico",
       "next": "TRAT_TOPICO_STEP_1"
     },
@@ -805,6 +813,7 @@ module.exports = {
     {
       "id": "TRAT_LASER_INFO",
       "type": "text",
+      "tags": ["hongos", "laser"],
       "text": "Información de tratamiento: Láser",
       "next": "TRAT_LASER_STEP_1"
     },
@@ -870,6 +879,7 @@ module.exports = {
     {
       "id": "TRAT_SISTEMICO_INFO",
       "type": "text",
+      "tags": ["hongos", "sistemico"],
       "text": "Información de tratamiento: Sistémico",
       "next": "TRAT_SISTEMICO_STEP_1"
     },
@@ -914,6 +924,7 @@ module.exports = {
     {
       "id": "SVC_PEDICURE_INFO",
       "type": "text",
+      "tags": ["pedicure"],
       "text": "Información de Pedicura Clínica",
       "next": "SVC_PEDICURE_STEP_1"
     },
@@ -986,6 +997,7 @@ module.exports = {
     {
       "id": "SVC_PODOPEDIATRIA_INFO",
       "type": "text",
+      "tags": ["podopediatria"],
       "text": "Información de Podopediatría",
       "next": "SVC_PODOPEDIATRIA_STEP_1"
     },
@@ -1057,6 +1069,7 @@ module.exports = {
     {
       "id": "SVC_PODOGERIATRIA_INFO",
       "type": "text",
+      "tags": ["podogeriatria"],
       "text": "Información de Podogeriatría",
       "next": "SVC_PODOGERIATRIA_STEP_1"
     },
@@ -1151,6 +1164,7 @@ module.exports = {
     {
       "id": "OTR_CALLOSIDAD_INFO",
       "type": "text",
+      "tags": ["callosidades"],
       "text": "Información de Callosidad",
       "next": "OTR_CALLOSIDAD_STEP_1"
     },
@@ -1209,6 +1223,7 @@ module.exports = {
     {
       "id": "OTR_VERRUGA_PLANTAR_INFO",
       "type": "text",
+      "tags": ["verruga_plantar"],
       "text": "*Verruga Plantar*",
       "next": "OTR_VERRUGA_STEP_1"
     },
@@ -1266,6 +1281,7 @@ module.exports = {
     {
       "id": "OTR_HELOMA_INFO",
       "type": "text",
+      "tags": ["heloma"],
       "text": "Información de Heloma",
       "next": "OTR_HELOMA_STEP_1"
     },
@@ -1303,6 +1319,7 @@ module.exports = {
     {
       "id": "OTR_EXTRACCION_UNA_INFO",
       "type": "text",
+      "tags": ["extraccion_una"],
       "text": "Información de Extracción de Uña",
       "next": "OTR_EXTRACCION_STEP_1"
     },
@@ -1359,6 +1376,7 @@ module.exports = {
     {
       "id": "OTR_PIE_ATLETA_INFO",
       "type": "text",
+      "tags": ["pie_de_atleta"],
       "text": "Información de Pie de Atleta",
       "next": "OTR_PIE_ATLETA_STEP_1"
     },
@@ -1403,6 +1421,7 @@ module.exports = {
     {
       "id": "OTR_PIE_DIABETICO_INFO",
       "type": "text",
+      "tags": ["pie_diabetico"],
       "text": "Información de Pie Diabético",
       "next": "OTR_PIE_DIABETICO_STEP_1"
     },
@@ -1461,6 +1480,7 @@ module.exports = {
     {
       "id": "CONTACT_METHOD",
       "type": "text",
+      "tags": ["contact"],
       "text": "Selección de forma de atención",
       "delayMs": 2500,
       "buttons": [

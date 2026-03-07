@@ -38,6 +38,7 @@ model Channel {
   provider         String   @default("whatsapp")
   phone_number_id  String   @unique
   display_name     String?
+  line_number      String?
   waba_id          String?
   verify_token     String
   wa_token_encrypted String

@@ -11,6 +11,11 @@ function normalizeValue(value) {
   return normalizeText(value || "").toLowerCase().trim();
 }
 
+function normalizeTagNames(tags) {
+  const values = Array.isArray(tags) ? tags : [tags];
+  return [...new Set(values.map((tag) => normalizeValue(tag)).filter(Boolean))];
+}
+
 async function loadActiveServices() {
   const now = Date.now();
   if (servicesCache && now - servicesCacheAt < SERVICE_CACHE_TTL) {
@@ -93,6 +98,35 @@ async function ensureDynamicAudienceIfEnabled({
   });
 }
 
+async function applyNamedTagsToConversation({
+  conversationId,
+  phoneNumberId,
+  tags,
+} = {}) {
+  if (!conversationId) {
+    return { tags: [] };
+  }
+
+  const normalizedTags = normalizeTagNames(tags);
+  if (!normalizedTags.length) {
+    return { tags: [] };
+  }
+
+  for (const tagName of normalizedTags) {
+    await addTagToConversation({
+      conversationId,
+      tagName,
+      userId: null,
+    });
+    await ensureDynamicAudienceIfEnabled({
+      phoneNumberId,
+      tagName,
+    });
+  }
+
+  return { tags: normalizedTags };
+}
+
 async function applyAutoTagsToConversation({
   conversationId,
   phoneNumberId,
@@ -105,23 +139,41 @@ async function applyAutoTagsToConversation({
   }
 
   const tags = await deriveServiceTags({ text, routeId, reason });
-  if (!tags.length) {
+  return applyNamedTagsToConversation({
+    conversationId,
+    phoneNumberId,
+    tags,
+  });
+}
+
+async function applyNamedTagsByWaId({
+  waId,
+  phoneNumberId,
+  tags,
+} = {}) {
+  if (!waId || !phoneNumberId) {
     return { tags: [] };
   }
 
-  for (const tagName of tags) {
-    await addTagToConversation({
-      conversationId,
-      tagName,
-      userId: null,
-    });
-    await ensureDynamicAudienceIfEnabled({
-      phoneNumberId,
-      tagName,
-    });
+  const conversation = await prisma.conversation.findUnique({
+    where: {
+      wa_id_phone_number_id: {
+        wa_id: waId,
+        phone_number_id: phoneNumberId,
+      },
+    },
+    select: { id: true, phone_number_id: true },
+  });
+
+  if (!conversation) {
+    return { tags: [] };
   }
 
-  return { tags };
+  return applyNamedTagsToConversation({
+    conversationId: conversation.id,
+    phoneNumberId: conversation.phone_number_id || phoneNumberId,
+    tags,
+  });
 }
 
 async function applyAutoTagsByWaId({
@@ -160,6 +212,8 @@ async function applyAutoTagsByWaId({
 
 module.exports = {
   deriveServiceTags,
+  applyNamedTagsToConversation,
+  applyNamedTagsByWaId,
   applyAutoTagsToConversation,
   applyAutoTagsByWaId,
   invalidateServicesCache() { servicesCache = null; servicesCacheAt = 0; },

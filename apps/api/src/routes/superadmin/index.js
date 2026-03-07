@@ -185,6 +185,7 @@ router.get("/tenants/:id/details", requireAuth, requireSuperAdmin, async (req, r
                 provider: ch.provider,
                 phone_number_id: ch.phone_number_id,
                 display_name: ch.display_name || null,
+                line_number: ch.line_number || null,
                 waba_id: ch.waba_id || null,
                 verify_token: ch.verify_token,
                 is_active: ch.is_active,
@@ -201,6 +202,7 @@ router.get("/tenants/:id/details", requireAuth, requireSuperAdmin, async (req, r
                 provider: channel.provider,
                 phone_number_id: channel.phone_number_id,
                 display_name: channel.display_name || null,
+                line_number: channel.line_number || null,
                 waba_id: channel.waba_id || null,
                 verify_token: channel.verify_token,
                 wa_token: channel.wa_token_encrypted
@@ -419,6 +421,7 @@ router.get("/channels", requireAuth, requireSuperAdmin, async (req, res) => {
             provider: channel.provider,
             phone_number_id: channel.phone_number_id,
             display_name: channel.display_name || null,
+            line_number: channel.line_number || null,
             waba_id: channel.waba_id || null,
             verify_token: channel.verify_token || null,
             is_active: channel.is_active,
@@ -433,6 +436,7 @@ router.post("/channels", requireAuth, requireSuperAdmin, async (req, res) => {
     const tenantId = req.body?.tenant_id;
     const phoneNumberId = (req.body?.phone_number_id || "").trim();
     const displayName = (req.body?.display_name || "").trim();
+    const lineNumber = (req.body?.line_number || "").trim();
     const wabaId = (req.body?.waba_id || "").trim();
     const verifyToken = (req.body?.verify_token || "").trim();
     const waToken = (req.body?.wa_token || "").trim();
@@ -447,6 +451,7 @@ router.post("/channels", requireAuth, requireSuperAdmin, async (req, res) => {
             provider: "whatsapp",
             phone_number_id: phoneNumberId,
             display_name: displayName || null,
+            line_number: lineNumber || null,
             waba_id: wabaId || null,
             verify_token: verifyToken,
             wa_token_encrypted: encryptString(waToken),
@@ -488,6 +493,7 @@ router.post("/channels", requireAuth, requireSuperAdmin, async (req, res) => {
             provider: channel.provider,
             phone_number_id: channel.phone_number_id,
             display_name: channel.display_name || null,
+            line_number: channel.line_number || null,
             waba_id: channel.waba_id || null,
             verify_token: channel.verify_token || null,
             is_active: channel.is_active,
@@ -506,6 +512,10 @@ router.patch("/channels/:id", requireAuth, requireSuperAdmin, async (req, res) =
     if (req.body?.display_name !== undefined) {
         const raw = String(req.body.display_name || "").trim();
         updates.display_name = raw || null;
+    }
+    if (req.body?.line_number !== undefined) {
+        const raw = String(req.body.line_number || "").trim();
+        updates.line_number = raw || null;
     }
     if (req.body?.verify_token) {
         updates.verify_token = String(req.body.verify_token).trim();
@@ -572,6 +582,7 @@ router.patch("/channels/:id", requireAuth, requireSuperAdmin, async (req, res) =
             provider: channel.provider,
             phone_number_id: channel.phone_number_id,
             display_name: channel.display_name || null,
+            line_number: channel.line_number || null,
             waba_id: channel.waba_id || null,
             verify_token: channel.verify_token || null,
             is_active: channel.is_active,

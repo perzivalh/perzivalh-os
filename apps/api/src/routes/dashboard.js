@@ -130,7 +130,14 @@ function buildCallSignalCondition() {
   };
 }
 
-async function getLineNameMap(user) {
+function buildLineLabel(line) {
+  if (!line) {
+    return null;
+  }
+  return line.line_number || line.display_name || line.phone_number_id || null;
+}
+
+async function getLineMetadataMap(user) {
   const map = new Map();
   if (!process.env.CONTROL_DB_URL || !user?.tenant_id) {
     return map;
@@ -146,6 +153,7 @@ async function getLineNameMap(user) {
       select: {
         phone_number_id: true,
         display_name: true,
+        line_number: true,
       },
     });
 
@@ -153,13 +161,114 @@ async function getLineNameMap(user) {
       if (!channel?.phone_number_id) {
         continue;
       }
-      map.set(channel.phone_number_id, channel.display_name || channel.phone_number_id);
+      map.set(channel.phone_number_id, {
+        phone_number_id: channel.phone_number_id,
+        display_name: channel.display_name || null,
+        line_number: channel.line_number || null,
+        label: buildLineLabel(channel),
+      });
     }
   } catch (error) {
     // If control DB is unavailable for a tenant, table still works with phone_number_id.
   }
 
   return map;
+}
+
+async function findConversationIdsHandledByOperator(operatorId) {
+  const normalizedOperatorId = String(operatorId || "").trim();
+  if (!normalizedOperatorId) {
+    return [];
+  }
+
+  const [messageRows, auditRows] = await Promise.all([
+    prisma.$queryRaw`
+      SELECT DISTINCT m.conversation_id
+      FROM "Message" m
+      WHERE m.direction = 'out'
+        AND m.raw_json->>'source' = 'panel'
+        AND m.raw_json->>'by_user_id' = ${normalizedOperatorId}
+    `,
+    prisma.$queryRaw`
+      SELECT DISTINCT (a.data_json->>'conversation_id') AS conversation_id
+      FROM "AuditLog" a
+      WHERE a.action = 'conversation.assigned'
+        AND COALESCE(
+          NULLIF(a.data_json->>'to', ''),
+          NULLIF(a.data_json->>'by_user_id', ''),
+          a.user_id
+        ) = ${normalizedOperatorId}
+        AND COALESCE(a.data_json->>'conversation_id', '') <> ''
+    `,
+  ]);
+
+  return [...new Set(
+    [...(messageRows || []), ...(auditRows || [])]
+      .map((row) => row?.conversation_id)
+      .filter(Boolean)
+  )];
+}
+
+async function getLatestOperatorEventMap(conversationIds) {
+  if (!Array.isArray(conversationIds) || !conversationIds.length) {
+    return new Map();
+  }
+
+  const latestRows = await prisma.$queryRaw`
+    SELECT DISTINCT ON (event.conversation_id)
+      event.conversation_id,
+      event.user_id,
+      event.created_at
+    FROM (
+      SELECT
+        m.conversation_id,
+        m.raw_json->>'by_user_id' AS user_id,
+        m.created_at
+      FROM "Message" m
+      WHERE m.conversation_id = ANY(${conversationIds})
+        AND m.direction = 'out'
+        AND m.raw_json->>'source' = 'panel'
+        AND COALESCE(m.raw_json->>'by_user_id', '') <> ''
+
+      UNION ALL
+
+      SELECT
+        (a.data_json->>'conversation_id') AS conversation_id,
+        COALESCE(
+          NULLIF(a.data_json->>'to', ''),
+          NULLIF(a.data_json->>'by_user_id', ''),
+          a.user_id
+        ) AS user_id,
+        a.created_at
+      FROM "AuditLog" a
+      WHERE a.action = 'conversation.assigned'
+        AND (a.data_json->>'conversation_id') = ANY(${conversationIds})
+    ) AS event
+    WHERE COALESCE(event.user_id, '') <> ''
+    ORDER BY event.conversation_id, event.created_at DESC
+  `;
+
+  const userIds = [...new Set((latestRows || []).map((row) => row?.user_id).filter(Boolean))];
+  const users = userIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, name: true },
+      })
+    : [];
+  const userNameById = new Map(users.map((user) => [user.id, user.name]));
+
+  return new Map(
+    (latestRows || [])
+      .filter((row) => row?.conversation_id)
+      .map((row) => [
+        row.conversation_id,
+        {
+          user_id: row.user_id || null,
+          name: userNameById.get(row.user_id) || null,
+          created_at: row.created_at || null,
+        },
+      ])
+  );
 }
 
 function buildConversationOrderBy(sortByRaw, sortOrderRaw) {
@@ -479,7 +588,7 @@ async function buildDashboardTablePayload({
     ? EXPORT_MAX_ROWS
     : parsePageSize(query.page_size, TABLE_PAGE_SIZE_DEFAULT);
 
-  const lineNameMap = await getLineNameMap(user);
+  const lineMetadataMap = await getLineMetadataMap(user);
   const where = {
     created_at: {
       gte: startDate,
@@ -505,7 +614,13 @@ async function buildDashboardTablePayload({
     if (operatorId === "unassigned") {
       andConditions.push({ assigned_user_id: null });
     } else {
-      andConditions.push({ assigned_user_id: operatorId });
+      const historicalConversationIds = await findConversationIdsHandledByOperator(operatorId);
+      andConditions.push({
+        OR: [
+          { assigned_user_id: operatorId },
+          ...(historicalConversationIds.length ? [{ id: { in: historicalConversationIds } }] : []),
+        ],
+      });
     }
   }
 
@@ -541,8 +656,16 @@ async function buildDashboardTablePayload({
   if (search) {
     const matchedLineIds = [];
     const searchLc = search.toLowerCase();
-    for (const [lineId, lineName] of lineNameMap.entries()) {
-      if (String(lineName || "").toLowerCase().includes(searchLc)) {
+    for (const [lineId, lineMeta] of lineMetadataMap.entries()) {
+      const haystack = [
+        lineMeta?.label || "",
+        lineMeta?.display_name || "",
+        lineMeta?.line_number || "",
+        lineId || "",
+      ]
+        .join(" ")
+        .toLowerCase();
+      if (haystack.includes(searchLc)) {
         matchedLineIds.push(lineId);
       }
     }
@@ -608,7 +731,7 @@ async function buildDashboardTablePayload({
   ]);
 
   const conversationIds = conversations.map((conversation) => conversation.id);
-  const [outboundRows, callRows, manualOpRows] = await Promise.all([
+  const [outboundRows, callRows, latestOperatorEvents] = await Promise.all([
     conversationIds.length
       ? prisma.message.findMany({
         where: {
@@ -629,55 +752,20 @@ async function buildDashboardTablePayload({
         distinct: ["conversation_id"],
       })
       : [],
-    conversationIds.length
-      ? prisma.$queryRaw`
-          SELECT m.conversation_id, m.raw_json->>'by_user_id' AS user_id
-          FROM "Message" m
-          WHERE m.conversation_id = ANY(${conversationIds})
-            AND m.direction = 'out'
-            AND m.raw_json->>'source' = 'panel'
-            AND m.raw_json->>'by_user_id' IS NOT NULL
-          GROUP BY m.conversation_id, m.raw_json->>'by_user_id'
-        `
-      : [],
+    getLatestOperatorEventMap(conversationIds),
   ]);
 
   const outboundSet = new Set(outboundRows.map((row) => row.conversation_id));
   const callSet = new Set(callRows.map((row) => row.conversation_id));
-
-  // Build per-conversation operator list from manual messages
-  const manualUserIds = [...new Set((manualOpRows || []).map((r) => r.user_id).filter(Boolean))];
-  const manualUsers = manualUserIds.length
-    ? await prisma.user.findMany({
-        where: { id: { in: manualUserIds } },
-        select: { id: true, name: true },
-      })
-    : [];
-  const userNameById = new Map(manualUsers.map((u) => [u.id, u.name]));
-
-  const convManualOps = new Map();
-  for (const row of manualOpRows || []) {
-    const name = userNameById.get(row.user_id);
-    if (!name) continue;
-    if (!convManualOps.has(row.conversation_id)) convManualOps.set(row.conversation_id, []);
-    if (!convManualOps.get(row.conversation_id).includes(name)) {
-      convManualOps.get(row.conversation_id).push(name);
-    }
-  }
 
   const rows = conversations.map((conversation) => {
     const allTagNames = (conversation.tags || [])
       .map((t) => t.tag?.name)
       .filter(Boolean);
     const lineId = conversation.phone_number_id || null;
-    const lineName = lineId ? (lineNameMap.get(lineId) || null) : null;
+    const lineMeta = lineId ? (lineMetadataMap.get(lineId) || null) : null;
     const phone = conversation.phone_e164 || conversation.wa_id || "-";
-
-    const manualOps = convManualOps.get(conversation.id) || [];
-    const assignedName = conversation.assigned_user?.name;
-    const allOperators = assignedName && !manualOps.includes(assignedName)
-      ? [...manualOps, assignedName]
-      : manualOps;
+    const latestOperator = latestOperatorEvents.get(conversation.id) || null;
 
     return {
       id: conversation.id,
@@ -688,10 +776,9 @@ async function buildDashboardTablePayload({
       message: outboundSet.has(conversation.id),
       tags: allTagNames,
       tag: allTagNames[0] || null,
-      operator: allOperators[0] || conversation.assigned_user?.name || null,
-      operator_id: conversation.assigned_user?.id || null,
-      operators: allOperators,
-      line: lineName,
+      operator: latestOperator?.name || conversation.assigned_user?.name || null,
+      operator_id: latestOperator?.user_id || conversation.assigned_user?.id || null,
+      line: lineMeta?.label || lineId || null,
       line_id: lineId,
       remarketing: conversation.remarketing ?? false,
     };

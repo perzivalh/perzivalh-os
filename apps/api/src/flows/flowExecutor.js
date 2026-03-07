@@ -10,7 +10,7 @@ const prisma = require("../db");
 const { getTenantContext } = require("../tenancy/tenantContext");
 const { setConversationStatus, addTagToConversation } = require("../services/conversations");
 const { routeWithAI } = require("../services/aiRouter");
-const { applyAutoTagsByWaId } = require("../services/conversationAutoTagService");
+const { applyAutoTagsByWaId, applyNamedTagsByWaId } = require("../services/conversationAutoTagService");
 
 const MAX_LIST_TITLE = 24;
 const BUTTON_TITLE_LIMIT = 20;
@@ -309,16 +309,128 @@ async function setConversationToPending(waId) {
   });
 }
 
+function normalizeTagNames(tagNames) {
+  const values = Array.isArray(tagNames) ? tagNames : [tagNames];
+  return [...new Set(values.map((value) => normalizeLabel(value)).filter(Boolean))];
+}
+
+function getNodeById(flow, nodeId) {
+  if (!nodeId || !Array.isArray(flow?.nodes)) {
+    return null;
+  }
+  return flow.nodes.find((node) => node?.id === nodeId) || null;
+}
+
+function hasExplicitTagConfig(node) {
+  if (!node || typeof node !== "object") {
+    return false;
+  }
+
+  return [
+    "tag",
+    "tags",
+    "auto_tag",
+    "auto_tags",
+    "autoTag",
+    "autoTags",
+  ].some((key) => Object.prototype.hasOwnProperty.call(node, key));
+}
+
+function getConfiguredTagsFromNode(node) {
+  if (!hasExplicitTagConfig(node)) {
+    return null;
+  }
+
+  return normalizeTagNames([
+    ...(Array.isArray(node.tags) ? node.tags : []),
+    ...(Array.isArray(node.auto_tags) ? node.auto_tags : []),
+    ...(Array.isArray(node.autoTags) ? node.autoTags : []),
+    node.tag,
+    node.auto_tag,
+    node.autoTag,
+  ]);
+}
+
+function extractTagFromReason(reason) {
+  const raw = String(reason || "").trim();
+  if (!raw || !raw.includes(":")) {
+    return null;
+  }
+  const candidate = raw.split(":").pop().trim();
+  if (!candidate) {
+    return null;
+  }
+  return candidate.replace(/^hours_service_override_/, "");
+}
+
+function getLegacyIntentTagsForNode(flow, nodeId, reason) {
+  if (!nodeId || !flow?.ai) {
+    return [];
+  }
+
+  const deterministicIntents = Array.isArray(flow.ai.deterministic_intents)
+    ? flow.ai.deterministic_intents
+    : [];
+  const hourIntents = Array.isArray(flow.ai.hours_qualified_service_intents)
+    ? flow.ai.hours_qualified_service_intents
+    : [];
+  const reasonTag = normalizeTagNames(extractTagFromReason(reason))[0] || null;
+
+  if (reasonTag) {
+    const reasonMatchedTags = normalizeTagNames([
+      ...deterministicIntents
+        .filter((intent) => intent?.routeId === nodeId && normalizeLabel(intent.intent) === reasonTag)
+        .map((intent) => intent.intent),
+      ...hourIntents
+        .filter((intent) => intent?.routeId === nodeId)
+        .map((intent) => intent.intent?.replace(/^hours_service_override_/, ""))
+        .filter((intent) => normalizeLabel(intent) === reasonTag),
+    ]);
+    if (reasonMatchedTags.length) {
+      return reasonMatchedTags;
+    }
+  }
+
+  return normalizeTagNames([
+    ...deterministicIntents
+      .filter((intent) => intent?.routeId === nodeId)
+      .map((intent) => intent.intent),
+    ...hourIntents
+      .filter((intent) => intent?.routeId === nodeId)
+      .map((intent) => intent.intent?.replace(/^hours_service_override_/, "")),
+  ]);
+}
+
+function getTagsForNode(flow, nodeId, reason) {
+  const configuredTags = getConfiguredTagsFromNode(getNodeById(flow, nodeId));
+  if (configuredTags !== null) {
+    return configuredTags;
+  }
+  return getLegacyIntentTagsForNode(flow, nodeId, reason);
+}
+
 async function applyFlowAutoTags({
   waId,
   text,
   routeId,
   reason,
+  flow,
 } = {}) {
   const phoneNumberId = getCurrentLineId();
   if (!waId || !phoneNumberId) {
     return;
   }
+
+  // Primary: derive tags from flow node metadata, with legacy intent mapping fallback.
+  if (flow && routeId) {
+    const tags = getTagsForNode(flow, routeId, reason);
+    if (tags.length) {
+      await applyNodeTags(waId, tags);
+      return;
+    }
+  }
+
+  // Fallback: DB service keyword matching
   try {
     await applyAutoTagsByWaId({
       waId,
@@ -337,18 +449,22 @@ async function applyFlowAutoTags({
   }
 }
 
-async function applyNodeTag(waId, tagName) {
+async function applyNodeTags(waId, tagNames) {
   const phoneNumberId = getCurrentLineId();
-  if (!waId || !phoneNumberId || !tagName) return;
+  const tags = normalizeTagNames(tagNames);
+  if (!waId || !phoneNumberId || !tags.length) return;
   try {
-    const conversation = await prisma.conversation.findUnique({
-      where: { wa_id_phone_number_id: { wa_id: waId, phone_number_id: phoneNumberId } },
-      select: { id: true },
+    await applyNamedTagsByWaId({
+      waId,
+      phoneNumberId,
+      tags,
     });
-    if (!conversation) return;
-    await addTagToConversation({ conversationId: conversation.id, tagName });
   } catch (error) {
-    logger.warn("flow.node_tag_failed", { waId, tagName, error: error.message || String(error) });
+    logger.warn("flow.node_tag_failed", {
+      waId,
+      tags,
+      error: error.message || String(error),
+    });
   }
 }
 
@@ -357,9 +473,10 @@ async function sendNode(waId, flow, node, visited) {
     return;
   }
 
-  // Apply node-specific tag if defined (fire-and-forget)
-  if (node.tag) {
-    void applyNodeTag(waId, String(node.tag).trim().toLowerCase());
+  // Apply node-specific tags if defined (fire-and-forget).
+  const nodeTags = getConfiguredTagsFromNode(node);
+  if (nodeTags?.length) {
+    void applyNodeTags(waId, nodeTags);
   }
 
   const delayMs =
@@ -564,6 +681,7 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
         waId,
         text,
         routeId: match.next,
+        flow,
       });
       await sendNode(waId, flow, nodeMap.get(match.next), new Set([match.next]));
       return;
@@ -695,6 +813,7 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
             text,
             routeId: aiDecision.route_id,
             reason: aiDecision.reason || null,
+            flow,
           });
           logger.info("flow.route_node_sent", {
             flowId: flow.id,
@@ -790,6 +909,7 @@ async function executeDynamicInteractive(waId, selectionId, flowData, context = 
         waId,
         text: selectionId,
         routeId: nextId,
+        flow,
       });
       await sendNode(waId, flow, target, new Set([nextId]));
       return;

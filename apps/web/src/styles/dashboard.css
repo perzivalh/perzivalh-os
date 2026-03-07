@@ -617,11 +617,11 @@ select.dash-filter:focus {
 .dash-table th,
 .dash-table td {
   border-bottom: 1px solid var(--border);
-  padding: 0.5rem 0.6rem;
+  padding: 0.7rem 0.6rem;
   text-align: left;
   font-size: 0.79rem;
   word-break: break-word;
-  overflow: hidden;
+  vertical-align: top;
 }
 
 /* Anchos proporcionales para que entren en pantalla sin scroll */
@@ -656,20 +656,24 @@ select.dash-filter:focus {
   color: #b91c1c;
 }
 
-.dash-td-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  align-items: center;
+.dash-td-tags-cell {
   min-width: 130px;
 }
 
+.dash-tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  align-items: flex-start;
+  min-height: 1.4rem;
+}
+
 .dash-tag-chip {
-  display: inline-block;
+  display: inline-flex;
   background: var(--accent-soft);
   color: var(--accent);
   border-radius: 999px;
-  padding: 0.15rem 0.45rem;
+  padding: 0.18rem 0.48rem;
   font-size: 0.7rem;
   font-weight: 500;
   white-space: nowrap;

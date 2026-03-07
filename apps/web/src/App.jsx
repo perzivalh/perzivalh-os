@@ -63,6 +63,7 @@ function App() {
   const [channelForm, setChannelForm] = useState({
     id: "",
     display_name: "",
+    line_number: "",
     is_default: false,
     is_active: true,
   });
@@ -2441,6 +2442,7 @@ function App() {
     setChannelForm({
       id: channel.id,
       display_name: channel.display_name || "",
+      line_number: channel.line_number || "",
       is_default: Boolean(channel.is_default),
       is_active: channel.is_active !== false,
     });
@@ -2454,12 +2456,14 @@ function App() {
     try {
       await apiPatch(`/api/channels/${channelForm.id}`, {
         display_name: channelForm.display_name.trim(),
+        line_number: channelForm.line_number.trim(),
         is_default: Boolean(channelForm.is_default),
         is_active: Boolean(channelForm.is_active),
       });
       setChannelForm({
         id: "",
         display_name: "",
+        line_number: "",
         is_default: false,
         is_active: true,
       });

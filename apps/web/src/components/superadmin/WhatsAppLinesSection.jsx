@@ -91,6 +91,10 @@ export function WhatsAppLinesSection({ channels = [], tenantId, onRefresh }) {
 
                             <div className="sa-line-details">
                                 <div className="sa-line-detail">
+                                    <span className="sa-detail-label">Numero de linea</span>
+                                    <span className="sa-detail-value">{line.line_number || "-"}</span>
+                                </div>
+                                <div className="sa-line-detail">
                                     <span className="sa-detail-label">WABA ID</span>
                                     <span className="sa-detail-value">{line.waba_id || "-"}</span>
                                 </div>

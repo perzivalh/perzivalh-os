@@ -3,6 +3,7 @@ import { XIcon, LoaderIcon, EyeIcon, EyeOffIcon } from "./icons";
 
 const EMPTY_CHANNEL = {
     display_name: "",
+    line_number: "",
     phone_number_id: "",
     waba_id: "",
     verify_token: "",
@@ -77,6 +78,15 @@ export function WhatsAppLineModal({ isOpen, onClose, initialData, onSave, tenant
                                 value={form.display_name || ""}
                                 onChange={(e) => setForm({ ...form, display_name: e.target.value })}
                                 placeholder="Ej: Ventas Principal"
+                            />
+                        </div>
+
+                        <div className="sa-field">
+                            <label>Numero de linea (Opcional)</label>
+                            <input
+                                value={form.line_number || ""}
+                                onChange={(e) => setForm({ ...form, line_number: e.target.value })}
+                                placeholder="Ej: 1"
                             />
                         </div>
 

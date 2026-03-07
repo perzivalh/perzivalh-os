@@ -173,6 +173,7 @@ router.post("/integrations/whatsapp/exchange", requireAuth, requireSuperAdmin, a
                 tenant_id: savedChannel.tenant_id,
                 phone_number_id: savedChannel.phone_number_id,
                 display_name: savedChannel.display_name,
+                line_number: savedChannel.line_number || null,
                 waba_id: savedChannel.waba_id,
                 is_active: savedChannel.is_active,
             },

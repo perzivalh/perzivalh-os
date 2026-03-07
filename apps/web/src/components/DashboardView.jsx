@@ -60,6 +60,11 @@ function formatChange(value, suffix = "%") {
   return value > 0 ? `+${value}${suffix}` : `${value}${suffix}`;
 }
 
+function getChannelDashboardLabel(channel) {
+  if (!channel) return "-";
+  return channel.line_number || channel.display_name || channel.phone_number_id || "-";
+}
+
 function buildTableParams({ selectedPeriod, selectedChannel, query, includePaging = true }) {
   const params = new URLSearchParams();
   params.set("period", selectedPeriod || "30d");
@@ -263,7 +268,7 @@ function DashboardView({
       const generatedAt = new Date().toLocaleString("es-BO");
       const periodLabel = PERIOD_OPTIONS.find((option) => option.value === (selectedPeriod || "30d"))?.label || "Ultimo mes";
       const lineLabel = selectedChannel
-        ? (channels || []).find((line) => line.phone_number_id === selectedChannel)?.display_name || selectedChannel
+        ? getChannelDashboardLabel((channels || []).find((line) => line.phone_number_id === selectedChannel)) || selectedChannel
         : "Todas las lineas";
 
       doc.setFontSize(13);
@@ -373,7 +378,7 @@ function DashboardView({
               <option value="">Todas las lineas</option>
               {(channels || []).map((channel) => (
                 <option key={channel.phone_number_id} value={channel.phone_number_id}>
-                  {channel.display_name || channel.phone_number_id}
+                  {getChannelDashboardLabel(channel)}
                 </option>
               ))}
             </select>
@@ -727,19 +732,18 @@ function DashboardView({
                           {row.message ? "Si" : "No"}
                         </span>
                       </td>
-                      <td className="dash-td-tags">
-                        {(row.tags || (row.tag ? [row.tag] : [])).length > 0
-                          ? (row.tags || [row.tag]).map((t) => (
-                            <span className="dash-tag-chip" key={t}>{t}</span>
-                          ))
-                          : <span className="dash-muted">-</span>
-                        }
+                      <td className="dash-td-tags-cell">
+                        <div className="dash-tags-list">
+                          {(row.tags || (row.tag ? [row.tag] : [])).length > 0
+                            ? (row.tags || [row.tag]).map((t) => (
+                              <span className="dash-tag-chip" key={t}>{t}</span>
+                            ))
+                            : <span className="dash-muted">-</span>
+                          }
+                        </div>
                       </td>
                       <td>
-                        {(row.operators && row.operators.length > 0)
-                          ? row.operators.join(", ")
-                          : (row.operator || <span className="dash-muted">Sin asignar</span>)
-                        }
+                        {row.operator || <span className="dash-muted">Sin asignar</span>}
                       </td>
                       <td>{row.line || <span className="dash-muted">-</span>}</td>
                       <td>
@@ -789,44 +793,46 @@ function DashboardView({
       </div>
 
       <aside className="dashboard-side">
-        <div className="dash-card">
-          <div className="dash-card-title">Performance de Operadores</div>
-          <div className="dash-card-subtitle">
-            Top 10 - {PERIOD_OPTIONS.find((option) => option.value === selectedPeriod)?.label || "Ultimo mes"}
-          </div>
-          <div className="dash-operator-help">
-            <small>
-              <strong>Cerrados:</strong> Conversaciones que el operador resolvio (status cerrado).
-              <br />
-              <strong>En curso:</strong> Conversaciones asignadas que aun estan activas.
-            </small>
-          </div>
-          <div className="dash-operator-list">
-            {operators.length > 0 ? (
-              operators.map((item, index) => (
-                <div className="dash-operator" key={item.id || `op-${index}`}>
-                  <div className="dash-operator-avatar">{item.name?.[0] || "?"}</div>
-                  <div className="dash-operator-meta">
-                    <div className="dash-operator-name">{item.name}</div>
-                    <div className="dash-operator-role">{item.role}</div>
-                    <div className="dash-operator-stats">
-                      <div>
-                        <div className="dash-stat-label">Cerrados</div>
-                        <div className="dash-stat-value success">{item.resolved}</div>
-                      </div>
-                      <div>
-                        <div className="dash-stat-label">En curso</div>
-                        <div className="dash-stat-value warning">{item.pending}</div>
+        {viewMode === "cards" && (
+          <div className="dash-card">
+            <div className="dash-card-title">Performance de Operadores</div>
+            <div className="dash-card-subtitle">
+              Top 10 - {PERIOD_OPTIONS.find((option) => option.value === selectedPeriod)?.label || "Ultimo mes"}
+            </div>
+            <div className="dash-operator-help">
+              <small>
+                <strong>Cerrados:</strong> Conversaciones que el operador resolvio (status cerrado).
+                <br />
+                <strong>En curso:</strong> Conversaciones asignadas que aun estan activas.
+              </small>
+            </div>
+            <div className="dash-operator-list">
+              {operators.length > 0 ? (
+                operators.map((item, index) => (
+                  <div className="dash-operator" key={item.id || `op-${index}`}>
+                    <div className="dash-operator-avatar">{item.name?.[0] || "?"}</div>
+                    <div className="dash-operator-meta">
+                      <div className="dash-operator-name">{item.name}</div>
+                      <div className="dash-operator-role">{item.role}</div>
+                      <div className="dash-operator-stats">
+                        <div>
+                          <div className="dash-stat-label">Cerrados</div>
+                          <div className="dash-stat-value success">{item.resolved}</div>
+                        </div>
+                        <div>
+                          <div className="dash-stat-label">En curso</div>
+                          <div className="dash-stat-value warning">{item.pending}</div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))
-            ) : (
-              <div className="empty-state">Sin operadores activos</div>
-            )}
+                ))
+              ) : (
+                <div className="empty-state">Sin operadores activos</div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="dash-card">
           <div className="dash-card-title">Eficiencia de Equipo</div>

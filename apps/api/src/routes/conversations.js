@@ -191,6 +191,7 @@ router.get(
             id: channel.id,
             phone_number_id: channel.phone_number_id,
             display_name: channel.display_name || null,
+            line_number: channel.line_number || null,
             waba_id: channel.waba_id || null,
             is_active: channel.is_active,
             is_default: channel.is_default,
@@ -215,6 +216,10 @@ router.patch("/channels/:id", requireAuth, requireSettingPermission("general", "
     if (req.body?.display_name !== undefined) {
         const rawName = String(req.body.display_name || "").trim();
         updates.display_name = rawName || null;
+    }
+    if (req.body?.line_number !== undefined) {
+        const rawLineNumber = String(req.body.line_number || "").trim();
+        updates.line_number = rawLineNumber || null;
     }
     if (req.body?.is_active !== undefined) {
         updates.is_active = Boolean(req.body.is_active);
@@ -247,6 +252,7 @@ router.patch("/channels/:id", requireAuth, requireSettingPermission("general", "
             id: channel.id,
             phone_number_id: channel.phone_number_id,
             display_name: channel.display_name || null,
+            line_number: channel.line_number || null,
             waba_id: channel.waba_id || null,
             is_active: channel.is_active,
             is_default: channel.is_default,

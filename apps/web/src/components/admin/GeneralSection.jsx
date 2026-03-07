@@ -6,6 +6,7 @@ import React, { useEffect, useMemo, useState } from "react";
 const INITIAL_CHANNEL_FORM = {
     id: "",
     display_name: "",
+    line_number: "",
     is_default: false,
     is_active: true,
 };
@@ -28,6 +29,9 @@ function formatShortDate(value) {
 function getLineName(channel) {
     if (channel?.display_name) {
         return channel.display_name;
+    }
+    if (channel?.line_number) {
+        return `Linea ${channel.line_number}`;
     }
     const suffix = channel?.phone_number_id
         ? String(channel.phone_number_id).slice(-4)
@@ -100,6 +104,7 @@ function GeneralSection({
                 }
                 const haystack = [
                     channel.display_name || "",
+                    channel.line_number || "",
                     channel.phone_number_id || "",
                     channel.waba_id || "",
                 ]
@@ -252,6 +257,9 @@ function GeneralSection({
                                         {channel.is_default ? (
                                             <span className="line-pill default">Principal</span>
                                         ) : null}
+                                        {channel.line_number ? (
+                                            <span className="line-pill">Linea {channel.line_number}</span>
+                                        ) : null}
                                         {channel.waba_id ? (
                                             <span className="line-pill">WABA {channel.waba_id}</span>
                                         ) : null}
@@ -336,6 +344,21 @@ function GeneralSection({
                                     }))
                                 }
                                 placeholder="Ej: Linea principal"
+                                disabled={!canManageGeneral || !channelForm.id}
+                            />
+                        </label>
+                        <label className="field">
+                            <span>Numero de linea</span>
+                            <input
+                                type="text"
+                                value={channelForm.line_number || ""}
+                                onChange={(event) =>
+                                    setChannelForm((prev) => ({
+                                        ...prev,
+                                        line_number: event.target.value,
+                                    }))
+                                }
+                                placeholder="Ej: 1"
                                 disabled={!canManageGeneral || !channelForm.id}
                             />
                         </label>

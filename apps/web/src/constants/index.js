@@ -22,6 +22,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
             templates: { read: true, write: true },
             audit: { read: true, write: true },
             odoo: { read: true, write: true },
+            ai_metrics: { read: true, write: true },
         },
     },
     recepcion: {
@@ -39,6 +40,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
             templates: { read: false, write: false },
             audit: { read: false, write: false },
             odoo: { read: false, write: false },
+            ai_metrics: { read: false, write: false },
         },
     },
     caja: {
@@ -56,6 +58,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
             templates: { read: false, write: false },
             audit: { read: false, write: false },
             odoo: { read: false, write: false },
+            ai_metrics: { read: false, write: false },
         },
     },
     marketing: {
@@ -73,6 +76,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
             templates: { read: true, write: true },
             audit: { read: false, write: false },
             odoo: { read: false, write: false },
+            ai_metrics: { read: false, write: false },
         },
     },
     doctor: {
@@ -90,6 +94,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
             templates: { read: false, write: false },
             audit: { read: false, write: false },
             odoo: { read: false, write: false },
+            ai_metrics: { read: false, write: false },
         },
     },
 };

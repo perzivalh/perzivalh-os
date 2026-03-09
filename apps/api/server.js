@@ -69,6 +69,7 @@ app.use(
 // JSON parser con rawBody para webhook signature
 app.use(
     express.json({
+        limit: "25mb",
         verify: (req, res, buf) => {
             req.rawBody = buf.toString("utf8");
         },

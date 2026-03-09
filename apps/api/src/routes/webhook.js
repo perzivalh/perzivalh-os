@@ -17,6 +17,7 @@ const sessionStore = require("../sessionStore");
 const { getTenantContext } = require("../tenancy/tenantContext");
 const { downloadMedia } = require("../services/metaGraphApi");
 const { uploadToR2, isConfigured: isR2Configured } = require("../services/mediaStorageService");
+const { emitEvent } = require("../realtime");
 const { transcribeAudio } = require("../services/aiProviders");
 const {
     applyAutoTagsToConversation,
@@ -73,10 +74,12 @@ async function downloadAndStoreMedia(messageId, message) {
             type: message.type,
             filename,
         });
-        await prisma.message.update({
+        const updated = await prisma.message.update({
             where: { id: messageId },
             data: { media_url: mediaUrl, media_filename: filename },
         });
+        // Notify frontend so it re-renders the message with the real media URL
+        emitEvent("message:update", { message: updated });
         logger.info("webhook.media_stored", { messageId, mediaUrl, type: message.type });
     } catch (error) {
         logger.warn("webhook.media_store_failed", { messageId, type: message.type, error: error.message });

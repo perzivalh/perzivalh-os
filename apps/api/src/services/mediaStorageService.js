@@ -52,13 +52,15 @@ function getDateStamp(datetime) {
     return datetime.slice(0, 8);
 }
 
-function buildAuthHeaders({ host, objectKey, contentType, bodyHash, datetime }) {
+function buildAuthHeaders({ host, bucketName, objectKey, contentType, bodyHash, datetime }) {
     const dateStamp = getDateStamp(datetime);
     const accessKeyId = process.env.R2_ACCESS_KEY_ID;
     const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
     const credentialScope = `${dateStamp}/${REGION}/${SERVICE}/aws4_request`;
 
-    const canonicalPath = `/${encodeURIComponent(objectKey).replace(/%2F/g, "/")}`;
+    // R2 uses path-style: /{bucket}/{key}
+    const encodedKey = objectKey.split("/").map(encodeURIComponent).join("/");
+    const canonicalPath = `/${bucketName}/${encodedKey}`;
     const signedHeaderKeys = "content-type;host;x-amz-content-sha256;x-amz-date";
     const canonicalHeaders =
         `content-type:${contentType}\n` +
@@ -154,7 +156,7 @@ async function uploadToR2({ buffer, mimeType, type = "misc", filename }) {
     const bodyHash = sha256Hex(buffer);
     const contentType = String(mimeType || "application/octet-stream").split(";")[0].trim();
 
-    const authHeaders = buildAuthHeaders({ host, objectKey, contentType, bodyHash, datetime });
+    const authHeaders = buildAuthHeaders({ host, bucketName, objectKey, contentType, bodyHash, datetime });
 
     const uploadUrl = `https://${host}/${bucketName}/${objectKey}`;
 

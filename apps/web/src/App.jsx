@@ -1153,6 +1153,12 @@ function App() {
         prev?.id === conversation.id ? { ...prev, ...conversation } : prev
       );
     });
+    socket.on("message:update", ({ message }) => {
+      setMessages((prev) => {
+        if (!prev.find((m) => m.id === message.id)) return prev;
+        return prev.map((m) => (m.id === message.id ? { ...m, ...message } : m));
+      });
+    });
     socket.on("message:new", ({ conversation, message }) => {
       applyPendingConversationState(conversation);
       syncPendingAlertLoop();

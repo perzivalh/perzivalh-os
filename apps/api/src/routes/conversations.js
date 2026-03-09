@@ -809,7 +809,7 @@ router.post("/conversations/:id/messages", requireAuth, requireModulePermission(
 // POST /api/conversations/:id/send-media
 // Accepts JSON: { type: "image"|"document"|"audio", data_base64: string, mime_type: string, filename?: string, caption?: string }
 router.post(
-    "/:id/send-media",
+    "/conversations/:id/send-media",
     requireAuth,
     requireModulePermission("chat", "write"),
     express.json({ limit: "20mb" }),

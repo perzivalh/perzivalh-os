@@ -1013,7 +1013,7 @@ function App() {
       return;
     }
     const roleAccess = currentRoleAccess;
-    const sections = ["general", "users", "bot", "company", "templates", "audit", "odoo"];
+    const sections = ["general", "users", "bot", "company", "templates", "audit", "odoo", "ai_metrics"];
     const allowed = sections.filter((section) =>
       hasPermission(roleAccess, "settings", section)
     );

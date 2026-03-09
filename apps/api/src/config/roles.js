@@ -13,6 +13,7 @@ const SETTINGS_PERMISSION_KEYS = [
     "templates",
     "audit",
     "odoo",
+    "ai_metrics",
 ];
 
 const DEFAULT_ROLE_PERMISSIONS = {
@@ -31,6 +32,7 @@ const DEFAULT_ROLE_PERMISSIONS = {
             templates: { read: true, write: true },
             audit: { read: true, write: true },
             odoo: { read: true, write: true },
+            ai_metrics: { read: true, write: true },
         },
     },
     recepcion: {

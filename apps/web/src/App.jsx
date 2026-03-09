@@ -48,6 +48,57 @@ import {
 } from "./components/icons";
 
 
+// ─── Media message renderer ───────────────────────────────────────────────────
+function MessageContent({ message }) {
+  const { type, text, media_url, media_filename } = message;
+
+  if (media_url) {
+    if (type === "image") {
+      return (
+        <div className="message-media">
+          <img
+            src={media_url}
+            alt={media_filename || "imagen"}
+            className="message-image"
+            onClick={() => window.open(media_url, "_blank")}
+            style={{ cursor: "pointer", maxWidth: "100%", maxHeight: 320, borderRadius: 8, display: "block" }}
+          />
+          {text && <div className="message-text" style={{ marginTop: 4 }}>{text}</div>}
+        </div>
+      );
+    }
+    if (type === "audio") {
+      return (
+        <div className="message-media">
+          <audio controls src={media_url} style={{ width: "100%", minWidth: 200 }} />
+          {text && <div className="message-text" style={{ marginTop: 4 }}>{text}</div>}
+        </div>
+      );
+    }
+    if (type === "video") {
+      return (
+        <div className="message-media">
+          <video controls src={media_url} style={{ maxWidth: "100%", maxHeight: 280, borderRadius: 8 }} />
+          {text && <div className="message-text" style={{ marginTop: 4 }}>{text}</div>}
+        </div>
+      );
+    }
+    if (type === "document") {
+      return (
+        <div className="message-media message-document">
+          <a href={media_url} target="_blank" rel="noopener noreferrer" download={media_filename || true} style={{ display: "flex", alignItems: "center", gap: 8, color: "inherit", textDecoration: "none" }}>
+            <span style={{ fontSize: 22 }}>📄</span>
+            <span style={{ textDecoration: "underline", fontSize: 13 }}>{media_filename || "Documento"}</span>
+          </a>
+          {text && <div className="message-text" style={{ marginTop: 4 }}>{text}</div>}
+        </div>
+      );
+    }
+  }
+
+  return <div className="message-text">{text || `[${type}]`}</div>;
+}
+
 function App() {
   const [token, setTokenState] = useState(localStorage.getItem("token") || "");
   const [superadminToken, setSuperadminToken] = useState(() =>
@@ -1790,6 +1841,27 @@ function App() {
     }
   }
 
+  async function handleSendMedia({ file, type, caption }) {
+    if (!activeConversation || !file) return;
+    try {
+      const data_base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      await apiPost(`/api/conversations/${activeConversation.id}/send-media`, {
+        type,
+        data_base64,
+        mime_type: file.type,
+        filename: file.name,
+        caption: caption || undefined,
+      });
+    } catch (error) {
+      setPageError(normalizeError(error));
+    }
+  }
+
   async function handleAddNote(event) {
     event.preventDefault();
     if (!activeConversation || !noteInput.trim()) {
@@ -2808,12 +2880,11 @@ function App() {
     messageBlocks.push(
       <div
         key={message.id}
-        className={`message ${message.direction} ${message.type === "note" ? "note" : ""
-          }`}
+        className={`message ${message.direction} ${message.type === "note" ? "note" : ""}`}
         data-day-key={dayKey}
         data-day-label={dayKey ? formatMessageDayLabel(createdAt) : ""}
       >
-        <div className="message-text">{message.text || `[${message.type}]`}</div>
+        <MessageContent message={message} />
         <div className="message-meta">{formatDate(message.created_at)}</div>
       </div>
     );
@@ -2983,6 +3054,7 @@ function App() {
               handleDeleteTag={handleDeleteTag}
               handleQuickAction={handleQuickAction}
               handleSendMessage={handleSendMessage}
+              handleSendMedia={handleSendMedia}
               setMessageMode={setMessageMode}
               setMessageDraft={setMessageDraft}
               scrollChatToBottom={scrollChatToBottom}

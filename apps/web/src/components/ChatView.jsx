@@ -64,6 +64,7 @@ function ChatView({
   handleDeleteTag,
   handleQuickAction,
   handleSendMessage,
+  handleSendMedia,
   setMessageMode,
   setMessageDraft,
   scrollChatToBottom,
@@ -73,6 +74,40 @@ function ChatView({
   InfoIcon,
   SendIcon,
 }) {
+  const attachFileRef = useRef(null);
+  const [attachPreview, setAttachPreview] = useState(null); // { file, type, objectUrl, caption }
+
+  function handleAttachClick() {
+    if (attachFileRef.current) {
+      attachFileRef.current.value = "";
+      attachFileRef.current.click();
+    }
+  }
+
+  function handleFileSelected(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const mime = file.type;
+    let type = "document";
+    if (mime.startsWith("image/")) type = "image";
+    else if (mime.startsWith("audio/")) type = "audio";
+    else if (mime.startsWith("video/")) type = "video";
+    const objectUrl = URL.createObjectURL(file);
+    setAttachPreview({ file, type, objectUrl, caption: "" });
+  }
+
+  async function handleConfirmSend() {
+    if (!attachPreview || !handleSendMedia) return;
+    const preview = attachPreview;
+    setAttachPreview(null);
+    URL.revokeObjectURL(preview.objectUrl);
+    await handleSendMedia({ file: preview.file, type: preview.type, caption: preview.caption });
+  }
+
+  function handleCancelAttach() {
+    if (attachPreview) URL.revokeObjectURL(attachPreview.objectUrl);
+    setAttachPreview(null);
+  }
   const channelMap = new Map(
     (channels || []).map((channel) => [
       channel.phone_number_id,
@@ -546,6 +581,56 @@ function ChatView({
               </button>
             )}
 
+            {/* Hidden file input for attachments */}
+            <input
+              ref={attachFileRef}
+              type="file"
+              accept="image/*,video/*,audio/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain"
+              style={{ display: "none" }}
+              onChange={handleFileSelected}
+            />
+
+            {/* Attachment preview modal */}
+            {attachPreview && (
+              <div style={{ position: "absolute", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ background: "var(--panel)", borderRadius: 12, padding: 20, maxWidth: 340, width: "90%", boxShadow: "0 8px 32px var(--shadow)" }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: "var(--ink)", marginBottom: 12 }}>Enviar archivo</div>
+                  {attachPreview.type === "image" && (
+                    <img src={attachPreview.objectUrl} alt="preview" style={{ width: "100%", maxHeight: 200, objectFit: "contain", borderRadius: 8, marginBottom: 10 }} />
+                  )}
+                  {attachPreview.type === "audio" && (
+                    <audio controls src={attachPreview.objectUrl} style={{ width: "100%", marginBottom: 10 }} />
+                  )}
+                  {attachPreview.type === "video" && (
+                    <video controls src={attachPreview.objectUrl} style={{ width: "100%", maxHeight: 180, marginBottom: 10, borderRadius: 8 }} />
+                  )}
+                  {attachPreview.type === "document" && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 0", marginBottom: 10 }}>
+                      <span style={{ fontSize: 26 }}>📄</span>
+                      <span style={{ fontSize: 13, color: "var(--ink)" }}>{attachPreview.file.name}</span>
+                    </div>
+                  )}
+                  {(attachPreview.type === "image" || attachPreview.type === "video") && (
+                    <input
+                      type="text"
+                      placeholder="Caption (opcional)"
+                      value={attachPreview.caption}
+                      onChange={(e) => setAttachPreview((p) => ({ ...p, caption: e.target.value }))}
+                      style={{ width: "100%", padding: "7px 10px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg-soft)", color: "var(--ink)", fontSize: 13, marginBottom: 12 }}
+                    />
+                  )}
+                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                    <button type="button" onClick={handleCancelAttach} style={{ padding: "8px 16px", borderRadius: 7, border: "1px solid var(--border)", background: "transparent", color: "var(--muted)", cursor: "pointer", fontSize: 13 }}>
+                      Cancelar
+                    </button>
+                    <button type="button" onClick={handleConfirmSend} style={{ padding: "8px 16px", borderRadius: 7, border: "none", background: "var(--accent)", color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
+                      Enviar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <form className="chat-composer" onSubmit={handleSendMessage}>
               {isAssignedToOther && (
                 <div className="assign-warning">
@@ -585,6 +670,18 @@ function ChatView({
                   onChange={(event) => setMessageDraft(event.target.value)}
                   disabled={isAssignedToOther}
                 />
+                {messageMode === "text" && (
+                  <button
+                    type="button"
+                    className="attach-button"
+                    title="Adjuntar archivo"
+                    disabled={isAssignedToOther}
+                    onClick={handleAttachClick}
+                    style={{ background: "none", border: "none", cursor: isAssignedToOther ? "not-allowed" : "pointer", padding: "0 6px", color: "var(--muted)", fontSize: 20, lineHeight: 1, display: "flex", alignItems: "center" }}
+                  >
+                    📎
+                  </button>
+                )}
                 <button className="send-button" type="submit" disabled={isAssignedToOther}>
                   <SendIcon className="icon" />
                 </button>

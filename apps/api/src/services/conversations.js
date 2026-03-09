@@ -134,6 +134,8 @@ async function createMessage({
   type,
   text,
   rawJson,
+  mediaUrl,
+  mediaFilename,
 }) {
   const message = await prisma.message.create({
     data: {
@@ -141,6 +143,8 @@ async function createMessage({
       direction,
       type,
       text: text || null,
+      media_url: mediaUrl || null,
+      media_filename: mediaFilename || null,
       raw_json: rawJson || {},
     },
   });

@@ -15,7 +15,9 @@ const prisma = require("../db");
 const { getControlClient } = require("../control/controlClient");
 const { getTenantContext } = require("../tenancy/tenantContext");
 const { resolveChannelByPhoneNumberId } = require("../tenancy/tenantResolver");
-const { sendText } = require("../whatsapp");
+const { sendText, sendImage, sendDocument, sendAudio } = require("../whatsapp");
+const { uploadToR2, isConfigured: isR2Configured } = require("../services/mediaStorageService");
+const { downloadMedia } = require("../services/metaGraphApi");
 const {
     getConversationById,
     formatConversation,
@@ -514,6 +516,8 @@ router.get("/conversations/:id", requireAuth, requireModulePermission("chat", "r
         text: true,
         type: true,
         direction: true,
+        media_url: true,
+        media_filename: true,
         created_at: true,
     };
 
@@ -801,5 +805,78 @@ router.post("/conversations/:id/messages", requireAuth, requireModulePermission(
     });
     return res.json({ ok: true });
 });
+
+// POST /api/conversations/:id/send-media
+// Accepts JSON: { type: "image"|"document"|"audio", data_base64: string, mime_type: string, filename?: string, caption?: string }
+router.post(
+    "/:id/send-media",
+    requireAuth,
+    requireModulePermission("chat", "write"),
+    express.json({ limit: "20mb" }),
+    async (req, res) => {
+        const conversationId = req.params.id;
+        const { type, data_base64, mime_type, filename, caption } = req.body || {};
+
+        if (!data_base64 || !mime_type || !type) {
+            return res.status(400).json({ error: "missing_fields" });
+        }
+        if (!["image", "document", "audio", "video"].includes(type)) {
+            return res.status(400).json({ error: "invalid_type" });
+        }
+        if (!isR2Configured()) {
+            return res.status(503).json({ error: "storage_not_configured", message: "R2 storage is not configured on this server." });
+        }
+
+        const conversation = await getConversationById(conversationId);
+        if (!conversation) return res.status(404).json({ error: "not_found" });
+
+        const tenantId = getTenantContext().tenantId;
+        let phoneNumberId = conversation.phone_number_id;
+        if (!phoneNumberId) {
+            if (tenantId && process.env.CONTROL_DB_URL) {
+                const control = getControlClient();
+                const channels = await control.channel.findMany({ where: { tenant_id: tenantId }, take: 1 });
+                if (channels.length) phoneNumberId = channels[0].phone_number_id;
+            }
+        }
+        if (!phoneNumberId) return res.status(400).json({ error: "missing_phone_number_id" });
+
+        const channelConfig = await resolveChannelByPhoneNumberId(phoneNumberId);
+        if (!channelConfig || channelConfig.tenantId !== tenantId) {
+            return res.status(400).json({ error: "missing_channel" });
+        }
+
+        try {
+            const buffer = Buffer.from(data_base64, "base64");
+            const { url: mediaUrl } = await uploadToR2({ buffer, mimeType: mime_type, type, filename });
+
+            const waOpts = { channel: channelConfig, meta: { source: "panel", by_user_id: req.user.id } };
+            if (type === "image") {
+                await sendImage(conversation.wa_id, mediaUrl, caption || null, waOpts);
+            } else if (type === "document") {
+                await sendDocument(conversation.wa_id, mediaUrl, filename || null, caption || null, waOpts);
+            } else if (type === "audio") {
+                await sendAudio(conversation.wa_id, mediaUrl, waOpts);
+            } else if (type === "video") {
+                const { sendVideo } = require("../whatsapp");
+                await sendVideo(conversation.wa_id, mediaUrl, caption || null, waOpts);
+            }
+
+            await createMessage({
+                conversationId,
+                direction: "out",
+                type,
+                text: caption || filename || null,
+                mediaUrl,
+                mediaFilename: filename || null,
+                rawJson: { source: "panel", by_user_id: req.user.id },
+            });
+
+            return res.json({ ok: true, media_url: mediaUrl });
+        } catch (error) {
+            return res.status(500).json({ error: "send_failed", message: error.message });
+        }
+    }
+);
 
 module.exports = router;

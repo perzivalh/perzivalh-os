@@ -132,6 +132,8 @@ model Message {
   direction       MessageDirection
   type            MessageType
   text            String?
+  media_url       String?
+  media_filename  String?
   raw_json        Json
   created_at      DateTime         @default(now())
   conversation    Conversation     @relation(fields: [conversation_id], references: [id])

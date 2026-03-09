@@ -16,6 +16,7 @@ const { executeDynamicFlow, executeDynamicInteractive } = require("../flows/flow
 const sessionStore = require("../sessionStore");
 const { getTenantContext } = require("../tenancy/tenantContext");
 const { downloadMedia } = require("../services/metaGraphApi");
+const { uploadToR2, isConfigured: isR2Configured } = require("../services/mediaStorageService");
 const { transcribeAudio } = require("../services/aiProviders");
 const {
     applyAutoTagsToConversation,
@@ -42,6 +43,44 @@ try {
     campaignJobQueue = require("../services/campaignJobQueue");
 } catch (e) {
     logger.warn("Template/Campaign services not loaded", { error: e.message });
+}
+
+// ─── Media download + upload helper (fire-and-forget) ─────────────────────────
+function extractMediaIdFromMessage(message) {
+    const mediaObj = message[message.type]; // e.g. message.image, message.document, message.video
+    return mediaObj?.id || null;
+}
+
+function extractMediaFilenameFromMessage(message) {
+    return message.document?.filename || message.video?.filename || null;
+}
+
+function getMimeTypeFromMessage(message) {
+    const obj = message[message.type];
+    return obj?.mime_type || null;
+}
+
+async function downloadAndStoreMedia(messageId, message) {
+    if (!isR2Configured()) return;
+    const mediaId = extractMediaIdFromMessage(message);
+    if (!mediaId) return;
+    try {
+        const { buffer, mimeType } = await downloadMedia(mediaId);
+        const filename = extractMediaFilenameFromMessage(message) || null;
+        const { url: mediaUrl } = await uploadToR2({
+            buffer,
+            mimeType: getMimeTypeFromMessage(message) || mimeType,
+            type: message.type,
+            filename,
+        });
+        await prisma.message.update({
+            where: { id: messageId },
+            data: { media_url: mediaUrl, media_filename: filename },
+        });
+        logger.info("webhook.media_stored", { messageId, mediaUrl, type: message.type });
+    } catch (error) {
+        logger.warn("webhook.media_store_failed", { messageId, type: message.type, error: error.message });
+    }
 }
 
 // Rate limiting
@@ -451,6 +490,12 @@ router.post("/webhook", async (req, res) => {
                         }
 
                         if (message.type === "video" || message.type === "image" || message.type === "document") {
+                            // Fire-and-forget: download from WhatsApp and upload to R2
+                            const savedMsgId = createdInboundMessage?.message?.id;
+                            if (savedMsgId) {
+                                void downloadAndStoreMedia(savedMsgId, message);
+                            }
+
                             const activeFlow = await getActiveTenantFlow(tenantContext.tenantId);
                             if (!activeFlow) continue;
                             const mediaFallbackText =

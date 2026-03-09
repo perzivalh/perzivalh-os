@@ -500,6 +500,56 @@ function parseInteractiveSelection(message) {
   return null;
 }
 
+async function sendDocument(to, documentUrl, filename = null, caption = null, options = {}) {
+  const config = getWhatsAppConfig(options);
+  if (!documentUrl) {
+    return sendText(to, "Documento no disponible.");
+  }
+  const payload = {
+    messaging_product: "whatsapp",
+    to,
+    type: "document",
+    document: {
+      link: documentUrl,
+      filename: filename || undefined,
+      caption: caption || undefined,
+    },
+  };
+  const result = await sendWhatsAppMessage(payload, options);
+  await recordOutgoingMessage(
+    to,
+    "document",
+    caption || filename || null,
+    { payload, response: result.response, error: result.error, meta: options.meta },
+    config.phoneNumberId
+  );
+  return result;
+}
+
+async function sendAudio(to, audioUrl, options = {}) {
+  const config = getWhatsAppConfig(options);
+  if (!audioUrl) {
+    return sendText(to, "Audio no disponible.");
+  }
+  const payload = {
+    messaging_product: "whatsapp",
+    to,
+    type: "audio",
+    audio: {
+      link: audioUrl,
+    },
+  };
+  const result = await sendWhatsAppMessage(payload, options);
+  await recordOutgoingMessage(
+    to,
+    "audio",
+    null,
+    { payload, response: result.response, error: result.error, meta: options.meta },
+    config.phoneNumberId
+  );
+  return result;
+}
+
 module.exports = {
   sendText,
   sendButtons,
@@ -507,6 +557,8 @@ module.exports = {
   sendLocation,
   sendImage,
   sendVideo,
+  sendDocument,
+  sendAudio,
   sendTemplate,
   parseInteractiveSelection,
   sendInteractiveList: sendList,

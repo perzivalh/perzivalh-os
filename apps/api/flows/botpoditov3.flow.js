@@ -84,7 +84,8 @@ module.exports = {
       { "routeId": "UNERO_TIPO_TRAT",   "intent": "unero",          "phrases": ["unero", "uneros", "una encarnada", "unas encarnadas", "una clavada"] },
       { "routeId": "TRAT_MATRICECTOMIA_INFO", "intent": "matricectomia", "phrases": ["matricectomia", "matricetomia", "cirugia de unero", "operacion unero"] },
       { "routeId": "HONGOS_TIPO_TRAT",  "intent": "hongos",         "phrases": ["hongo", "hongos", "onicomicosis"] },
-      { "routeId": "SVC_PEDICURE_INFO", "intent": "pedicure",       "phrases": ["pedicure", "pedicura", "pedicure clinico", "pedicura clinica", "limpieza de pies", "limpieza podal"] }
+      { "routeId": "SVC_PEDICURE_INFO", "intent": "pedicure",       "phrases": ["pedicure", "pedicura", "pedicure clinico", "pedicura clinica", "limpieza de pies", "limpieza podal"] },
+      { "routeId": "CONSULTA_GRATUITA_INFO", "intent": "consulta", "phrases": ["consulta", "valoracion", "valoración", "evaluacion", "evaluación", "diagnostico", "diagnóstico", "revision", "revisión", "primera vez", "primera consulta", "primera visita", "ir a consultar", "quiero ir", "quiero consultar", "me pueden revisar", "pueden revisarme"] }
     ],
 
     // --- Calificadores de horario (detectan preguntas sobre horario de servicio específico) ---
@@ -273,6 +274,17 @@ module.exports = {
       "tarifas": "PRECIOS_INFO",
       "cuanto": "PRECIOS_INFO",
 
+      "consulta": "CONSULTA_GRATUITA_INFO",
+      "valoracion": "CONSULTA_GRATUITA_INFO",
+      "evaluacion": "CONSULTA_GRATUITA_INFO",
+      "diagnostico": "CONSULTA_GRATUITA_INFO",
+      "revision": "CONSULTA_GRATUITA_INFO",
+      "primera vez": "CONSULTA_GRATUITA_INFO",
+      "primera consulta": "CONSULTA_GRATUITA_INFO",
+      "primera visita": "CONSULTA_GRATUITA_INFO",
+      "quiero consultar": "CONSULTA_GRATUITA_INFO",
+      "ir a consultar": "CONSULTA_GRATUITA_INFO",
+
       "talon": "OTROS_MENU",
       "talones": "OTROS_MENU",
       "espolon": "OTROS_MENU",
@@ -325,6 +337,13 @@ module.exports = {
       "text": "En *PODOPIE* nos especializamos en salud podológica 🦶 (solo pies). Te muestro los servicios que *SÍ* tenemos:",
       "delayMs": 1000,
       "next": "SERVICIOS_MENU"
+    },
+    {
+      "id": "CONSULTA_GRATUITA_INFO",
+      "type": "text",
+      "text": "¡Buenas noticias! 🎉 La *valoración médica en PODOPIE es totalmente GRATUITA* 🤩🦶, realizada por un especialista.\nNo necesitas cita previa, atendemos por orden de llegada. ¡Ven cuando quieras! 😊",
+      "delayMs": 1000,
+      "next": "HORARIOS_INFO"
     },
     {
       "id": "AI_HANDOFF_OFFER",

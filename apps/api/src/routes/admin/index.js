@@ -31,6 +31,8 @@ const {
     normalizeAiQuotaConfig,
     getDailyAiQuotaSnapshot,
     invalidateAiQuotaConfigCache,
+    persistDailySnapshotToHistory,
+    getDailyUsageHistory,
 } = require("../../services/aiDailyQuota");
 
 // Settings cache (para sincronizar con webhook)
@@ -1235,6 +1237,26 @@ router.get("/bots/ai-quota", requireAuth, requireSettingPermission("bot", "read"
         return res.json(snapshot);
     } catch (error) {
         logger.error("bots.ai_quota_failed", { message: error.message });
+        return res.status(500).json({ error: "load_failed" });
+    }
+});
+
+// GET /api/admin/bots/ai-history
+// Returns up to 30 days of historical daily token usage, persisting today's snapshot first
+router.get("/bots/ai-history", requireAuth, requireSettingPermission("bot", "read"), async (req, res) => {
+    const tenantId = req.user.tenant_id || getTenantContext().tenantId || "legacy";
+    const days = Math.min(30, Math.max(1, Number(req.query.days) || 30));
+    try {
+        // Persist today's snapshot so the current day is always reflected in history
+        await persistDailySnapshotToHistory({ tenantId });
+        const history = await getDailyUsageHistory({ tenantId, days });
+        const config = await (async () => {
+            const snap = await getDailyAiQuotaSnapshot({ tenantId });
+            return snap.config;
+        })();
+        return res.json({ history, config });
+    } catch (error) {
+        logger.error("bots.ai_history_failed", { message: error.message });
         return res.status(500).json({ error: "load_failed" });
     }
 });

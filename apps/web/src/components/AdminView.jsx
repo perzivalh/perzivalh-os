@@ -13,6 +13,7 @@ import CompanySection from "./admin/CompanySection";
 import TemplatesSection from "./admin/TemplatesSection";
 import AuditSection from "./admin/AuditSection";
 import OdooSection from "./admin/OdooSection";
+import AiMetricsDashboard from "./admin/AiMetricsDashboard";
 
 // Importar iconos y constantes
 import {
@@ -23,6 +24,7 @@ import {
   TemplateIcon,
   AuditIcon,
   PuzzleIcon,
+  ChartIcon,
 } from "./admin/icons";
 
 function AdminView({
@@ -85,6 +87,7 @@ function AdminView({
         { id: "templates", label: "Plantillas de Meta", icon: TemplateIcon },
         { id: "audit", label: "Registros / Auditoria", icon: AuditIcon },
         { id: "odoo", label: "Integracion Odoo", icon: PuzzleIcon },
+        { id: "ai_metrics", label: "IA Analytics", icon: ChartIcon },
       ],
     },
   ];
@@ -212,6 +215,10 @@ function AdminView({
         )}
 
         {settingsSection === "odoo" && <OdooSection />}
+
+        {settingsSection === "ai_metrics" && (
+          <AiMetricsDashboard canManage={canWriteSection("bot")} />
+        )}
 
         {isOffline ? (
           <NoticeBanner

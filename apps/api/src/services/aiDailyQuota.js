@@ -466,10 +466,91 @@ async function reserveDailyAiQuota({
   };
 }
 
+const HISTORY_HASH_TTL_SECONDS = 60 * 60 * 24 * 35; // 35 days
+const HISTORY_MAX_DAYS = 30;
+
+function buildHistoryHashKey(tenantId) {
+  return `ai:quota:history:${tenantId || "legacy"}`;
+}
+
+async function persistDailySnapshotToHistory({ tenantId, snapshot } = {}) {
+  const resolvedTenantId = tenantId || getTenantContext().tenantId || "legacy";
+  const usedSnapshot = snapshot || (await getDailyAiQuotaSnapshot({ tenantId: resolvedTenantId }));
+  const day = usedSnapshot.day || getBudgetDay();
+  const hashKey = buildHistoryHashKey(resolvedTenantId);
+
+  const record = {
+    day,
+    used_tokens: usedSnapshot.usage?.tenant?.used_tokens ?? 0,
+    limit_tokens: usedSnapshot.usage?.tenant?.limit_tokens ?? null,
+    chat_count: usedSnapshot.usage?.chats?.length ?? 0,
+    top_chats: (usedSnapshot.usage?.chats || []).slice(0, 10).map((c) => ({
+      wa_id_masked: c.wa_id_masked,
+      used_tokens: c.used_tokens,
+    })),
+  };
+
+  try {
+    const client = getRedis();
+    await client.hset(hashKey, day, JSON.stringify(record));
+    await client.expire(hashKey, HISTORY_HASH_TTL_SECONDS);
+    if (isVerbose()) {
+      logger.info("ai.daily_quota_history_persisted", { tenantId: resolvedTenantId, day });
+    }
+  } catch (error) {
+    logger.warn("ai.daily_quota_history_persist_failed", {
+      tenantId: resolvedTenantId,
+      day,
+      message: error.message,
+    });
+  }
+
+  return record;
+}
+
+async function getDailyUsageHistory({ tenantId, days = HISTORY_MAX_DAYS } = {}) {
+  const resolvedTenantId = tenantId || getTenantContext().tenantId || "legacy";
+  const hashKey = buildHistoryHashKey(resolvedTenantId);
+
+  let allEntries = [];
+
+  try {
+    const client = getRedis();
+    const rawMap = await client.hgetall(hashKey);
+    if (rawMap) {
+      for (const [, rawValue] of Object.entries(rawMap)) {
+        try {
+          const parsed = JSON.parse(rawValue);
+          if (parsed && parsed.day) {
+            allEntries.push(parsed);
+          }
+        } catch {
+          // skip malformed entries
+        }
+      }
+    }
+  } catch (error) {
+    logger.warn("ai.daily_quota_history_read_failed", {
+      tenantId: resolvedTenantId,
+      message: error.message,
+    });
+  }
+
+  // Sort descending by date, then take requested window
+  allEntries.sort((a, b) => (b.day > a.day ? 1 : -1));
+  const limited = allEntries.slice(0, Math.max(1, Number(days) || HISTORY_MAX_DAYS));
+  // Return ascending order for chart rendering
+  limited.reverse();
+
+  return limited;
+}
+
 module.exports = {
   normalizeAiQuotaConfig,
   getEffectiveAiQuotaConfig,
   getDailyAiQuotaSnapshot,
   reserveDailyAiQuota,
   invalidateAiQuotaConfigCache,
+  persistDailySnapshotToHistory,
+  getDailyUsageHistory,
 };

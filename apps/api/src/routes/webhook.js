@@ -450,6 +450,19 @@ router.post("/webhook", async (req, res) => {
                             continue;
                         }
 
+                        if (message.type === "video" || message.type === "image" || message.type === "document") {
+                            const activeFlow = await getActiveTenantFlow(tenantContext.tenantId);
+                            if (!activeFlow) continue;
+                            const mediaFallbackText =
+                                message.type === "video"
+                                    ? (activeFlow.flow?.ai?.video_fallback_text || "Recibí tu video 😊 Si tienes alguna consulta, escríbeme y te ayudo con servicios, precios, horarios o atención personal.")
+                                    : message.type === "image"
+                                        ? (activeFlow.flow?.ai?.image_fallback_text || "Recibí tu imagen 😊 Si tienes alguna consulta, escríbeme y te ayudo.")
+                                        : (activeFlow.flow?.ai?.document_fallback_text || "Recibí tu documento 😊 Si tienes alguna consulta, escríbeme y te ayudo.");
+                            await sendText(waId, mediaFallbackText);
+                            continue;
+                        }
+
                         if (isHandoffRequest(normalized, incomingText)) {
                             await setConversationStatus({
                                 conversationId: conversation.id,

@@ -85,7 +85,9 @@ module.exports = {
       { "routeId": "TRAT_MATRICECTOMIA_INFO", "intent": "matricectomia", "phrases": ["matricectomia", "matricetomia", "cirugia de unero", "operacion unero"] },
       { "routeId": "HONGOS_TIPO_TRAT",  "intent": "hongos",         "phrases": ["hongo", "hongos", "onicomicosis"] },
       { "routeId": "SVC_PEDICURE_INFO", "intent": "pedicure",       "phrases": ["pedicure", "pedicura", "pedicure clinico", "pedicura clinica", "limpieza de pies", "limpieza podal"] },
-      { "routeId": "CONSULTA_GRATUITA_INFO", "intent": "consulta", "phrases": ["consulta", "valoracion", "valoración", "evaluacion", "evaluación", "diagnostico", "diagnóstico", "revision", "revisión", "primera vez", "primera consulta", "primera visita", "ir a consultar", "quiero ir", "quiero consultar", "me pueden revisar", "pueden revisarme"] }
+      { "routeId": "CONSULTA_GRATUITA_INFO", "intent": "consulta", "phrases": ["consulta", "valoracion", "valoración", "evaluacion", "evaluación", "diagnostico", "diagnóstico", "revision", "revisión", "primera vez", "primera consulta", "primera visita", "ir a consultar", "quiero ir", "quiero consultar", "me pueden revisar", "pueden revisarme"] },
+      { "routeId": "ANESTESIA_INFO", "intent": "anestesia", "phrases": ["anestesia", "anestecia", "anestesia local", "anestesia en spray", "anestecia local", "anestecia en spray", "anestesia spray", "anestecia spray", "con anestesia", "sin anestesia", "anestesia inyectable", "anestesia topica", "duele la inyeccion", "duele la anestesia"] },
+      { "routeId": "DOCTOR_HANDOFF", "intent": "doctor", "phrases": ["doctor", "doctora", "dr", "dra", "medico", "medica", "que doctor", "que doctora", "con que doctor", "con que doctora", "quien me atiende", "con quien me atiendo", "nombre del doctor", "nombre de la doctora"] }
     ],
 
     // --- Calificadores de horario (detectan preguntas sobre horario de servicio específico) ---
@@ -284,6 +286,26 @@ module.exports = {
       "primera visita": "CONSULTA_GRATUITA_INFO",
       "quiero consultar": "CONSULTA_GRATUITA_INFO",
       "ir a consultar": "CONSULTA_GRATUITA_INFO",
+
+      "anestesia": "ANESTESIA_INFO",
+      "anestecia": "ANESTESIA_INFO",
+      "anestesia local": "ANESTESIA_INFO",
+      "anestesia en spray": "ANESTESIA_INFO",
+      "anestecia local": "ANESTESIA_INFO",
+      "anestecia en spray": "ANESTESIA_INFO",
+      "anestesia spray": "ANESTESIA_INFO",
+      "con anestesia": "ANESTESIA_INFO",
+      "sin anestesia": "ANESTESIA_INFO",
+      "anestesia inyectable": "ANESTESIA_INFO",
+
+      "doctor": "DOCTOR_HANDOFF",
+      "doctora": "DOCTOR_HANDOFF",
+      "que doctor": "DOCTOR_HANDOFF",
+      "que doctora": "DOCTOR_HANDOFF",
+      "con que doctor": "DOCTOR_HANDOFF",
+      "nombre del doctor": "DOCTOR_HANDOFF",
+      "quien me atiende": "DOCTOR_HANDOFF",
+      "con quien me atiendo": "DOCTOR_HANDOFF",
 
       "talon": "OTROS_MENU",
       "talones": "OTROS_MENU",
@@ -547,7 +569,7 @@ module.exports = {
     {
       "id": "UNERO_TIPO_TRAT",
       "type": "text",
-      "tags": ["unero"],
+      "tags": ["uñero"],
       "text": "Información de Uñero",
       "next": "UNERO_INFO_1"
     },
@@ -684,7 +706,7 @@ module.exports = {
     {
       "id": "TRAT_MATRICECTOMIA_INFO",
       "type": "text",
-      "tags": ["unero", "matricectomia"],
+      "tags": ["uñero", "matricectomia"],
       "text": "Información de tratamiento: Matricectomía",
       "next": "TRAT_MATRICECTOMIA_STEP_1"
     },
@@ -742,7 +764,7 @@ module.exports = {
     {
       "id": "TRAT_ORTESIS_INFO",
       "type": "text",
-      "tags": ["unero", "ortesis"],
+      "tags": ["uñero", "ortesis"],
       "text": "Información de tratamiento: Ortesis",
       "next": "TRAT_ORTESIS_STEP_1"
     },
@@ -1338,7 +1360,7 @@ module.exports = {
     {
       "id": "OTR_EXTRACCION_UNA_INFO",
       "type": "text",
-      "tags": ["extraccion_una"],
+      "tags": ["extraccion_uña"],
       "text": "Información de Extracción de Uña",
       "next": "OTR_EXTRACCION_STEP_1"
     },
@@ -1497,9 +1519,52 @@ module.exports = {
       ]
     },
     {
+      "id": "ANESTESIA_INFO",
+      "type": "text",
+      "text": "💉 *Sobre la anestesia en PODOPIE:*\n\n• La *anestesia en spray* está incluida en el precio de los procedimientos de *200 Bs* (uñeros en un pie) y *300 Bs* (uñeros en ambos pies).\n• La *anestesia local* (inyectable) tiene un costo adicional de *150 Bs*, aparte del valor del servicio.\n\nEl especialista determinará cuál corresponde según tu caso durante la valoración gratuita. 🩺",
+      "delayMs": 1000,
+      "next": "ANESTESIA_INFO_ACTIONS"
+    },
+    {
+      "id": "ANESTESIA_INFO_ACTIONS",
+      "type": "text",
+      "text": "¿Necesitas algo más?",
+      "delayMs": 2500,
+      "buttons": [
+        {
+          "label": "💰 VER PRECIOS",
+          "next": "PRECIOS_INFO"
+        },
+        {
+          "label": "👨‍💻 ATENCIÓN PERSONAL",
+          "next": "CONTACT_METHOD"
+        },
+        {
+          "label": "⬅️ VOLVER AL MENU",
+          "next": "MAIN_MENU"
+        }
+      ]
+    },
+    {
+      "id": "DOCTOR_HANDOFF",
+      "type": "text",
+      "text": "Para consultas sobre nuestro equipo médico o para solicitar atención con un especialista en particular, te recomendamos hablar directamente con uno de nuestros operadores. 👨‍⚕️\n\n¿Te derivamos con atención personalizada?",
+      "delayMs": 1000,
+      "buttons": [
+        {
+          "label": "✅ SÍ, DERIVARME",
+          "next": "CONTACT_METHOD"
+        },
+        {
+          "label": "❌ NO, VER MENÚ",
+          "next": "MAIN_MENU"
+        }
+      ]
+    },
+    {
       "id": "CONTACT_METHOD",
       "type": "text",
-      "tags": ["contact"],
+      "tags": [],
       "text": "Selección de forma de atención",
       "delayMs": 2500,
       "buttons": [

@@ -3076,7 +3076,7 @@ function App() {
               activePhone={activePhone}
               activeStatusLabel={activeStatusLabel}
               canManageStatus={canManageStatus}
-              canEditConversationFlags={canManageStatus}
+              canEditConversationFlags={canViewChats}
               currentUser={user}
               messageInputRef={messageInputRef}
               chatBodyRef={chatBodyRef}

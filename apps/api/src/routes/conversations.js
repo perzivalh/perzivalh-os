@@ -596,7 +596,7 @@ router.get("/conversations/:id", requireAuth, requireModulePermission("chat", "r
 });
 
 // PATCH /api/conversations/:id/flags
-router.patch("/conversations/:id/flags", requireAuth, requireModulePermission("chat", "write"), async (req, res) => {
+router.patch("/conversations/:id/flags", requireAuth, requireModulePermission("chat", "read"), async (req, res) => {
     const remarketing = req.body?.remarketing;
     const asistio = req.body?.asistio;
 

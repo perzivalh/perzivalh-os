@@ -32,6 +32,10 @@
   min-height: 0;
 }
 
+.dashboard-layout.table-expanded {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .dashboard-main,
 .dashboard-side {
   display: flex;

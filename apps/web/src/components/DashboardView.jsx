@@ -170,9 +170,6 @@ function DashboardView({
     : [];
 
   const operators = metrics?.operators ?? [];
-  const efficiencyValue = Math.round(metrics?.team_efficiency ?? 0);
-  const dailyGoal = metrics?.daily_goal ?? 500;
-  const resolvedToday = metrics?.resolved_today ?? 0;
 
   const totalPages = useMemo(() => {
     return Math.max(1, Math.ceil(tableTotal / tableQuery.page_size));
@@ -385,7 +382,7 @@ function DashboardView({
   const tableRangeEnd = Math.min(tableTotal, tableQuery.page * tableQuery.page_size);
 
   return (
-    <section className="dashboard-layout">
+    <section className={`dashboard-layout ${viewMode === "table" ? "table-expanded" : ""}`}>
       <div className="dashboard-main">
         <header className="dashboard-header">
           <div>
@@ -850,8 +847,8 @@ function DashboardView({
         )}
       </div>
 
-      <aside className="dashboard-side">
-        {viewMode === "cards" && (
+      {viewMode === "cards" && (
+        <aside className="dashboard-side">
           <div className="dash-card">
             <div className="dash-card-title">Performance de Operadores</div>
             <div className="dash-card-subtitle">
@@ -890,21 +887,8 @@ function DashboardView({
               )}
             </div>
           </div>
-        )}
-
-        <div className="dash-card">
-          <div className="dash-card-title">Eficiencia de Equipo</div>
-          <div className="dash-efficiency">
-            <div className="dash-efficiency-value">{efficiencyValue}%</div>
-            <div className="dash-progress">
-              <div className="dash-progress-fill" style={{ width: `${efficiencyValue}%` }} />
-            </div>
-            <div className="dash-muted">
-              {resolvedToday.toLocaleString()} cerradas de {dailyGoal.toLocaleString()} objetivo
-            </div>
-          </div>
-        </div>
-      </aside>
+        </aside>
+      )}
     </section>
   );
 }

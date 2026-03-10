@@ -19,6 +19,8 @@ const CONVERSATION_SELECT = {
   last_message_type: true,
   last_message_direction: true,
   primary_tag_id: true,
+  remarketing: true,
+  asistio: true,
   created_at: true,
   assigned_user: {
     select: {
@@ -358,6 +360,74 @@ async function getConversationById(conversationId) {
   return formatConversation(conversation);
 }
 
+async function updateConversationFlags({
+  conversationId,
+  remarketing,
+  asistio,
+  userId,
+}) {
+  const current = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: {
+      id: true,
+      remarketing: true,
+      asistio: true,
+    },
+  });
+
+  if (!current) {
+    throw new Error("conversation_not_found");
+  }
+
+  const data = {};
+  const changes = {};
+
+  if (typeof remarketing === "boolean") {
+    data.remarketing = remarketing;
+    if (current.remarketing !== remarketing) {
+      changes.remarketing = {
+        from: current.remarketing,
+        to: remarketing,
+      };
+    }
+  }
+
+  if (typeof asistio === "boolean") {
+    data.asistio = asistio;
+    if (current.asistio !== asistio) {
+      changes.asistio = {
+        from: current.asistio,
+        to: asistio,
+      };
+    }
+  }
+
+  if (!Object.keys(data).length) {
+    throw new Error("invalid_flags");
+  }
+
+  const updated = await prisma.conversation.update({
+    where: { id: conversationId },
+    data,
+    select: CONVERSATION_SELECT,
+  });
+  const formatted = formatConversation(updated);
+
+  if (userId && Object.keys(changes).length) {
+    await logAudit({
+      userId,
+      action: "conversation.flags_updated",
+      data: {
+        conversation_id: conversationId,
+        changes,
+      },
+    });
+  }
+
+  emitEvent("conversation:update", { conversation: formatted });
+  return formatted;
+}
+
 async function updateConversationVerification({
   conversationId,
   partnerId,
@@ -420,6 +490,7 @@ module.exports = {
   addTagToConversation,
   removeTagFromConversation,
   getConversationById,
+  updateConversationFlags,
   updateConversationVerification,
   updateConversationByWaId,
   refreshPrimaryTag,

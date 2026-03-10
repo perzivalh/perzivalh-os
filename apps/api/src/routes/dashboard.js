@@ -12,6 +12,7 @@ const router = express.Router();
 const { requireAuth, requireModulePermission } = require("../middleware/auth");
 const prisma = require("../db");
 const { getControlClient } = require("../control/controlClient");
+const { updateConversationFlags } = require("../services/conversations");
 
 const EXPORT_MAX_ROWS = 5000;
 const TABLE_PAGE_SIZE_DEFAULT = 25;
@@ -726,6 +727,7 @@ async function buildDashboardTablePayload({
           },
         },
         remarketing: true,
+        asistio: true,
       },
     }),
   ]);
@@ -781,6 +783,7 @@ async function buildDashboardTablePayload({
       line: lineMeta?.label || lineId || null,
       line_id: lineId,
       remarketing: conversation.remarketing ?? false,
+      asistio: conversation.asistio ?? false,
     };
   });
 
@@ -904,13 +907,16 @@ router.get("/dashboard/report", requireAuth, requireModulePermission("dashboard"
 router.patch("/dashboard/table/row/:id", requireAuth, requireModulePermission("dashboard", "read"), async (req, res) => {
   const { id } = req.params;
   const remarketing = req.body?.remarketing;
-  if (typeof remarketing !== "boolean") {
-    return res.status(400).json({ error: "remarketing must be boolean" });
+  const asistio = req.body?.asistio;
+  if (typeof remarketing !== "boolean" && typeof asistio !== "boolean") {
+    return res.status(400).json({ error: "invalid_flags" });
   }
   try {
-    await prisma.conversation.update({
-      where: { id },
-      data: { remarketing },
+    await updateConversationFlags({
+      conversationId: id,
+      remarketing,
+      asistio,
+      userId: req.user.id,
     });
     return res.json({ ok: true });
   } catch (error) {

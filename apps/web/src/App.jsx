@@ -1978,6 +1978,52 @@ function App() {
     }
   }
 
+  async function handleConversationFlagChange(field, value) {
+    if (!activeConversation || !["remarketing", "asistio"].includes(field)) {
+      return;
+    }
+
+    const snapshot = activeConversation;
+    const previousValue = Boolean(snapshot[field]);
+    const nextValue = Boolean(value);
+    const nextConversation = {
+      ...snapshot,
+      [field]: nextValue,
+    };
+
+    setActiveConversation(nextConversation);
+    setConversations((prev) =>
+      prev.map((item) =>
+        item.id === snapshot.id ? { ...item, [field]: nextValue } : item
+      )
+    );
+
+    try {
+      const data = await apiPatch(`/api/conversations/${snapshot.id}/flags`, {
+        [field]: nextValue,
+      });
+      const updatedConversation = data?.conversation || nextConversation;
+      setActiveConversation((prev) =>
+        prev?.id === snapshot.id ? { ...prev, ...updatedConversation } : prev
+      );
+      setConversations((prev) =>
+        prev.map((item) =>
+          item.id === snapshot.id ? { ...item, ...updatedConversation } : item
+        )
+      );
+    } catch (error) {
+      setActiveConversation((prev) =>
+        prev?.id === snapshot.id ? { ...prev, [field]: previousValue } : prev
+      );
+      setConversations((prev) =>
+        prev.map((item) =>
+          item.id === snapshot.id ? { ...item, [field]: previousValue } : item
+        )
+      );
+      setPageError(normalizeError(error));
+    }
+  }
+
   async function handleToggleTag(tagName) {
     if (!activeConversation) {
       return;
@@ -3030,6 +3076,7 @@ function App() {
               activePhone={activePhone}
               activeStatusLabel={activeStatusLabel}
               canManageStatus={canManageStatus}
+              canEditConversationFlags={canManageStatus}
               currentUser={user}
               messageInputRef={messageInputRef}
               chatBodyRef={chatBodyRef}
@@ -3044,6 +3091,7 @@ function App() {
               handleChatScroll={handleChatScroll}
               handleAssignSelf={handleAssignSelf}
               handleStatusChange={handleStatusChange}
+              handleConversationFlagChange={handleConversationFlagChange}
               handleToggleTag={handleToggleTag}
               handleAddTag={handleAddTag}
               setNoteInput={setNoteInput}

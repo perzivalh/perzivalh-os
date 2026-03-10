@@ -1,0 +1,2 @@
+ALTER TABLE "Conversation"
+  ADD COLUMN IF NOT EXISTS "asistio" BOOLEAN NOT NULL DEFAULT false;

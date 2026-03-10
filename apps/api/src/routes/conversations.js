@@ -25,6 +25,7 @@ const {
     assignConversation,
     addTagToConversation,
     removeTagFromConversation,
+    updateConversationFlags,
     createMessage,
     logAudit,
 } = require("../services/conversations");
@@ -54,6 +55,8 @@ const CONVERSATION_LIST_SELECT = {
     last_message_type: true,
     last_message_direction: true,
     primary_tag_id: true,
+    remarketing: true,
+    asistio: true,
     created_at: true,
     assigned_user: {
         select: {
@@ -590,6 +593,31 @@ router.get("/conversations/:id", requireAuth, requireModulePermission("chat", "r
     });
 
     return res.json({ conversation, messages });
+});
+
+// PATCH /api/conversations/:id/flags
+router.patch("/conversations/:id/flags", requireAuth, requireModulePermission("chat", "write"), async (req, res) => {
+    const remarketing = req.body?.remarketing;
+    const asistio = req.body?.asistio;
+
+    if (typeof remarketing !== "boolean" && typeof asistio !== "boolean") {
+        return res.status(400).json({ error: "invalid_flags" });
+    }
+
+    try {
+        const conversation = await updateConversationFlags({
+            conversationId: req.params.id,
+            remarketing,
+            asistio,
+            userId: req.user.id,
+        });
+        return res.json({ conversation });
+    } catch (error) {
+        if (error?.message === "invalid_flags") {
+            return res.status(400).json({ error: "invalid_flags" });
+        }
+        return res.status(404).json({ error: "not_found" });
+    }
 });
 
 // PATCH /api/conversations/:id/status

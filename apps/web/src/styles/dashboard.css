@@ -626,14 +626,15 @@ select.dash-filter:focus {
 
 /* Anchos proporcionales para que entren en pantalla sin scroll */
 .dash-table th:nth-child(1), .dash-table td:nth-child(1) { width: 14%; } /* Paciente */
-.dash-table th:nth-child(2), .dash-table td:nth-child(2) { width: 11%; } /* Numero */
+.dash-table th:nth-child(2), .dash-table td:nth-child(2) { width: 10%; } /* Numero */
 .dash-table th:nth-child(3), .dash-table td:nth-child(3) { width: 8%;  } /* Fecha */
 .dash-table th:nth-child(4), .dash-table td:nth-child(4) { width: 7%;  } /* Llamada */
 .dash-table th:nth-child(5), .dash-table td:nth-child(5) { width: 7%;  } /* Mensaje */
-.dash-table th:nth-child(6), .dash-table td:nth-child(6) { width: 18%; } /* Etiquetas */
-.dash-table th:nth-child(7), .dash-table td:nth-child(7) { width: 14%; } /* Operador */
-.dash-table th:nth-child(8), .dash-table td:nth-child(8) { width: 12%; } /* Linea */
-.dash-table th:nth-child(9), .dash-table td:nth-child(9) { width: 9%;  } /* Remarketing */
+.dash-table th:nth-child(6), .dash-table td:nth-child(6) { width: 16%; } /* Etiquetas */
+.dash-table th:nth-child(7), .dash-table td:nth-child(7) { width: 13%; } /* Operador */
+.dash-table th:nth-child(8), .dash-table td:nth-child(8) { width: 10%; } /* Linea */
+.dash-table th:nth-child(9), .dash-table td:nth-child(9) { width: 7%;  } /* Remarketing */
+.dash-table th:nth-child(10), .dash-table td:nth-child(10) { width: 8%;  } /* Asistio */
 
 .dash-table th {
   text-transform: uppercase;
@@ -682,14 +683,15 @@ select.dash-filter:focus {
   text-overflow: ellipsis;
 }
 
-.dash-remarketing-select {
-  width: 100%;
-  padding: 0.25rem 0.4rem;
-  font-size: 0.78rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--panel);
-  color: var(--text);
+.dash-flag-cell {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.dash-flag-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
   cursor: pointer;
 }
 

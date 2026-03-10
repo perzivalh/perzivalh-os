@@ -85,6 +85,13 @@ function buildTableParams({ selectedPeriod, selectedChannel, query, includePagin
   return params;
 }
 
+function getRowFlags(row, currentFlags) {
+  return {
+    remarketing: currentFlags?.remarketing ?? row?.remarketing ?? false,
+    asistio: currentFlags?.asistio ?? row?.asistio ?? false,
+  };
+}
+
 function DashboardView({
   metrics,
   channels,
@@ -119,8 +126,8 @@ function DashboardView({
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportMeta, setExportMeta] = useState(null);
   const [tableReloadSeq, setTableReloadSeq] = useState(0);
-  const [remarketingMap, setRemarketingMap] = useState({});
-  const remarketingPending = useRef({});
+  const [tableFlagMap, setTableFlagMap] = useState({});
+  const tableFlagPending = useRef({});
 
   const activeConversations = metrics?.active_conversations?.value ?? 0;
   const activeChange = metrics?.active_conversations?.change ?? null;
@@ -182,6 +189,12 @@ function DashboardView({
     return () => clearTimeout(timer);
   }, [searchDraft]);
 
+  useEffect(() => {
+    return () => {
+      Object.values(tableFlagPending.current).forEach((timer) => clearTimeout(timer));
+    };
+  }, []);
+
   const tableParamsKey = useMemo(() => {
     return JSON.stringify({
       period: selectedPeriod,
@@ -211,19 +224,16 @@ function DashboardView({
         const rows = data?.rows || [];
         setTableRows(rows);
         setTableTotal(data?.total || 0);
-        setRemarketingMap((prev) => {
-          const next = { ...prev };
-          rows.forEach((row) => {
-            if (!(row.id in next)) {
-              next[row.id] = row.remarketing ?? false;
-            }
-          });
-          return next;
-        });
+        setTableFlagMap(
+          Object.fromEntries(
+            rows.map((row) => [row.id, getRowFlags(row)])
+          )
+        );
       } catch (error) {
         if (!active) return;
         setTableRows([]);
         setTableTotal(0);
+        setTableFlagMap({});
         setTableError(error?.message || "No se pudo cargar la tabla");
       } finally {
         if (active) {
@@ -287,11 +297,24 @@ function DashboardView({
         row.tag || "-",
         row.operator || "-",
         row.line || "-",
+        row.remarketing ? "Si" : "No",
+        row.asistio ? "Si" : "No",
       ]));
 
       autoTable(doc, {
         startY: 34,
-        head: [["Paciente", "Numero", "Fecha", "Llamada", "Mensaje", "Etiqueta", "Operador", "Linea"]],
+        head: [[
+          "Paciente",
+          "Numero",
+          "Fecha",
+          "Llamada",
+          "Mensaje",
+          "Etiqueta",
+          "Operador",
+          "Linea",
+          "Remarketing",
+          "Asistio",
+        ]],
         body,
         styles: {
           fontSize: 8,
@@ -326,16 +349,34 @@ function DashboardView({
     }
   }
 
-  function handleRemarketingChange(rowId, value) {
-    const boolVal = value === "true";
-    setRemarketingMap((prev) => ({ ...prev, [rowId]: boolVal }));
-    clearTimeout(remarketingPending.current[rowId]);
-    remarketingPending.current[rowId] = setTimeout(async () => {
+  function handleFlagChange(row, field, value) {
+    const previousFlags = getRowFlags(row, tableFlagMap[row.id]);
+    const nextFlags = {
+      ...previousFlags,
+      [field]: Boolean(value),
+    };
+
+    setTableFlagMap((prev) => ({
+      ...prev,
+      [row.id]: nextFlags,
+    }));
+
+    clearTimeout(tableFlagPending.current[row.id]);
+    tableFlagPending.current[row.id] = setTimeout(async () => {
       try {
-        await apiPatch(`/api/dashboard/table/row/${rowId}`, { remarketing: boolVal });
+        await apiPatch(`/api/dashboard/table/row/${row.id}`, nextFlags);
+        setTableRows((prev) =>
+          prev.map((item) =>
+            item.id === row.id ? { ...item, ...nextFlags } : item
+          )
+        );
       } catch {
-        // revert on error
-        setRemarketingMap((prev) => ({ ...prev, [rowId]: !boolVal }));
+        setTableFlagMap((prev) => ({
+          ...prev,
+          [row.id]: previousFlags,
+        }));
+      } finally {
+        delete tableFlagPending.current[row.id];
       }
     }, 500);
   }
@@ -699,65 +740,82 @@ function DashboardView({
                     <th>Operador</th>
                     <th>Linea</th>
                     <th>Remarketing</th>
+                    <th>Asistio</th>
                   </tr>
                 </thead>
                 <tbody>
                   {tableLoading && (
                     <tr>
-                      <td colSpan="9" className="dash-table-empty">Cargando filas...</td>
+                      <td colSpan="10" className="dash-table-empty">Cargando filas...</td>
                     </tr>
                   )}
                   {!tableLoading && tableError && (
                     <tr>
-                      <td colSpan="9" className="dash-table-empty error">{tableError}</td>
+                      <td colSpan="10" className="dash-table-empty error">{tableError}</td>
                     </tr>
                   )}
                   {!tableLoading && !tableError && tableRows.length === 0 && (
                     <tr>
-                      <td colSpan="9" className="dash-table-empty">Sin resultados</td>
+                      <td colSpan="10" className="dash-table-empty">Sin resultados</td>
                     </tr>
                   )}
-                  {!tableLoading && !tableError && tableRows.map((row) => (
-                    <tr key={row.id}>
-                      <td className="dash-td-name">{sanitizeName(row.patient)}</td>
-                      <td>{row.number || "-"}</td>
-                      <td>{formatTableDate(row.date)}</td>
-                      <td>
-                        <span className={`dash-bool-pill ${row.call ? "yes" : "no"}`}>
-                          {row.call ? "Si" : "No"}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={`dash-bool-pill ${row.message ? "yes" : "no"}`}>
-                          {row.message ? "Si" : "No"}
-                        </span>
-                      </td>
-                      <td className="dash-td-tags-cell">
-                        <div className="dash-tags-list">
-                          {(row.tags || (row.tag ? [row.tag] : [])).length > 0
-                            ? (row.tags || [row.tag]).map((t) => (
-                              <span className="dash-tag-chip" key={t}>{t}</span>
-                            ))
-                            : <span className="dash-muted">-</span>
-                          }
-                        </div>
-                      </td>
-                      <td>
-                        {row.operator || <span className="dash-muted">Sin asignar</span>}
-                      </td>
-                      <td>{row.line || <span className="dash-muted">-</span>}</td>
-                      <td>
-                        <select
-                          className="dash-remarketing-select"
-                          value={String(remarketingMap[row.id] ?? row.remarketing ?? false)}
-                          onChange={(e) => handleRemarketingChange(row.id, e.target.value)}
-                        >
-                          <option value="false">No</option>
-                          <option value="true">Si</option>
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
+                  {!tableLoading && !tableError && tableRows.map((row) => {
+                    const rowFlags = getRowFlags(row, tableFlagMap[row.id]);
+
+                    return (
+                      <tr key={row.id}>
+                        <td className="dash-td-name">{sanitizeName(row.patient)}</td>
+                        <td>{row.number || "-"}</td>
+                        <td>{formatTableDate(row.date)}</td>
+                        <td>
+                          <span className={`dash-bool-pill ${row.call ? "yes" : "no"}`}>
+                            {row.call ? "Si" : "No"}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`dash-bool-pill ${row.message ? "yes" : "no"}`}>
+                            {row.message ? "Si" : "No"}
+                          </span>
+                        </td>
+                        <td className="dash-td-tags-cell">
+                          <div className="dash-tags-list">
+                            {(row.tags || (row.tag ? [row.tag] : [])).length > 0
+                              ? (row.tags || [row.tag]).map((t) => (
+                                <span className="dash-tag-chip" key={t}>{t}</span>
+                              ))
+                              : <span className="dash-muted">-</span>
+                            }
+                          </div>
+                        </td>
+                        <td>
+                          {row.operator || <span className="dash-muted">Sin asignar</span>}
+                        </td>
+                        <td>{row.line || <span className="dash-muted">-</span>}</td>
+                        <td className="dash-flag-cell">
+                          <input
+                            className="dash-flag-checkbox"
+                            type="checkbox"
+                            checked={Boolean(rowFlags.remarketing)}
+                            onChange={(event) =>
+                              handleFlagChange(row, "remarketing", event.target.checked)
+                            }
+                            aria-label={`Remarketing para ${row.patient || row.number || row.id}`}
+                          />
+                        </td>
+                        <td className="dash-flag-cell">
+                          <input
+                            className="dash-flag-checkbox"
+                            type="checkbox"
+                            checked={Boolean(rowFlags.asistio)}
+                            onChange={(event) =>
+                              handleFlagChange(row, "asistio", event.target.checked)
+                            }
+                            aria-label={`Asistio para ${row.patient || row.number || row.id}`}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

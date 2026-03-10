@@ -34,6 +34,7 @@ function ChatView({
   activePhone,
   activeStatusLabel,
   canManageStatus,
+  canEditConversationFlags,
   currentUser,
   messageInputRef,
   chatBodyRef,
@@ -48,6 +49,7 @@ function ChatView({
   handleChatScroll,
   handleAssignSelf,
   handleStatusChange,
+  handleConversationFlagChange,
   handleToggleTag,
   handleAddTag,
   setNoteInput,
@@ -710,6 +712,42 @@ function ChatView({
             <div className="info-name">{activeName}</div>
             <div className="info-phone">{activePhone || "Sin telefono"}</div>
           </div>
+
+          {activeConversation && (
+            <div className="info-section">
+              <div className="section-title">Seguimiento</div>
+              <div className="info-checkbox-list">
+                <label className="info-checkbox-item">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(activeConversation.remarketing)}
+                    onChange={(event) =>
+                      handleConversationFlagChange?.("remarketing", event.target.checked)
+                    }
+                    disabled={!canEditConversationFlags}
+                  />
+                  <span className="info-checkbox-copy">
+                    <strong>Remarketing</strong>
+                    <small>Marca si al contacto se le hizo remarketing.</small>
+                  </span>
+                </label>
+                <label className="info-checkbox-item">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(activeConversation.asistio)}
+                    onChange={(event) =>
+                      handleConversationFlagChange?.("asistio", event.target.checked)
+                    }
+                    disabled={!canEditConversationFlags}
+                  />
+                  <span className="info-checkbox-copy">
+                    <strong>Asistio</strong>
+                    <small>Marca si el contacto asistio o vino.</small>
+                  </span>
+                </label>
+              </div>
+            </div>
+          )}
 
           <div className="info-section">
             <div className="section-header">

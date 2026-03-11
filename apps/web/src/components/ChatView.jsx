@@ -1,4 +1,13 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+
+function normalizePanelCommandSearch(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "");
+}
 
 function ChatView({
   activeConversation,
@@ -20,6 +29,7 @@ function ChatView({
   messageBlocks,
   messageDraft,
   messageMode,
+  panelCommands,
   quickActions,
   tagInput,
   setTagInput,
@@ -134,6 +144,7 @@ function ChatView({
   const pullReadyRef = useRef(false);
   const [pullDistance, setPullDistance] = useState(0);
   const [pullReady, setPullReady] = useState(false);
+  const [activePanelCommandIndex, setActivePanelCommandIndex] = useState(0);
   const PULL_MAX = 96;
   const PULL_THRESHOLD = 56;
 
@@ -143,6 +154,28 @@ function ChatView({
     : pullReady
       ? "Suelta para actualizar"
       : "Desliza para recargar chats";
+  const slashDraft = String(messageDraft || "").trimStart();
+  const normalizedSlashQuery = normalizePanelCommandSearch(slashDraft.slice(1));
+  const shouldSuggestPanelCommands =
+    messageMode === "text" &&
+    !isAssignedToOther &&
+    slashDraft.startsWith("/");
+  const panelCommandSuggestions = useMemo(() => {
+    if (!shouldSuggestPanelCommands) {
+      return [];
+    }
+    const availableCommands = Array.isArray(panelCommands) ? panelCommands : [];
+    return availableCommands.filter((entry) => {
+      const command = String(entry?.command || "").trim();
+      if (!command.startsWith("/")) {
+        return false;
+      }
+      if (!normalizedSlashQuery) {
+        return true;
+      }
+      return normalizePanelCommandSearch(command.slice(1)).includes(normalizedSlashQuery);
+    });
+  }, [normalizedSlashQuery, panelCommands, shouldSuggestPanelCommands]);
 
   useEffect(() => {
     if (
@@ -258,6 +291,69 @@ function ChatView({
     if (shouldRefresh) {
       onRefreshConversations?.();
     }
+  }
+
+  useEffect(() => {
+    setActivePanelCommandIndex(0);
+  }, [normalizedSlashQuery, messageMode, activeConversation?.id]);
+
+  useEffect(() => {
+    setActivePanelCommandIndex((currentIndex) => {
+      if (!panelCommandSuggestions.length) {
+        return 0;
+      }
+      return Math.min(currentIndex, panelCommandSuggestions.length - 1);
+    });
+  }, [panelCommandSuggestions.length]);
+
+  function handleSelectPanelCommand(command) {
+    if (!command) {
+      return;
+    }
+    setMessageDraft(command);
+    messageInputRef.current?.focus();
+  }
+
+  function handleMessageInputKeyDown(event) {
+    if (!shouldSuggestPanelCommands || !panelCommandSuggestions.length) {
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActivePanelCommandIndex((currentIndex) => (
+        (currentIndex + 1) % panelCommandSuggestions.length
+      ));
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActivePanelCommandIndex((currentIndex) => (
+        (currentIndex - 1 + panelCommandSuggestions.length) % panelCommandSuggestions.length
+      ));
+      return;
+    }
+
+    if (event.key !== "Enter" && event.key !== "Tab") {
+      return;
+    }
+
+    const typedCommand = String(messageDraft || "").trim().toLowerCase();
+    const hasExactMatch = panelCommandSuggestions.some((entry) => (
+      String(entry?.command || "").trim().toLowerCase() === typedCommand
+    ));
+
+    if (event.key === "Enter" && hasExactMatch) {
+      return;
+    }
+
+    const selectedCommand = panelCommandSuggestions[activePanelCommandIndex]?.command;
+    if (!selectedCommand) {
+      return;
+    }
+    event.preventDefault();
+    handleSelectPanelCommand(selectedCommand);
   }
 
   function getPreview(conversation) {
@@ -664,14 +760,44 @@ function ChatView({
                   <option value="text">WhatsApp</option>
                   <option value="note">Nota interna</option>
                 </select>
-                <input
-                  ref={messageInputRef}
-                  type="text"
-                  placeholder="Escribe un mensaje..."
-                  value={messageDraft}
-                  onChange={(event) => setMessageDraft(event.target.value)}
-                  disabled={isAssignedToOther}
-                />
+                <div className="composer-input-wrap">
+                  {shouldSuggestPanelCommands && (
+                    <div className="composer-command-menu" role="listbox" aria-label="Comandos disponibles">
+                      {panelCommandSuggestions.length > 0 ? (
+                        panelCommandSuggestions.map((entry, index) => (
+                          <button
+                            key={`${entry.command}-${entry.node_id}-${index}`}
+                            type="button"
+                            className={`composer-command-item${index === activePanelCommandIndex ? " active" : ""}`}
+                            aria-selected={index === activePanelCommandIndex}
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              handleSelectPanelCommand(entry.command);
+                            }}
+                          >
+                            <span className="composer-command-name">{entry.command}</span>
+                            <span className="composer-command-meta">Comando rapido</span>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="composer-command-empty">No hay coincidencias para este comando.</div>
+                      )}
+                    </div>
+                  )}
+                  <input
+                    ref={messageInputRef}
+                    type="text"
+                    placeholder="Escribe un mensaje..."
+                    value={messageDraft}
+                    onChange={(event) => setMessageDraft(event.target.value)}
+                    onKeyDown={handleMessageInputKeyDown}
+                    disabled={isAssignedToOther}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                  />
+                </div>
                 {messageMode === "text" && (
                   <button
                     type="button"

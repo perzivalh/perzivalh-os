@@ -868,6 +868,69 @@ body[data-theme="dark"] .chat-encryption {
   min-width: 0;
 }
 
+.composer-input-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.composer-input-wrap input {
+  width: 100%;
+}
+
+.composer-command-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 0.65rem);
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+  max-height: 260px;
+  overflow-y: auto;
+  z-index: 5;
+}
+
+.composer-command-item {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--ink);
+  padding: 0.65rem 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.composer-command-item:hover,
+.composer-command-item.active {
+  border-color: var(--border);
+  background: var(--accent-soft-2);
+}
+
+.composer-command-name {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.composer-command-meta,
+.composer-command-empty {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.composer-command-empty {
+  padding: 0.65rem 0.8rem;
+}
+
 .message-mode {
   border: none;
   background: transparent;

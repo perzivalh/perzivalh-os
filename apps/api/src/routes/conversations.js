@@ -124,6 +124,26 @@ function resolvePanelCommand(flow, text) {
     return null;
 }
 
+function listPanelCommands(flow) {
+    const commands = flow?.panel_commands;
+    if (!commands || typeof commands !== "object") {
+        return [];
+    }
+
+    return Object.entries(commands)
+        .filter(([key, config]) => (
+            Boolean(normalizePanelCommandKey(key)) &&
+            config &&
+            typeof config === "object" &&
+            Boolean(config.node_id)
+        ))
+        .map(([command, config]) => ({
+            command: String(command || "").trim(),
+            node_id: config.node_id,
+        }))
+        .sort((left, right) => left.command.localeCompare(right.command, "es", { sensitivity: "base" }));
+}
+
 // Aplicar rate limiter a todas las rutas /api
 router.use(panelLimiter);
 
@@ -241,6 +261,18 @@ router.get(
             is_default: channel.is_default,
             created_at: channel.created_at,
         })),
+    });
+});
+
+// GET /api/panel-commands
+router.get("/panel-commands", requireAuth, requireModulePermission("chat", "read"), async (req, res) => {
+    if (!req.user?.tenant_id) {
+        return res.json({ commands: [] });
+    }
+
+    const activeFlow = await getActiveTenantFlow(req.user.tenant_id);
+    return res.json({
+        commands: listPanelCommands(activeFlow?.flow),
     });
 });
 

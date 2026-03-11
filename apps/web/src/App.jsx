@@ -267,6 +267,7 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [messageDraft, setMessageDraft] = useState("");
   const [messageMode, setMessageMode] = useState("text");
+  const [panelCommands, setPanelCommands] = useState([]);
   const [tags, setTags] = useState([]);
   const [users, setUsers] = useState([]);
   const [tagInput, setTagInput] = useState("");
@@ -850,6 +851,7 @@ function App() {
     if (!user || isSuperadminUser) {
       setBranding(null);
       setTenantChannels([]);
+      setPanelCommands([]);
       applyBrandingToCss(null);
       return;
     }
@@ -919,9 +921,11 @@ function App() {
 
   useEffect(() => {
     if (!user || !permissionsReady) {
+      setPanelCommands([]);
       return;
     }
     if (isSuperadminUser) {
+      setPanelCommands([]);
       return;
     }
     if (canLoadUsersDirectory) {
@@ -931,6 +935,18 @@ function App() {
       void loadTags();
     }
   }, [user, permissionsReady, canLoadUsersDirectory, canLoadTagsDirectory]);
+
+  useEffect(() => {
+    if (!user || !permissionsReady || isSuperadminUser) {
+      setPanelCommands([]);
+      return;
+    }
+    if (!hasPermission(currentRoleAccess, "modules", "chat")) {
+      setPanelCommands([]);
+      return;
+    }
+    void loadPanelCommands();
+  }, [user, permissionsReady, isSuperadminUser, currentRoleAccess]);
 
   useEffect(() => {
     if (!user) {
@@ -1295,6 +1311,15 @@ function App() {
       setTags(data.tags || []);
     } catch (error) {
       setPageError(normalizeError(error));
+    }
+  }
+
+  async function loadPanelCommands() {
+    try {
+      const data = await apiGet("/api/panel-commands");
+      setPanelCommands(Array.isArray(data.commands) ? data.commands : []);
+    } catch (error) {
+      setPanelCommands([]);
     }
   }
 
@@ -3062,6 +3087,7 @@ function App() {
               messageBlocks={messageBlocks}
               messageDraft={messageDraft}
               messageMode={messageMode}
+              panelCommands={panelCommands}
               quickActions={quickActions}
               tagInput={tagInput}
               setTagInput={setTagInput}

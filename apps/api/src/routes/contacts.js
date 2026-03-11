@@ -9,7 +9,12 @@ const logger = require("../lib/logger");
 const { getControlClient } = require("../control/controlClient");
 
 const contactImportService = require("../services/contactImportService");
-const { hasOdooConfig } = require("../services/odooClient");
+const {
+    hasOdooConfig,
+    checkCurrentOdooConnection,
+    formatOdooConnectionError,
+    clearOdooConfigCache,
+} = require("../services/odooClient");
 
 const CONTACTS_READ_ACCESS = [
     { group: "modules", key: "campaigns" },
@@ -97,7 +102,18 @@ router.get("/contacts/stats", requireAnyPermission(CONTACTS_READ_ACCESS), async 
  */
 router.get("/contacts/odoo-status", requireAnyPermission(CONTACTS_READ_ACCESS), async (req, res) => {
     try {
-        const connected = await hasOdooConfig();
+        clearOdooConfigCache(req.user?.tenant_id);
+        const configured = await hasOdooConfig();
+        const connection = configured
+            ? await checkCurrentOdooConnection()
+            : {
+                configured: false,
+                connected: false,
+                checked_at: new Date().toISOString(),
+                error: "Odoo no esta configurado para este tenant.",
+                error_code: "odoo_not_configured",
+                upstream_status: null,
+            };
         let sync = null;
         if (process.env.CONTROL_DB_URL && req.user?.tenant_id) {
             const control = getControlClient();
@@ -113,7 +129,15 @@ router.get("/contacts/odoo-status", requireAnyPermission(CONTACTS_READ_ACCESS), 
                 },
             });
         }
-        res.json({ connected, sync });
+        res.json({
+            configured,
+            connected: Boolean(connection.connected),
+            checked_at: connection.checked_at || null,
+            error: connection.error || null,
+            error_code: connection.error_code || null,
+            upstream_status: connection.upstream_status || null,
+            sync,
+        });
     } catch (error) {
         logger.error("Failed to check Odoo status", { error: error.message });
         res.status(500).json({ error: error.message });
@@ -135,6 +159,7 @@ router.get("/contacts/odoo-fields", requireAnyPermission(CONTACTS_READ_ACCESS), 
  */
 router.post("/contacts/import-odoo", requireAnyPermission(CONTACTS_WRITE_ACCESS), async (req, res) => {
     try {
+        clearOdooConfigCache(req.user?.tenant_id);
         const { limit } = req.body;
         const result = await contactImportService.importAllFromOdoo({ limit });
         await persistTenantOdooSyncState(req.user?.tenant_id, {
@@ -146,8 +171,16 @@ router.post("/contacts/import-odoo", requireAnyPermission(CONTACTS_WRITE_ACCESS)
         });
         res.json(result);
     } catch (error) {
+        const publicError = formatOdooConnectionError(error);
+        await persistTenantOdooSyncState(req.user?.tenant_id, {
+            last_error_at: new Date(),
+            last_error_message: publicError.message,
+        });
         logger.error("Odoo import failed", { error: error.message });
-        res.status(500).json({ error: error.message });
+        res.status(publicError.status || 500).json({
+            error: publicError.message,
+            code: publicError.code,
+        });
     }
 });
 
@@ -157,6 +190,7 @@ router.post("/contacts/import-odoo", requireAnyPermission(CONTACTS_WRITE_ACCESS)
  */
 router.post("/contacts/refresh-odoo", requireAnyPermission(CONTACTS_WRITE_ACCESS), async (req, res) => {
     try {
+        clearOdooConfigCache(req.user?.tenant_id);
         const syncRecord = await getTenantOdooSyncRecord(req.user?.tenant_id);
         const result = await contactImportService.refreshFromOdoo({
             lastPartnerWriteAt: syncRecord?.last_partner_write_at || null,
@@ -171,8 +205,16 @@ router.post("/contacts/refresh-odoo", requireAnyPermission(CONTACTS_WRITE_ACCESS
         });
         res.json(result);
     } catch (error) {
+        const publicError = formatOdooConnectionError(error);
+        await persistTenantOdooSyncState(req.user?.tenant_id, {
+            last_error_at: new Date(),
+            last_error_message: publicError.message,
+        });
         logger.error("Odoo refresh failed", { error: error.message });
-        res.status(500).json({ error: error.message });
+        res.status(publicError.status || 500).json({
+            error: publicError.message,
+            code: publicError.code,
+        });
     }
 });
 

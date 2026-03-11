@@ -2271,6 +2271,14 @@
   gap: 0.5rem;
 }
 
+.odoo-status-error {
+  margin-top: 0.75rem;
+  max-width: 720px;
+  color: #b45309;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
 .odoo-indicator {
   width: 8px;
   height: 8px;

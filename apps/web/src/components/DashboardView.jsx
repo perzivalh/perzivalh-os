@@ -323,6 +323,7 @@ function DashboardView({
   const [tableTotal, setTableTotal] = useState(0);
   const [tableLoading, setTableLoading] = useState(false);
   const [tableError, setTableError] = useState("");
+  const [viewMode, setViewMode] = useState("dashboard");
   const [tableQuery, setTableQuery] = useState({
     page: 1,
     page_size: TABLE_PAGE_SIZE,
@@ -388,6 +389,9 @@ function DashboardView({
   );
 
   useEffect(() => {
+    if (viewMode !== "table") {
+      return undefined;
+    }
     let active = true;
     async function loadTable() {
       setTableLoading(true);
@@ -424,7 +428,7 @@ function DashboardView({
     return () => {
       active = false;
     };
-  }, [tableParamsKey, selectedPeriod, selectedChannel, tableQuery, tableReloadSeq]);
+  }, [tableParamsKey, selectedPeriod, selectedChannel, tableQuery, tableReloadSeq, viewMode]);
 
   async function handleExportPdf() {
     setExportingPdf(true);
@@ -512,6 +516,218 @@ function DashboardView({
 
   const tableRangeStart = tableTotal === 0 ? 0 : (tableQuery.page - 1) * tableQuery.page_size + 1;
   const tableRangeEnd = Math.min(tableTotal, tableQuery.page * tableQuery.page_size);
+  const tablePanel = (
+    <Panel
+      title="Tabla operativa"
+      subtitle="Drilldown con tiempos por chat y estado Odoo"
+      className="panel-table overview-table-screen"
+      actions={
+        exportMeta ? (
+          <span className="overview-export-meta">
+            {exportMeta.error
+              ? exportMeta.error
+              : `${exportMeta.rows}/${exportMeta.total}${exportMeta.truncated ? " truncado" : ""}`}
+          </span>
+        ) : null
+      }
+    >
+      <div className="overview-table-toolbar">
+        <label className="ui-search overview-table-search">
+          <span>Buscar</span>
+          <input
+            type="search"
+            value={searchDraft}
+            onChange={(event) => setSearchDraft(event.target.value)}
+            placeholder="Paciente, numero o linea"
+          />
+        </label>
+
+        <select
+          className="dash-filter"
+          value={tableQuery.tag}
+          onChange={(event) => setTableQuery((prev) => ({ ...prev, page: 1, tag: event.target.value }))}
+        >
+          <option value="">Todas las etiquetas</option>
+          {tags.map((tag) => (
+            <option key={tag.id || tag.name} value={tag.name}>
+              {tag.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          className="dash-filter"
+          value={tableQuery.operator_id}
+          onChange={(event) => setTableQuery((prev) => ({ ...prev, page: 1, operator_id: event.target.value }))}
+        >
+          <option value="">Todos los operadores</option>
+          <option value="unassigned">Sin asignar</option>
+          {users.map((user) => (
+            <option key={user.id} value={user.id}>
+              {user.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          className="dash-filter"
+          value={tableQuery.call}
+          onChange={(event) => setTableQuery((prev) => ({ ...prev, page: 1, call: event.target.value }))}
+        >
+          <option value="">Llamada: todos</option>
+          <option value="yes">Con llamada</option>
+          <option value="no">Sin llamada</option>
+        </select>
+
+        <select
+          className="dash-filter"
+          value={tableQuery.message}
+          onChange={(event) => setTableQuery((prev) => ({ ...prev, page: 1, message: event.target.value }))}
+        >
+          <option value="">Mensaje: todos</option>
+          <option value="yes">Con mensaje</option>
+          <option value="no">Sin mensaje</option>
+        </select>
+
+        <select
+          className="dash-filter"
+          value={`${tableQuery.sort_by}:${tableQuery.sort_order}`}
+          onChange={(event) => {
+            const [sortBy, sortOrder] = event.target.value.split(":");
+            setTableQuery((prev) => ({
+              ...prev,
+              page: 1,
+              sort_by: sortBy,
+              sort_order: sortOrder,
+            }));
+          }}
+        >
+          <option value="date:desc">Fecha desc</option>
+          <option value="date:asc">Fecha asc</option>
+          <option value="patient:asc">Paciente A-Z</option>
+          <option value="number:asc">Numero asc</option>
+          <option value="operator:asc">Operador A-Z</option>
+        </select>
+      </div>
+
+      <div className="overview-table-meta">
+        <span>
+          Mostrando {tableRangeStart} - {tableRangeEnd} de {tableTotal.toLocaleString("es-BO")}
+        </span>
+      </div>
+
+      <div className="overview-table-wrap">
+        <table className="overview-table">
+          <thead>
+            <tr>
+              <th>Paciente</th>
+              <th>Numero</th>
+              <th>Fecha</th>
+              <th>Etiquetas</th>
+              <th>Operador</th>
+              <th>1ra resp.</th>
+              <th>Prom. resp.</th>
+              <th>Odoo</th>
+              <th>Remarketing</th>
+              <th>Asistio</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tableLoading && (
+              <tr>
+                <td colSpan="10" className="overview-table-empty">Cargando filas...</td>
+              </tr>
+            )}
+            {!tableLoading && tableError && (
+              <tr>
+                <td colSpan="10" className="overview-table-empty error">{tableError}</td>
+              </tr>
+            )}
+            {!tableLoading && !tableError && tableRows.length === 0 && (
+              <tr>
+                <td colSpan="10" className="overview-table-empty">Sin resultados</td>
+              </tr>
+            )}
+            {!tableLoading && !tableError && tableRows.map((row) => {
+              const rowFlags = getRowFlags(row, tableFlagMap[row.id]);
+              return (
+                <tr key={row.id}>
+                  <td>
+                    <div className="overview-table-patient">
+                      <strong>{row.patient_display || row.patient || "[sin nombre]"}</strong>
+                      <span>{row.line || "-"}</span>
+                    </div>
+                  </td>
+                  <td>{row.number || "-"}</td>
+                  <td>{formatTableDate(row.date)}</td>
+                  <td>
+                    <div className="overview-tag-list">
+                      {(row.tags || []).length ? (
+                        row.tags.map((tag) => (
+                          <span key={`${row.id}-${tag}`} className="overview-tag-pill">{tag}</span>
+                        ))
+                      ) : (
+                        <span className="overview-muted">Sin etiquetas</span>
+                      )}
+                    </div>
+                  </td>
+                  <td>{row.operator_display || "Sin asignar"}</td>
+                  <td>{formatDuration(row.first_human_response_min)}</td>
+                  <td>{formatDuration(row.avg_human_response_min)}</td>
+                  <td>
+                    <span className={`overview-status-pill tone-${MATCH_STATUS_TONES[row.odoo_match_status] || "muted"}`}>
+                      {MATCH_STATUS_LABELS[row.odoo_match_status] || row.odoo_match_status || "Sin match"}
+                    </span>
+                  </td>
+                  <td>
+                    <label className="overview-check">
+                      <input
+                        type="checkbox"
+                        checked={rowFlags.remarketing}
+                        onChange={(event) => handleToggleFlag(row, "remarketing", event.target.checked)}
+                      />
+                    </label>
+                  </td>
+                  <td>
+                    <div className="overview-asistio-cell">
+                      <label className="overview-check">
+                        <input
+                          type="checkbox"
+                          checked={rowFlags.asistio}
+                          onChange={(event) => handleToggleFlag(row, "asistio", event.target.checked)}
+                        />
+                      </label>
+                      <span className="overview-asistio-source">{row.asistio_source || "--"}</span>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="overview-table-pagination">
+        <button
+          className="ui-btn secondary"
+          type="button"
+          disabled={tableQuery.page <= 1}
+          onClick={() => setTableQuery((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
+        >
+          Anterior
+        </button>
+        <span>Pagina {tableQuery.page} / {totalPages}</span>
+        <button
+          className="ui-btn secondary"
+          type="button"
+          disabled={tableQuery.page >= totalPages}
+          onClick={() => setTableQuery((prev) => ({ ...prev, page: Math.min(totalPages, prev.page + 1) }))}
+        >
+          Siguiente
+        </button>
+      </div>
+    </Panel>
+  );
 
   return (
     <section className="overview-shell">
@@ -522,6 +738,22 @@ function DashboardView({
           <p>Estado actual del inbox, rendimiento humano y conversiones reconciliadas con Odoo.</p>
         </div>
         <div className="overview-controls">
+          <div className="overview-view-switch" role="tablist" aria-label="Vista dashboard">
+            <button
+              className={`overview-view-btn ${viewMode === "dashboard" ? "active" : ""}`}
+              type="button"
+              onClick={() => setViewMode("dashboard")}
+            >
+              Dashboard
+            </button>
+            <button
+              className={`overview-view-btn ${viewMode === "table" ? "active" : ""}`}
+              type="button"
+              onClick={() => setViewMode("table")}
+            >
+              Tabla
+            </button>
+          </div>
           <select
             className="dash-filter"
             value={selectedChannel || ""}
@@ -548,297 +780,92 @@ function DashboardView({
           <button className="ui-btn secondary" type="button" onClick={onRefresh}>
             Actualizar
           </button>
-          <button className="ui-btn secondary" type="button" onClick={handleExportPdf} disabled={exportingPdf}>
-            {exportingPdf ? "Exportando..." : "Exportar PDF"}
-          </button>
+          {viewMode === "table" ? (
+            <button className="ui-btn secondary" type="button" onClick={handleExportPdf} disabled={exportingPdf}>
+              {exportingPdf ? "Exportando..." : "Exportar PDF"}
+            </button>
+          ) : null}
           <button className="ui-btn primary" type="button" onClick={onGenerateReport}>
             Generar reporte
           </button>
         </div>
       </header>
 
-      <div className="overview-grid">
-        <section className="overview-stats">
-          {topCards.map((card) => (
-            <StatCard key={card.label} {...card} />
-          ))}
-        </section>
+      {viewMode === "dashboard" ? (
+        <div className="overview-grid">
+          <section className="overview-stats">
+            {topCards.map((card) => (
+              <StatCard key={card.label} {...card} />
+            ))}
+          </section>
 
-        <Panel
-          title="Serie diaria"
-          subtitle="Entrantes, bot y humano"
-          className="panel-timeline"
-        >
-          <TimelineChart items={overview.period_summary?.message_timeline || []} />
-        </Panel>
+          <Panel
+            title="Serie diaria"
+            subtitle="Entrantes, bot y humano"
+            className="panel-timeline"
+          >
+            <TimelineChart items={overview.period_summary?.message_timeline || []} />
+          </Panel>
 
-        <Panel
-          title="Estado actual"
-          subtitle="Distribucion instantanea"
-          className="panel-status"
-        >
-          <DonutChart data={overview.live?.status_distribution || []} />
-        </Panel>
+          <Panel
+            title="Estado actual"
+            subtitle="Distribucion instantanea"
+            className="panel-status"
+          >
+            <DonutChart data={overview.live?.status_distribution || []} />
+          </Panel>
 
-        <Panel
-          title="Funnel del flow"
-          subtitle={(overview.funnel?.tracking_ready ? "Unico por conversacion" : "Desde despliegue del tracking")}
-          className="panel-funnel"
-        >
-          <FunnelChart steps={overview.funnel?.steps || []} />
-        </Panel>
+          <Panel
+            title="Funnel del flow"
+            subtitle={(overview.funnel?.tracking_ready ? "Unico por conversacion" : "Desde despliegue del tracking")}
+            className="panel-funnel"
+          >
+            <FunnelChart steps={overview.funnel?.steps || []} />
+          </Panel>
 
-        <Panel
-          title="Cola pendiente"
-          subtitle="Antiguedad de espera"
-          className="panel-queue"
-        >
-          <BarList items={(overview.live?.queue_age_buckets || []).map((item) => ({ id: item.label, label: item.label, count: item.count }))} />
-        </Panel>
+          <Panel
+            title="Cola pendiente"
+            subtitle="Antiguedad de espera"
+            className="panel-queue"
+          >
+            <BarList items={(overview.live?.queue_age_buckets || []).map((item) => ({ id: item.label, label: item.label, count: item.count }))} />
+          </Panel>
 
-        <Panel
-          title="Equipo"
-          subtitle="Promedios por operador"
-          className="panel-team"
-        >
-          <TeamTable team={overview.team || []} />
-        </Panel>
+          <Panel
+            title="Equipo"
+            subtitle="Promedios por operador"
+            className="panel-team"
+          >
+            <TeamTable team={overview.team || []} />
+          </Panel>
 
-        <Panel
-          title="Odoo"
-          subtitle="Match por telefono y salud del sync"
-          className="panel-odoo"
-        >
-          <OdooStatusPanel odoo={overview.odoo} />
-        </Panel>
+          <Panel
+            title="Odoo"
+            subtitle="Match por telefono y salud del sync"
+            className="panel-odoo"
+          >
+            <OdooStatusPanel odoo={overview.odoo} />
+          </Panel>
 
-        <Panel
-          title="Temas top"
-          subtitle="Nodos mas visitados del flow"
-          className="panel-topics"
-        >
-          <BarList items={overview.funnel?.top_topics || []} />
-        </Panel>
+          <Panel
+            title="Temas top"
+            subtitle="Nodos mas visitados del flow"
+            className="panel-topics"
+          >
+            <BarList items={overview.funnel?.top_topics || []} />
+          </Panel>
 
-        <Panel
-          title="Nodos activos"
-          subtitle="Sesiones abiertas por nodo"
-          className="panel-nodes"
-        >
-          <BarList items={(overview.live?.current_nodes || []).map((item) => ({ ...item, label: item.node_id }))} />
-        </Panel>
-
-        <Panel
-          title="Tabla operativa"
-          subtitle="Drilldown con tiempos por chat y estado Odoo"
-          className="panel-table"
-          actions={
-            exportMeta ? (
-              <span className="overview-export-meta">
-                {exportMeta.error
-                  ? exportMeta.error
-                  : `${exportMeta.rows}/${exportMeta.total}${exportMeta.truncated ? " truncado" : ""}`}
-              </span>
-            ) : null
-          }
-        >
-          <div className="overview-table-toolbar">
-            <label className="ui-search overview-table-search">
-              <span>Buscar</span>
-              <input
-                type="search"
-                value={searchDraft}
-                onChange={(event) => setSearchDraft(event.target.value)}
-                placeholder="Paciente, numero o linea"
-              />
-            </label>
-
-            <select
-              className="dash-filter"
-              value={tableQuery.tag}
-              onChange={(event) => setTableQuery((prev) => ({ ...prev, page: 1, tag: event.target.value }))}
-            >
-              <option value="">Todas las etiquetas</option>
-              {tags.map((tag) => (
-                <option key={tag.id || tag.name} value={tag.name}>
-                  {tag.name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              className="dash-filter"
-              value={tableQuery.operator_id}
-              onChange={(event) => setTableQuery((prev) => ({ ...prev, page: 1, operator_id: event.target.value }))}
-            >
-              <option value="">Todos los operadores</option>
-              <option value="unassigned">Sin asignar</option>
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              className="dash-filter"
-              value={tableQuery.call}
-              onChange={(event) => setTableQuery((prev) => ({ ...prev, page: 1, call: event.target.value }))}
-            >
-              <option value="">Llamada: todos</option>
-              <option value="yes">Con llamada</option>
-              <option value="no">Sin llamada</option>
-            </select>
-
-            <select
-              className="dash-filter"
-              value={tableQuery.message}
-              onChange={(event) => setTableQuery((prev) => ({ ...prev, page: 1, message: event.target.value }))}
-            >
-              <option value="">Mensaje: todos</option>
-              <option value="yes">Con mensaje</option>
-              <option value="no">Sin mensaje</option>
-            </select>
-
-            <select
-              className="dash-filter"
-              value={`${tableQuery.sort_by}:${tableQuery.sort_order}`}
-              onChange={(event) => {
-                const [sortBy, sortOrder] = event.target.value.split(":");
-                setTableQuery((prev) => ({
-                  ...prev,
-                  page: 1,
-                  sort_by: sortBy,
-                  sort_order: sortOrder,
-                }));
-              }}
-            >
-              <option value="date:desc">Fecha desc</option>
-              <option value="date:asc">Fecha asc</option>
-              <option value="patient:asc">Paciente A-Z</option>
-              <option value="number:asc">Numero asc</option>
-              <option value="operator:asc">Operador A-Z</option>
-            </select>
-          </div>
-
-          <div className="overview-table-meta">
-            <span>
-              Mostrando {tableRangeStart} - {tableRangeEnd} de {tableTotal.toLocaleString("es-BO")}
-            </span>
-          </div>
-
-          <div className="overview-table-wrap">
-            <table className="overview-table">
-              <thead>
-                <tr>
-                  <th>Paciente</th>
-                  <th>Numero</th>
-                  <th>Fecha</th>
-                  <th>Etiquetas</th>
-                  <th>Operador</th>
-                  <th>1ra resp.</th>
-                  <th>Prom. resp.</th>
-                  <th>Odoo</th>
-                  <th>Remarketing</th>
-                  <th>Asistio</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tableLoading && (
-                  <tr>
-                    <td colSpan="10" className="overview-table-empty">Cargando filas...</td>
-                  </tr>
-                )}
-                {!tableLoading && tableError && (
-                  <tr>
-                    <td colSpan="10" className="overview-table-empty error">{tableError}</td>
-                  </tr>
-                )}
-                {!tableLoading && !tableError && tableRows.length === 0 && (
-                  <tr>
-                    <td colSpan="10" className="overview-table-empty">Sin resultados</td>
-                  </tr>
-                )}
-                {!tableLoading && !tableError && tableRows.map((row) => {
-                  const rowFlags = getRowFlags(row, tableFlagMap[row.id]);
-                  return (
-                    <tr key={row.id}>
-                      <td>
-                        <div className="overview-table-patient">
-                          <strong>{row.patient_display || row.patient || "[sin nombre]"}</strong>
-                          <span>{row.line || "-"}</span>
-                        </div>
-                      </td>
-                      <td>{row.number || "-"}</td>
-                      <td>{formatTableDate(row.date)}</td>
-                      <td>
-                        <div className="overview-tag-list">
-                          {(row.tags || []).length ? (
-                            row.tags.map((tag) => (
-                              <span key={`${row.id}-${tag}`} className="overview-tag-pill">{tag}</span>
-                            ))
-                          ) : (
-                            <span className="overview-muted">Sin etiquetas</span>
-                          )}
-                        </div>
-                      </td>
-                      <td>{row.operator_display || "Sin asignar"}</td>
-                      <td>{formatDuration(row.first_human_response_min)}</td>
-                      <td>{formatDuration(row.avg_human_response_min)}</td>
-                      <td>
-                        <span className={`overview-status-pill tone-${MATCH_STATUS_TONES[row.odoo_match_status] || "muted"}`}>
-                          {MATCH_STATUS_LABELS[row.odoo_match_status] || row.odoo_match_status || "Sin match"}
-                        </span>
-                      </td>
-                      <td>
-                        <label className="overview-check">
-                          <input
-                            type="checkbox"
-                            checked={rowFlags.remarketing}
-                            onChange={(event) => handleToggleFlag(row, "remarketing", event.target.checked)}
-                          />
-                        </label>
-                      </td>
-                      <td>
-                        <div className="overview-asistio-cell">
-                          <label className="overview-check">
-                            <input
-                              type="checkbox"
-                              checked={rowFlags.asistio}
-                              onChange={(event) => handleToggleFlag(row, "asistio", event.target.checked)}
-                            />
-                          </label>
-                          <span className="overview-asistio-source">{row.asistio_source || "--"}</span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="overview-table-pagination">
-            <button
-              className="ui-btn secondary"
-              type="button"
-              disabled={tableQuery.page <= 1}
-              onClick={() => setTableQuery((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
-            >
-              Anterior
-            </button>
-            <span>Pagina {tableQuery.page} / {totalPages}</span>
-            <button
-              className="ui-btn secondary"
-              type="button"
-              disabled={tableQuery.page >= totalPages}
-              onClick={() => setTableQuery((prev) => ({ ...prev, page: Math.min(totalPages, prev.page + 1) }))}
-            >
-              Siguiente
-            </button>
-          </div>
-        </Panel>
-      </div>
+          <Panel
+            title="Nodos activos"
+            subtitle="Sesiones abiertas por nodo"
+            className="panel-nodes"
+          >
+            <BarList items={(overview.live?.current_nodes || []).map((item) => ({ ...item, label: item.node_id }))} />
+          </Panel>
+        </div>
+      ) : (
+        tablePanel
+      )}
     </section>
   );
 }

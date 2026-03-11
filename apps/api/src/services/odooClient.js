@@ -128,6 +128,99 @@ async function hasOdooConfig() {
   return Boolean(resolved.config);
 }
 
+function getOdooErrorMeta(error) {
+  const status =
+    error?.response?.status ||
+    error?.status ||
+    error?.data?.http_status ||
+    null;
+  const upstreamMessage =
+    error?.response?.data?.error?.data?.message ||
+    error?.response?.data?.message ||
+    error?.data?.message ||
+    error?.message ||
+    null;
+  return {
+    status: status ? Number(status) : null,
+    upstreamMessage: upstreamMessage ? String(upstreamMessage) : null,
+  };
+}
+
+function formatOdooConnectionError(error) {
+  const meta = getOdooErrorMeta(error);
+  if (meta.status === 404) {
+    return {
+      code: "odoo_upstream_not_found",
+      status: 404,
+      message: "La URL configurada de Odoo respondio 404. Revisa el ngrok o la URL base.",
+    };
+  }
+  if ([502, 503, 504].includes(meta.status)) {
+    return {
+      code: "odoo_upstream_unavailable",
+      status: meta.status,
+      message: "Odoo no esta disponible en este momento. Revisa la URL o el servidor.",
+    };
+  }
+  if ((meta.upstreamMessage || "").toLowerCase().includes("master_key missing")) {
+    return {
+      code: "odoo_missing_master_key",
+      status: 500,
+      message: "Falta MASTER_KEY en el backend para leer la configuracion cifrada de Odoo.",
+    };
+  }
+  if ((meta.upstreamMessage || "").toLowerCase().includes("network")) {
+    return {
+      code: "odoo_network_error",
+      status: 502,
+      message: "No se pudo conectar con Odoo por un error de red.",
+    };
+  }
+  return {
+    code: "odoo_connection_failed",
+    status: meta.status || 500,
+    message: meta.upstreamMessage || "No se pudo conectar con Odoo.",
+  };
+}
+
+async function checkCurrentOdooConnection() {
+  try {
+    const configured = await hasOdooConfig();
+    if (!configured) {
+      return {
+        configured: false,
+        connected: false,
+        checked_at: new Date().toISOString(),
+        error: "Odoo no esta configurado para este tenant.",
+        error_code: "odoo_not_configured",
+        upstream_status: null,
+      };
+    }
+
+    await callKw("res.partner", "search_count", [[]], {});
+    const session = await module.exports.getSessionInfo();
+    return {
+      configured: true,
+      connected: true,
+      checked_at: new Date().toISOString(),
+      error: null,
+      error_code: null,
+      upstream_status: null,
+      session,
+    };
+  } catch (error) {
+    const formatted = formatOdooConnectionError(error);
+    return {
+      configured: true,
+      connected: false,
+      checked_at: new Date().toISOString(),
+      error: formatted.message,
+      error_code: formatted.code,
+      upstream_status: formatted.status,
+    };
+  }
+}
+
 function buildOdooConfig(input = {}) {
   return {
     baseUrl: normalizeBaseUrl(input.baseUrl || input.base_url || ""),
@@ -650,6 +743,8 @@ async function getPosOrdersWithLines(partnerId, limit = 50) {
 
 module.exports = {
   hasOdooConfig,
+  checkCurrentOdooConnection,
+  formatOdooConnectionError,
   validateOdooCredentials,
   normalizeCI,
   normalizePhone,

@@ -806,6 +806,31 @@ select.dash-filter:focus {
   justify-content: flex-end;
 }
 
+.overview-view-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.overview-view-btn {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+  padding: 0.55rem 0.95rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.overview-view-btn.active {
+  background: rgba(29, 78, 216, 0.12);
+  color: var(--accent);
+}
+
 .overview-grid {
   flex: 1;
   min-height: 0;
@@ -946,6 +971,10 @@ select.dash-filter:focus {
 .panel-table {
   grid-column: 1 / -1;
   min-height: 360px;
+}
+
+.overview-table-screen {
+  min-height: calc(100dvh - 240px);
 }
 
 .overview-timeline {
@@ -1363,6 +1392,10 @@ body[data-theme="dark"] .overview-header {
 
 body[data-theme="dark"] .overview-stat-card {
   background: linear-gradient(180deg, rgba(15, 23, 42, 0.96) 0%, rgba(30, 41, 59, 0.94) 100%);
+}
+
+body[data-theme="dark"] .overview-view-switch {
+  background: rgba(15, 23, 42, 0.88);
 }
 
 body[data-theme="dark"] .overview-table thead th {

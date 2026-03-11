@@ -415,14 +415,26 @@ function CampaignsView({
     }
   }
 
-  async function loadOdooStatus() {
+  async function loadOdooStatus(showToast = false) {
     setCheckingOdoo(true);
     try {
       const res = await apiGet("/api/contacts/odoo-status");
-      setOdooStatus(res || { connected: false });
+      const nextStatus = res || { connected: false, configured: false };
+      setOdooStatus(nextStatus);
+      if (showToast) {
+        pushToast({
+          type: nextStatus.connected ? "success" : "error",
+          message: nextStatus.connected
+            ? "Conexion Odoo validada"
+            : nextStatus.error || "Odoo no esta disponible",
+        });
+      }
     } catch (err) {
       console.error("Failed to load Odoo status", err);
-      setOdooStatus({ connected: false });
+      setOdooStatus({ connected: false, configured: false, error: err.message || "No se pudo validar Odoo" });
+      if (showToast) {
+        pushToast({ type: "error", message: err.message || "No se pudo validar Odoo" });
+      }
     } finally {
       setCheckingOdoo(false);
     }
@@ -1815,13 +1827,20 @@ function CampaignsView({
                   <div className="audience-flow-content odoo-flow">
                     <div className="odoo-status">
                       <span className={`odoo-indicator ${odooStatus.connected ? "on" : "off"}`} />
-                      Estado: {odooStatus.connected ? "Odoo conectado" : "Odoo no conectado"}
+                      Estado: {odooStatus.connected
+                        ? "Odoo conectado"
+                        : odooStatus.configured
+                          ? "Configurado sin conexion"
+                          : "Odoo no configurado"}
                     </div>
+                    {odooStatus.error ? (
+                      <div className="odoo-status-error">{odooStatus.error}</div>
+                    ) : null}
                     <div className="odoo-actions">
                       <button
                         className="campaigns-ghost"
                         type="button"
-                        onClick={loadOdooStatus}
+                        onClick={() => loadOdooStatus(true)}
                         disabled={checkingOdoo}
                       >
                         {checkingOdoo ? "Validando..." : "Validar Conexión"}

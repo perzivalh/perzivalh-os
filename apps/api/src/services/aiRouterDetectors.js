@@ -158,6 +158,10 @@ function detectDeterministicDomainIntentRoute(text, flowAi) {
   return best;
 }
 
+function isDirectSupportRoute(routeId) {
+  return routeId === "CONTACT_METHOD" || routeId === "DOCTOR_HANDOFF";
+}
+
 function shouldForceKeywordRoute(text) {
   const normalized = normalizeText(text || "").toLowerCase().trim();
   if (!normalized) {
@@ -390,6 +394,19 @@ function buildDeterministicDecision({ text, previousQuestion, summary, knowledge
   const tokenCount = softenedNormalized.split(/\s+/).filter(Boolean).length;
   const shouldForceRoute = shouldForceKeywordRoute(raw);
   const isPrioritizedHoursServiceRoute = deterministicIntent?.intent?.startsWith("hours_service_override_");
+  const isDirectSupportIntent = isDirectSupportRoute(deterministicIntent?.routeId);
+
+  if (isDirectSupportIntent && !inClarifyFlow) {
+    return {
+      action: "route",
+      route_id: deterministicIntent.routeId,
+      text: "",
+      reason: `deterministic_support_route:${deterministicIntent.intent || deterministicIntent.matchedPhrase || "support"}`,
+      ai_used: false,
+      clear_pending: Boolean(previousQuestion),
+      reset_turns: true,
+    };
+  }
 
   if (isPrioritizedHoursServiceRoute && !looksMultiIntent && !inClarifyFlow) {
     return {

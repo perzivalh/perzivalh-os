@@ -209,7 +209,17 @@ function isHandoffRequest(normalized, rawText) {
     if (!normalized && !rawText) return false;
     const text = normalized || normalizeText(rawText);
     if (text === "5") return true;
-    return text.includes("asesor") || text.includes("recepcion") || text.includes("humano");
+    return [
+        "asesor",
+        "asesora",
+        "recepcion",
+        "humano",
+        "operador",
+        "operadora",
+        "agente",
+        "persona real",
+        "alguien real",
+    ].some((term) => text.includes(term));
 }
 
 function isMenuRequest(normalized) {

@@ -48,7 +48,15 @@ function buildRoutingNodeCatalog(flow) {
 
   // Also include special AI config nodes and the start node
   const ai = flow?.ai || {};
-  [ai.handoff_node_id, ai.services_node_id, ai.out_of_scope_node_id, flow?.start_node_id]
+  [
+    ai.handoff_node_id,
+    ai.services_node_id,
+    ai.out_of_scope_node_id,
+    flow?.start_node_id,
+    ...(ai.deterministic_intents || []).map((intent) => intent?.routeId),
+    ...(ai.hours_qualified_service_intents || []).map((intent) => intent?.routeId),
+    ...Object.values(ai.keyword_routes || {}),
+  ]
     .filter(Boolean)
     .forEach((id) => buttonTargets.add(id));
 
@@ -182,20 +190,22 @@ ${ubicacionesList || "- Consultar disponibilidad"}
 5. Si pregunta el precio de un tratamiento especifico -> route al nodo de ese tratamiento, NO a PRECIOS_INFO.
 6. Si pide precios/costos/tarifas generales -> route PRECIOS_INFO.
 7. Si pide horarios/ubicacion/sucursal/direccion -> route HORARIOS_INFO.
-8. Si pide contacto/asesor/humano -> route CONTACT_METHOD (o handoff si hay urgencia).
+8. Si pide contacto/asesor/humano/operador/operadora/agente/persona real -> route CONTACT_METHOD (o handoff si hay urgencia).
 9. Si no sabe que servicio necesita -> show_services.
 10. Si el usuario se despide, agradece o hace un comentario social (ej: "gracias", "mañana iré", "ok perfecto", "hasta luego", "chau", "voy mañana") -> respond con texto breve y amable de despedida. NUNCA uses out_of_scope para mensajes sociales o de cierre.
 11. Si el usuario expresa queja, reclamo o malestar (ej: "pésimo servicio", "qué mal", "encima responden automático", "sugerencia") -> respond con texto empatico y ofrece escribir "asesor" para hablar con el equipo. No uses out_of_scope.
-12. Si el tema claramente NO es de pies/podologia (ej: peluqueria, reposteria, barberia, maquillaje, manos) -> respond con texto breve aclarando que solo atienden pies. Nunca menciones literalmente lo que dijo el usuario en el mensaje de rechazo.
-13. Usa clarify solo si falta dato clave y como maximo una vez.
-14. NUNCA repitas la misma pregunta de clarificacion.
+12. Si pregunta por doctor, doctora, dr, dra, medico, medica, por disponibilidad de algun doctor, por un nombre propio de especialista o por quien atiende -> route DOCTOR_HANDOFF. Nunca uses out_of_scope ni clarify para esto.
+13. Si el tema claramente NO es de pies/podologia (ej: peluqueria, reposteria, barberia, maquillaje, manos) -> respond con texto breve aclarando que solo atienden pies. Nunca menciones literalmente lo que dijo el usuario en el mensaje de rechazo.
+14. Usa clarify solo si falta dato clave y como maximo una vez.
+15. NUNCA repitas la misma pregunta de clarificacion.
 
 ## Rutas Directas (prioridad alta)
 - precio/costo/cuanto/tarifa -> PRECIOS_INFO
 - si precio/costo aparece junto con un servicio especifico -> route al nodo del servicio especifico
 - servicio/tratamiento/que ofrecen/que tienen -> SERVICIOS_MENU (solo si sigue siendo podologia)
 - horario/ubicacion/donde/sucursal/direccion/como llegar -> HORARIOS_INFO
-- asesor/humano/llamar/contacto/atencion personal -> CONTACT_METHOD
+- asesor/humano/operador/operadora/agente/llamar/contacto/atencion personal/persona real -> CONTACT_METHOD
+- doctor/doctora/dr/dra/medico/medica/quien me atiende/esta la dra -> DOCTOR_HANDOFF
 - ficha/cita/agendar/turno/reservar -> respond explicando que la atencion es por orden de llegada
 - unero/una encarnada -> UNERO_TIPO_TRAT
 - hongo/onicomicosis -> HONGOS_TIPO_TRAT
@@ -281,7 +291,7 @@ Tu trabajo es decidir accion y route_id. No expliques nada, no redactes horarios
 
 Reglas:
 - route: si pide servicios, tratamiento, horarios, ubicacion, direccion, sucursal, precios o contacto del negocio.
-- handoff: si pide humano/asesor o hay urgencia medica.
+- handoff: si pide humano/asesor/operador o hay urgencia medica.
 - respond: si es fuera de podologia, saludo, despedida, agradecimiento, queja/reclamo, o ficha/cita/agendar.
 - clarify: solo si falta contexto real y maximo una vez.
 - show_services: si es del negocio pero no identificas nodo exacto.
@@ -292,7 +302,8 @@ Atajos:
 - ubicacion, direccion, sucursal, como llegar -> HORARIOS_INFO
 - precio, costo, cuanto cuesta -> PRECIOS_INFO
 - si precio/costo aparece junto con un servicio especifico -> route al nodo del servicio especifico
-- asesor, humano, recepcion -> CONTACT_METHOD
+- asesor, humano, operador, operadora, agente, recepcion -> CONTACT_METHOD
+- doctor, doctora, dr, dra, medico, medica, quien me atiende -> DOCTOR_HANDOFF
 - ficha, cita, turno, agendar, reservar, hacerse atender -> respond: atencion por orden de llegada, sin cita previa
 - consulta, valoracion, evaluacion, diagnostico, revision, primera vez -> CONSULTA_GRATUITA_INFO
 

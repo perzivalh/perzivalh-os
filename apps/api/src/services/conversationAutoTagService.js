@@ -2,6 +2,7 @@ const prisma = require("../db");
 const { normalizeText } = require("../lib/normalize");
 const { addTagToConversation } = require("./conversations");
 const audienceAutomationService = require("./audienceAutomationService");
+const { canonicalizeTagName, normalizeTagNames } = require("./tagNormalization");
 
 const SERVICE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 let servicesCache = null;
@@ -9,11 +10,6 @@ let servicesCacheAt = 0;
 
 function normalizeValue(value) {
   return normalizeText(value || "").toLowerCase().trim();
-}
-
-function normalizeTagNames(tags) {
-  const values = Array.isArray(tags) ? tags : [tags];
-  return [...new Set(values.map((tag) => normalizeValue(tag)).filter(Boolean))];
 }
 
 async function loadActiveServices() {
@@ -41,7 +37,7 @@ async function deriveServiceTags({ text, routeId } = {}) {
 
   const services = await loadActiveServices();
   for (const svc of services) {
-    const tagName = svc.name.trim().toLowerCase();
+    const tagName = canonicalizeTagName(svc.name);
     if (!tagName) continue;
 
     // Match by routeId containing part of the service name

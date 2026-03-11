@@ -11,6 +11,7 @@ const { getTenantContext } = require("../tenancy/tenantContext");
 const { setConversationStatus, addTagToConversation } = require("../services/conversations");
 const { routeWithAI } = require("../services/aiRouter");
 const { applyAutoTagsByWaId, applyNamedTagsByWaId } = require("../services/conversationAutoTagService");
+const { normalizeTagKey, normalizeTagNames } = require("../services/tagNormalization");
 
 const MAX_LIST_TITLE = 24;
 const BUTTON_TITLE_LIMIT = 20;
@@ -309,11 +310,6 @@ async function setConversationToPending(waId) {
   });
 }
 
-function normalizeTagNames(tagNames) {
-  const values = Array.isArray(tagNames) ? tagNames : [tagNames];
-  return [...new Set(values.map((value) => normalizeLabel(value)).filter(Boolean))];
-}
-
 function getNodeById(flow, nodeId) {
   if (!nodeId || !Array.isArray(flow?.nodes)) {
     return null;
@@ -374,17 +370,17 @@ function getLegacyIntentTagsForNode(flow, nodeId, reason) {
   const hourIntents = Array.isArray(flow.ai.hours_qualified_service_intents)
     ? flow.ai.hours_qualified_service_intents
     : [];
-  const reasonTag = normalizeTagNames(extractTagFromReason(reason))[0] || null;
+  const reasonTag = normalizeTagKey(extractTagFromReason(reason));
 
   if (reasonTag) {
     const reasonMatchedTags = normalizeTagNames([
       ...deterministicIntents
-        .filter((intent) => intent?.routeId === nodeId && normalizeLabel(intent.intent) === reasonTag)
+        .filter((intent) => intent?.routeId === nodeId && normalizeTagKey(intent.intent) === reasonTag)
         .map((intent) => intent.intent),
       ...hourIntents
         .filter((intent) => intent?.routeId === nodeId)
         .map((intent) => intent.intent?.replace(/^hours_service_override_/, ""))
-        .filter((intent) => normalizeLabel(intent) === reasonTag),
+        .filter((intent) => normalizeTagKey(intent) === reasonTag),
     ]);
     if (reasonMatchedTags.length) {
       return reasonMatchedTags;

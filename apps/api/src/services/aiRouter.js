@@ -423,7 +423,7 @@ async function routeWithStandardProviderRouteFirst({
     };
   }
 
-  const fallbackText = evaluateDomainGate({ text, knowledge, flowAi: aiFlow }).classification === "out_of_domain"
+  const fallbackText = evaluateDomainGate({ text, knowledge, flowAi: flow?.ai }).classification === "out_of_domain"
     ? buildOutOfDomainResponseText({ text, knowledge })
     : "Entiendo tu consulta. Te ayudo con eso.";
 
@@ -615,9 +615,10 @@ async function routeWithAI({ text, flow, config, session, waId }) {
         return cacheAndReturn(cloudflareDecision);
       }
       logger.warn("ai.router_cloudflare_no_decision", { flowId, model });
+      const businessScope = knowledge?.clinica?.especialidad || "el negocio";
       return cacheAndReturn({
         action: "respond",
-        text: "Puedo ayudarte con temas de pies y podología. Si quieres, dime si buscas información de un servicio, horarios, precios o atención con un asesor.",
+        text: `Puedo ayudarte con consultas relacionadas con ${businessScope}. Si quieres, dime si buscas información de un servicio, horarios, precios o atención con un asesor.`,
         ai_used: false,
       });
     } catch (error) {
@@ -636,9 +637,10 @@ async function routeWithAI({ text, flow, config, session, waId }) {
         );
       }
       logger.error("ai.router_error", { message: error.message, provider, model, flowId });
+      const businessScope = knowledge?.clinica?.especialidad || "el negocio";
       return cacheAndReturn({
         action: "respond",
-        text: "Tuve un problema procesando tu mensaje, pero puedo ayudarte con temas de pies. Si quieres, dime el servicio que buscas o si prefieres hablar con un asesor.",
+        text: `Tuve un problema procesando tu mensaje, pero puedo ayudarte con consultas relacionadas con ${businessScope}. Si quieres, dime el servicio que buscas o si prefieres hablar con un asesor.`,
         ai_used: false,
       });
     }

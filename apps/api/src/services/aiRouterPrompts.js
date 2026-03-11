@@ -19,18 +19,7 @@ const { evaluateDomainGate } = require("./aiRouterDomainGate");
  * Load knowledge base for a flow
  */
 function loadKnowledgeBase(flowId) {
-  try {
-    // Try to load flow-specific knowledge
-    const knowledgePath = `../../flows/knowledge/${flowId.replace("botpodito", "podopie")}.knowledge.js`;
-    return require(knowledgePath);
-  } catch {
-    // Fallback to default PODOPIE knowledge
-    try {
-      return require("../../flows/knowledge/podopie.knowledge.js");
-    } catch {
-      return null;
-    }
-  }
+  return knowledgeService.loadKnowledgeFromFile(flowId);
 }
 
 function buildRoutingNodeCatalog(flow) {
@@ -74,6 +63,42 @@ function buildRoutingNodeCatalog(flow) {
     .join("\n");
 }
 
+function buildDeterministicRouteHints(flow) {
+  const deterministicIntents = Array.isArray(flow?.ai?.deterministic_intents)
+    ? flow.ai.deterministic_intents
+    : [];
+  const routes = new Map();
+
+  for (const intent of deterministicIntents) {
+    const routeId = String(intent?.routeId || "").trim();
+    if (!routeId) {
+      continue;
+    }
+    const phrases = Array.isArray(intent?.phrases)
+      ? intent.phrases.map((phrase) => String(phrase || "").trim()).filter(Boolean)
+      : [];
+    if (!phrases.length) {
+      continue;
+    }
+    if (!routes.has(routeId)) {
+      routes.set(routeId, []);
+    }
+    const current = routes.get(routeId);
+    for (const phrase of phrases) {
+      if (!current.includes(phrase)) {
+        current.push(phrase);
+      }
+      if (current.length >= 5) {
+        break;
+      }
+    }
+  }
+
+  return [...routes.entries()]
+    .map(([routeId, phrases]) => `- ${phrases.join(", ")} -> ${routeId}`)
+    .join("\n");
+}
+
 /**
  * Build comprehensive system prompt with full context
  */
@@ -83,9 +108,10 @@ function buildSystemPrompt(knowledge, session, flow) {
   const clinica = kb.clinica || {};
   const servicios = kb.servicios || {};
   const ubicaciones = kb.ubicaciones || {};
-  const nombre = personalidad.nombre || "PODITO";
-  const clinicaNombre = clinica.nombre || "PODOPIE";
-  const ciudad = clinica.ciudad || "Santa Cruz, Bolivia";
+  const nombre = personalidad.nombre || "Asistente";
+  const clinicaNombre = clinica.nombre || "Mi Empresa";
+  const ciudad = clinica.ciudad || "tu ciudad";
+  const businessScope = clinica.especialidad || "el rubro del negocio";
 
   const serviciosList = Object.values(servicios)
     .map((svc) => {
@@ -141,12 +167,13 @@ function buildSystemPrompt(knowledge, session, flow) {
     .filter(Boolean)
     .join("\n");
 
-  const nodeCatalog = flow ? buildRoutingNodeCatalog(flow) : `MAIN_MENU, SERVICIOS_MENU, HORARIOS_INFO, PRECIOS_INFO, CONTACT_METHOD, UNERO_TIPO_TRAT, HONGOS_TIPO_TRAT, SVC_PEDICURE_INFO, SVC_PODOPEDIATRIA_INFO, SVC_PODOGERIATRIA_INFO, OTR_PIE_DIABETICO_INFO, OTR_CALLOSIDAD_INFO, OTR_HELOMA_INFO, OTR_VERRUGA_PLANTAR_INFO, OTR_EXTRACCION_UNA_INFO, OTR_PIE_ATLETA_INFO, OTROS_MENU`;
+  const nodeCatalog = flow ? buildRoutingNodeCatalog(flow) : "- MAIN_MENU";
+  const directRoutes = flow ? buildDeterministicRouteHints(flow) : "";
 
   return `# ${nombre} - Asistente Virtual de ${clinicaNombre}
 
 ## Tu Identidad
-Eres ${nombre} ${personalidad.emoji || "??"}, el asistente virtual de ${clinicaNombre}, una clinica de podologia en ${ciudad}.
+Eres ${nombre} ${personalidad.emoji || "??"}, el asistente virtual de ${clinicaNombre}, un negocio enfocado en ${businessScope} en ${ciudad}.
 
 ## Tu Personalidad
 - Tono: ${personalidad.tono || "amable, calido, profesional"}
@@ -156,8 +183,8 @@ Eres ${nombre} ${personalidad.emoji || "??"}, el asistente virtual de ${clinicaN
 - Se conversacional, NO robotico
 
 ## Importante
-- ${clinica.especialidad || "SOLO trabajamos con pies"}
-- NO hacemos: ${(clinica.no_hacemos || ["manos", "manicure"]).join(", ")}
+- ${businessScope}
+- NO hacemos: ${(clinica.no_hacemos || ["fuera del alcance del negocio"]).join(", ")}
 
 ## Servicios Disponibles (resumen)
 ${serviciosList || "- Consultar en menu"}
@@ -183,38 +210,27 @@ ${ubicacionesList || "- Consultar disponibilidad"}
 - out_of_scope: permitido, pero si lo usas incluye text personalizado
 
 ## Reglas de Decision (prioridad)
-1. Si existe un nodo claro para el tema podologico -> route con route_id exacto.
+1. Si existe un nodo claro para el tema del negocio -> route con route_id exacto.
 2. Si saluda -> respond con saludo corto y pregunta como ayudar.
 3. Si hay dolor intenso/urgencia/sangrado/pus/infeccion/ulcera -> handoff.
 4. Si pregunta por ficha, cita, turno, reserva o agendamiento -> respond que la atencion es por orden de llegada y no necesita cita previa.
-5. Si pregunta el precio de un tratamiento especifico -> route al nodo de ese tratamiento, NO a PRECIOS_INFO.
-6. Si pide precios/costos/tarifas generales -> route PRECIOS_INFO.
-7. Si pide horarios/ubicacion/sucursal/direccion -> route HORARIOS_INFO.
-8. Si pide contacto/asesor/humano/operador/operadora/agente/persona real -> route CONTACT_METHOD (o handoff si hay urgencia).
+5. Si pregunta el precio de un tratamiento especifico -> route al nodo de ese tratamiento, no al de precios generales.
+6. Si pide precios/costos/tarifas generales -> route al nodo de precios generales.
+7. Si pide horarios/ubicacion/sucursal/direccion -> route al nodo general de horarios o ubicacion.
+8. Si pide contacto/asesor/humano/operador/operadora/agente/persona real -> route al nodo configurado de atencion humana (o handoff si hay urgencia).
 9. Si no sabe que servicio necesita -> show_services.
 10. Si el usuario se despide, agradece o hace un comentario social (ej: "gracias", "mañana iré", "ok perfecto", "hasta luego", "chau", "voy mañana") -> respond con texto breve y amable de despedida. NUNCA uses out_of_scope para mensajes sociales o de cierre.
 11. Si el usuario expresa queja, reclamo o malestar (ej: "pésimo servicio", "qué mal", "encima responden automático", "sugerencia") -> respond con texto empatico y ofrece escribir "asesor" para hablar con el equipo. No uses out_of_scope.
-12. Si pregunta por doctor, doctora, dr, dra, medico, medica, por disponibilidad de algun doctor, por un nombre propio de especialista o por quien atiende -> route DOCTOR_HANDOFF. Nunca uses out_of_scope ni clarify para esto.
-13. Si el tema claramente NO es de pies/podologia (ej: peluqueria, reposteria, barberia, maquillaje, manos) -> respond con texto breve aclarando que solo atienden pies. Nunca menciones literalmente lo que dijo el usuario en el mensaje de rechazo.
+12. Si pregunta por disponibilidad de especialistas, doctor, doctora, dr, dra, medico, medica, por quien atiende o por un nombre propio del equipo clinico -> route al nodo configurado para ese caso. Nunca uses out_of_scope ni clarify para esto.
+13. Si el tema claramente NO corresponde al rubro del negocio -> respond con texto breve aclarando el alcance real del negocio. Nunca menciones literalmente lo que dijo el usuario en el mensaje de rechazo.
 14. Usa clarify solo si falta dato clave y como maximo una vez.
 15. NUNCA repitas la misma pregunta de clarificacion.
 
 ## Rutas Directas (prioridad alta)
-- precio/costo/cuanto/tarifa -> PRECIOS_INFO
+- precio/costo/cuanto/tarifa general -> nodo de precios generales
 - si precio/costo aparece junto con un servicio especifico -> route al nodo del servicio especifico
-- servicio/tratamiento/que ofrecen/que tienen -> SERVICIOS_MENU (solo si sigue siendo podologia)
-- horario/ubicacion/donde/sucursal/direccion/como llegar -> HORARIOS_INFO
-- asesor/humano/operador/operadora/agente/llamar/contacto/atencion personal/persona real -> CONTACT_METHOD
-- doctor/doctora/dr/dra/medico/medica/quien me atiende/esta la dra -> DOCTOR_HANDOFF
 - ficha/cita/agendar/turno/reservar -> respond explicando que la atencion es por orden de llegada
-- unero/una encarnada -> UNERO_TIPO_TRAT
-- hongo/onicomicosis -> HONGOS_TIPO_TRAT
-- pedicure/pedicura -> SVC_PEDICURE_INFO
-- pie de atleta -> OTR_PIE_ATLETA_INFO
-- consulta/valoracion/evaluacion/diagnostico/revision/primera vez -> CONSULTA_GRATUITA_INFO
-- callo/callosidad -> OTR_CALLOSIDAD_INFO
-- verruga -> OTR_VERRUGA_PLANTAR_INFO
-- diabetes/pie diabetico -> OTR_PIE_DIABETICO_INFO
+${directRoutes || "- Usa los intents determinísticos configurados en el flow"}
 
 ## Nodos Disponibles para Routing
 ${nodeCatalog}
@@ -266,6 +282,7 @@ function buildUserPrompt({ message, history, summary, previousQuestion }) {
 
 function buildCloudflareRouteSystemPrompt({ knowledge, flow, previousQuestion, summary }) {
   const clinica = knowledge?.clinica || {};
+  const directRoutes = buildDeterministicRouteHints(flow);
   const serviciosCompact = Object.values(knowledge?.servicios || {})
     .map((svc) => {
       const name = String(svc?.nombre || "").trim();
@@ -285,27 +302,23 @@ function buildCloudflareRouteSystemPrompt({ knowledge, flow, previousQuestion, s
   const nodeCatalog = buildRoutingNodeCatalog(flow);
   const clarifyCount = Number(summary?.clarificationsAsked || 0);
 
-  return `Eres un router de WhatsApp para ${clinica.nombre || "PODOPIE"}.
+  return `Eres un router de WhatsApp para ${clinica.nombre || "Mi Empresa"}.
 Devuelve SOLO JSON valido.
 Tu trabajo es decidir accion y route_id. No expliques nada, no redactes horarios, no des direcciones.
 
 Reglas:
 - route: si pide servicios, tratamiento, horarios, ubicacion, direccion, sucursal, precios o contacto del negocio.
-- handoff: si pide humano/asesor/operador o hay urgencia medica.
-- respond: si es fuera de podologia, saludo, despedida, agradecimiento, queja/reclamo, o ficha/cita/agendar.
+- handoff: si hay urgencia medica o el flow define que el caso debe pasar a una derivacion humana.
+- respond: si es fuera del rubro del negocio, saludo, despedida, agradecimiento, queja/reclamo, o ficha/cita/agendar.
 - clarify: solo si falta contexto real y maximo una vez.
 - show_services: si es del negocio pero no identificas nodo exacto.
 IMPORTANTE: Si el usuario se despide o agradece ("gracias", "mañana iré", "hasta luego") -> respond amable. NUNCA out_of_scope para mensajes sociales.
 IMPORTANTE: Si el usuario se queja ("pésimo", "mal servicio", "sugerencia") -> respond empatico, NO out_of_scope.
 
 Atajos:
-- ubicacion, direccion, sucursal, como llegar -> HORARIOS_INFO
-- precio, costo, cuanto cuesta -> PRECIOS_INFO
 - si precio/costo aparece junto con un servicio especifico -> route al nodo del servicio especifico
-- asesor, humano, operador, operadora, agente, recepcion -> CONTACT_METHOD
-- doctor, doctora, dr, dra, medico, medica, quien me atiende -> DOCTOR_HANDOFF
 - ficha, cita, turno, agendar, reservar, hacerse atender -> respond: atencion por orden de llegada, sin cita previa
-- consulta, valoracion, evaluacion, diagnostico, revision, primera vez -> CONSULTA_GRATUITA_INFO
+${directRoutes || "- Usa los intents determinísticos configurados en el flow"}
 
 Servicios detectables:
 ${serviciosCompact || "- servicios"}
@@ -330,18 +343,18 @@ function buildCloudflareCopyPrompt({ knowledge, action, userText, kbSnippet = ""
   const emoji = Array.isArray(personalidad.emojis_frecuentes) && personalidad.emojis_frecuentes.length
     ? personalidad.emojis_frecuentes.slice(0, 2).join(" ")
     : "🦶";
-  const onlyFeet = clinica.especialidad || "solo atendemos temas de pies/podologia";
+  const businessScope = clinica.especialidad || "solo atendemos consultas dentro de nuestro rubro";
   const snippetSuffix = kbSnippet ? `\nContexto relevante:\n${kbSnippet}` : "";
 
   if (action === "clarify") {
     return {
-      system: `Eres un asistente de ${clinica.nombre || "PODOPIE"}. Responde SOLO con una pregunta corta (1 frase) para aclarar la necesidad del usuario. Tono ${tone}. No inventes horarios/precios. Usa español.`,
+      system: `Eres un asistente de ${clinica.nombre || "Mi Empresa"}. Responde SOLO con una pregunta corta (1 frase) para aclarar la necesidad del usuario. Tono ${tone}. No inventes horarios/precios. Usa español.`,
       user: `Mensaje del usuario: "${userText}"\nDevuelve solo la pregunta, sin JSON.`,
     };
   }
 
   return {
-    system: `Eres un asistente de ${clinica.nombre || "PODOPIE"}. Tono ${tone}. Maximo 2 oraciones. No inventes horarios, direcciones ni precios. Si el usuario se despide, agradece o hace comentario social -> responde breve y amable (ej: "¡Con gusto! Hasta pronto 👋"). Si el usuario se queja o reclama -> responde con empatia y ofrece escribir "asesor". Si el tema no es podologia -> aclara brevemente que ${onlyFeet} sin repetir lo que dijo el usuario. Puedes usar ${emoji}.${snippetSuffix}`,
+    system: `Eres un asistente de ${clinica.nombre || "Mi Empresa"}. Tono ${tone}. Maximo 2 oraciones. No inventes horarios, direcciones ni precios. Si el usuario se despide, agradece o hace comentario social -> responde breve y amable (ej: "¡Con gusto! Hasta pronto 👋"). Si el usuario se queja o reclama -> responde con empatia y ofrece escribir "asesor". Si el tema no corresponde al rubro -> aclara brevemente que ${businessScope} sin repetir lo que dijo el usuario. Puedes usar ${emoji}.${snippetSuffix}`,
     user: `Responde al usuario de forma breve y util.\nMensaje del usuario: "${userText}"\nDevuelve solo el texto final, sin JSON ni markdown.`,
   };
 }
@@ -384,7 +397,7 @@ function buildRouteBridgePrompt({ knowledge, routeId, action, userText }) {
               : "Confirma que vas a ayudar con lo pedido.";
 
   return {
-    system: `Eres ${personalidad.nombre || "PODITO"}, asistente de ${clinica.nombre || "PODOPIE"}. Tono ${tone}. Escribe UNA sola frase natural, breve y humana. ${objective} NO inventes datos concretos, NO des direcciones, horarios, precios ni detalles medicos. Solo una frase puente antes de la informacion real.`,
+    system: `Eres ${personalidad.nombre || "Asistente"}, asistente de ${clinica.nombre || "Mi Empresa"}. Tono ${tone}. Escribe UNA sola frase natural, breve y humana. ${objective} NO inventes datos concretos, NO des direcciones, horarios, precios ni detalles medicos. Solo una frase puente antes de la informacion real.`,
     user: `Mensaje del usuario: "${userText}"\nDevuelve solo la frase final, sin JSON ni markdown.`,
   };
 }
@@ -446,8 +459,9 @@ async function generateRouteBridgeText({
 
 // Generic friendly fallback - never extracts topic to avoid "no brindamos informacion sobre mañana iré".
 function buildOutOfDomainResponseText({ knowledge }) {
-  const clinicName = knowledge?.clinica?.nombre || "PODOPIE";
-  return `En ${clinicName} atendemos temas de salud podologica 🦶 (pies). Si buscas info sobre servicios, precios, horarios o atencion personal, estoy aqui para ayudarte 😊`;
+  const clinicName = knowledge?.clinica?.nombre || "Mi Empresa";
+  const businessScope = knowledge?.clinica?.especialidad || "nuestros servicios";
+  return `En ${clinicName} atendemos consultas relacionadas con ${businessScope}. Si buscas info sobre servicios, precios, horarios o atencion personal, estoy aqui para ayudarte 😊`;
 }
 
 async function generateOutOfDomainReplyText({
@@ -710,9 +724,10 @@ function buildLowCostRecoveryDecision({ text, previousQuestion, summary, knowled
   }
 
   if (domainGate?.classification === "ambiguous") {
+    const businessScope = knowledge?.clinica?.especialidad || "el rubro del negocio";
     return {
       action: "clarify",
-      question: "¿Buscas precios, horarios o información de un tratamiento para pies?",
+      question: `¿Buscas precios, horarios o información sobre ${businessScope}?`,
       ai_used: false,
       clear_pending: Boolean(previousQuestion),
       reset_turns: false,

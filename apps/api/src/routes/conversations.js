@@ -3,6 +3,7 @@
  */
 const express = require("express");
 const router = express.Router();
+const { normalizeText } = require("../lib/normalize");
 
 const {
     requireAuth,
@@ -16,8 +17,10 @@ const { getControlClient } = require("../control/controlClient");
 const { getTenantContext } = require("../tenancy/tenantContext");
 const { resolveChannelByPhoneNumberId } = require("../tenancy/tenantResolver");
 const { sendText, sendImage, sendDocument, sendAudio } = require("../whatsapp");
+const { sendPanelCommandNode } = require("../flows/flowExecutor");
 const { uploadToR2, isConfigured: isR2Configured } = require("../services/mediaStorageService");
 const { downloadMedia } = require("../services/metaGraphApi");
+const { getActiveTenantFlow } = require("../services/tenantBots");
 const {
     getConversationById,
     formatConversation,
@@ -84,6 +87,42 @@ const CONVERSATION_LIST_SELECT = {
         },
     },
 };
+
+function normalizePanelCommandKey(value) {
+    const raw = String(value || "").trim().toLowerCase();
+    if (!raw.startsWith("/")) {
+        return null;
+    }
+    const normalized = normalizeText(raw.slice(1)).replace(/\s+/g, "");
+    return normalized ? `/${normalized}` : null;
+}
+
+function resolvePanelCommand(flow, text) {
+    const raw = String(text || "").trim();
+    if (!/^\/\S+$/.test(raw)) {
+        return null;
+    }
+    const commands = flow?.panel_commands;
+    if (!commands || typeof commands !== "object") {
+        return null;
+    }
+    const normalizedText = normalizePanelCommandKey(raw);
+    if (!normalizedText) {
+        return null;
+    }
+
+    for (const [key, config] of Object.entries(commands)) {
+        if (normalizePanelCommandKey(key) !== normalizedText) {
+            continue;
+        }
+        if (!config || typeof config !== "object" || !config.node_id) {
+            return { key, config: null };
+        }
+        return { key, config };
+    }
+
+    return null;
+}
 
 // Aplicar rate limiter a todas las rutas /api
 router.use(panelLimiter);
@@ -825,6 +864,34 @@ router.post("/conversations/:id/messages", requireAuth, requireModulePermission(
     const tenantId = getTenantContext().tenantId;
     if (!channelConfig || channelConfig.tenantId !== tenantId) {
         return res.status(400).json({ error: "missing_channel" });
+    }
+
+    const shouldCheckPanelCommand = String(text || "").trim().startsWith("/");
+    const activeFlow = shouldCheckPanelCommand && req.user?.tenant_id
+        ? await getActiveTenantFlow(req.user.tenant_id)
+        : null;
+    const panelCommand = shouldCheckPanelCommand
+        ? resolvePanelCommand(activeFlow?.flow, text)
+        : null;
+    if (panelCommand) {
+        if (!panelCommand.config?.node_id || !activeFlow?.flow) {
+            return res.status(400).json({ error: "invalid_panel_command" });
+        }
+        const result = await sendPanelCommandNode({
+            waId: conversation.wa_id,
+            flow: activeFlow.flow,
+            nodeId: panelCommand.config.node_id,
+            channel: channelConfig,
+            byUserId: req.user.id,
+        });
+        if (!result?.ok) {
+            return res.status(400).json({ error: result?.error || "invalid_panel_command" });
+        }
+        return res.json({
+            ok: true,
+            panel_command: panelCommand.key,
+            node_id: panelCommand.config.node_id,
+        });
     }
 
     await sendText(conversation.wa_id, text, {

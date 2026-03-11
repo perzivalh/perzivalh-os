@@ -67,10 +67,26 @@ async function rSet(key, value, ttlSeconds) {
  */
 async function rDel(key) {
   try {
+    if (Array.isArray(key)) {
+      const keys = key.filter(Boolean);
+      if (!keys.length) {
+        return;
+      }
+      await getRedis().del(...keys);
+      return;
+    }
     await getRedis().del(key);
   } catch {
     // no-op
   }
 }
 
-module.exports = { getRedis, rGet, rSet, rDel };
+async function rKeys(pattern) {
+  try {
+    return await getRedis().keys(pattern);
+  } catch {
+    return [];
+  }
+}
+
+module.exports = { getRedis, rGet, rSet, rDel, rKeys };

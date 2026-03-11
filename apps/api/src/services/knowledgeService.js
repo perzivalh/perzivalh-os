@@ -6,13 +6,13 @@
  */
 const prisma = require("../db");
 const { getTenantContext } = require("../tenancy/tenantContext");
-const { rGet, rSet, rDel } = require("../lib/redis");
+const { rGet, rSet, rDel, rKeys } = require("../lib/redis");
 const logger = require("../lib/logger");
 
 const KNOWLEDGE_TTL_SECONDS = 10 * 60; // 10 minutos
 
-function getCacheKey(tenantId) {
-  return `knowledge:${tenantId || "legacy"}`;
+function getCacheKey(tenantId, flowId) {
+  return `knowledge:${tenantId || "legacy"}:${flowId || "default"}`;
 }
 
 /**
@@ -96,7 +96,7 @@ async function buildKnowledgeFromDb() {
  */
 async function getKnowledge(flowId) {
   const { tenantId } = getTenantContext();
-  const cacheKey = getCacheKey(tenantId);
+  const cacheKey = getCacheKey(tenantId, flowId);
 
   // 1. Intentar desde Redis
   const cached = await rGet(cacheKey);
@@ -135,8 +135,11 @@ async function getKnowledge(flowId) {
  */
 async function invalidateKnowledgeCache() {
   const { tenantId } = getTenantContext();
-  const cacheKey = getCacheKey(tenantId);
-  await rDel(cacheKey);
+  const cachePrefix = `knowledge:${tenantId || "legacy"}:*`;
+  const keys = await rKeys(cachePrefix);
+  if (keys.length) {
+    await rDel(keys);
+  }
   logger.info("knowledge_service.cache_invalidated", { tenantId });
 }
 
@@ -144,16 +147,15 @@ async function invalidateKnowledgeCache() {
  * Carga el knowledge desde el archivo JS (fallback legacy).
  */
 function loadKnowledgeFromFile(flowId) {
+  const normalizedFlowId = String(flowId || "").trim();
   try {
-    const slug = flowId ? flowId.replace("botpodito", "podopie") : "podopie";
-    return require(`../../flows/knowledge/${slug}.knowledge.js`);
-  } catch {
-    try {
-      return require("../../flows/knowledge/podopie.knowledge.js");
-    } catch {
+    if (!normalizedFlowId) {
       return null;
     }
+    return require(`../../flows/knowledge/${normalizedFlowId}.knowledge.js`);
+  } catch {
+    return null;
   }
 }
 
-module.exports = { getKnowledge, invalidateKnowledgeCache };
+module.exports = { getKnowledge, invalidateKnowledgeCache, loadKnowledgeFromFile };

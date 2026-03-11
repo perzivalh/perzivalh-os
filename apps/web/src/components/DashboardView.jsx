@@ -48,13 +48,6 @@ function formatTableDate(value) {
   });
 }
 
-// Elimina emojis y caracteres especiales, solo letras, números y puntuación básica
-function sanitizeName(name) {
-  if (!name) return "-";
-  const cleaned = name.replace(/[^\p{L}\p{N}\s.\-,'()]/gu, "").trim();
-  return cleaned || "-";
-}
-
 function formatChange(value, suffix = "%") {
   if (value === null || value === undefined) return null;
   return value > 0 ? `+${value}${suffix}` : `${value}${suffix}`;
@@ -286,13 +279,13 @@ function DashboardView({
       doc.text(`Generado: ${generatedAt}`, 14, 28);
 
       const body = rows.map((row) => ([
-        row.patient || "-",
+        row.patient_display || "[sin nombre]",
         row.number || "-",
         formatTableDate(row.date),
         row.call ? "Si" : "No",
         row.message ? "Si" : "No",
-        row.tag || "-",
-        row.operator || "-",
+        (row.tags || (row.tag ? [row.tag] : [])).join(", ") || "-",
+        row.operator_display || row.operator || "-",
         row.line || "-",
         row.remarketing ? "Si" : "No",
         row.asistio ? "Si" : "No",
@@ -758,10 +751,16 @@ function DashboardView({
                   )}
                   {!tableLoading && !tableError && tableRows.map((row) => {
                     const rowFlags = getRowFlags(row, tableFlagMap[row.id]);
+                    const operatorList = Array.isArray(row.operators) && row.operators.length > 0
+                      ? row.operators
+                      : row.operator
+                        ? [{ id: row.operator_id || row.operator, name: row.operator }]
+                        : [];
+                    const patientDisplay = row.patient_display || "[sin nombre]";
 
                     return (
                       <tr key={row.id}>
-                        <td className="dash-td-name">{sanitizeName(row.patient)}</td>
+                        <td className="dash-td-name">{patientDisplay}</td>
                         <td>{row.number || "-"}</td>
                         <td>{formatTableDate(row.date)}</td>
                         <td>
@@ -784,8 +783,20 @@ function DashboardView({
                             }
                           </div>
                         </td>
-                        <td>
-                          {row.operator || <span className="dash-muted">Sin asignar</span>}
+                        <td className="dash-td-tags-cell">
+                          <div className="dash-tags-list">
+                            {operatorList.length > 0
+                              ? operatorList.map((operator) => (
+                                <span
+                                  className="dash-tag-chip"
+                                  key={`${row.id}-${operator.id || operator.name || "operator"}`}
+                                >
+                                  {operator.name || "[sin nombre]"}
+                                </span>
+                              ))
+                              : <span className="dash-muted">Sin asignar</span>
+                            }
+                          </div>
                         </td>
                         <td>{row.line || <span className="dash-muted">-</span>}</td>
                         <td className="dash-flag-cell">
@@ -796,7 +807,7 @@ function DashboardView({
                             onChange={(event) =>
                               handleFlagChange(row, "remarketing", event.target.checked)
                             }
-                            aria-label={`Remarketing para ${row.patient || row.number || row.id}`}
+                            aria-label={`Remarketing para ${patientDisplay || row.number || row.id}`}
                           />
                         </td>
                         <td className="dash-flag-cell">
@@ -807,7 +818,7 @@ function DashboardView({
                             onChange={(event) =>
                               handleFlagChange(row, "asistio", event.target.checked)
                             }
-                            aria-label={`Asistio para ${row.patient || row.number || row.id}`}
+                            aria-label={`Asistio para ${patientDisplay || row.number || row.id}`}
                           />
                         </td>
                       </tr>

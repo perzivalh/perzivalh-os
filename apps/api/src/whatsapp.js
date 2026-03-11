@@ -190,6 +190,10 @@ async function sendWhatsAppMessage(payload, options = {}) {
 
 async function recordOutgoingMessage(to, type, text, raw, phoneNumberId) {
   try {
+    const payload = raw && typeof raw === "object" ? { ...raw } : {};
+    if (payload.meta && typeof payload.meta === "object") {
+      Object.assign(payload, payload.meta);
+    }
     const conversation = await upsertConversation({
       waId: to,
       phoneE164: toPhoneE164(to),
@@ -200,7 +204,7 @@ async function recordOutgoingMessage(to, type, text, raw, phoneNumberId) {
       direction: "out",
       type,
       text,
-      rawJson: raw || {},
+      rawJson: payload,
     });
   } catch (error) {
     logger.error("Outgoing message log error", {

@@ -18,6 +18,7 @@ module.exports = {
     "handoff_node_id": "AI_HANDOFF_OFFER",
     "services_node_id": "SERVICIOS_MENU",
     "out_of_scope_node_id": "OUT_OF_SCOPE",
+    "force_route_ids": ["CONTACT_METHOD", "DOCTOR_HANDOFF"],
 
     // --- Inactividad ---
     "inactivity": {
@@ -336,6 +337,32 @@ module.exports = {
       "me duele el pie": "OTROS_MENU",
       "problema en el pie": "OTROS_MENU"
     }
+  },
+
+  panel_commands: {
+    "/menu": { node_id: "MAIN_MENU" },
+    "/ubicacion": { node_id: "HORARIOS_INFO" },
+    "/horario": { node_id: "HORARIOS_INFO" },
+    "/horarios": { node_id: "HORARIOS_INFO" },
+    "/precios": { node_id: "PRECIOS_INFO" },
+    "/precio": { node_id: "PRECIOS_INFO" },
+    "/servicios": { node_id: "SERVICIOS_MENU" },
+    "/consulta": { node_id: "CONSULTA_GRATUITA_INFO" },
+    "/uñero": { node_id: "UNERO_TIPO_TRAT" },
+    "/unero": { node_id: "UNERO_TIPO_TRAT" },
+    "/hongos": { node_id: "HONGOS_TIPO_TRAT" },
+    "/pedicure": { node_id: "SVC_PEDICURE_INFO" },
+    "/podopediatria": { node_id: "SVC_PODOPEDIATRIA_INFO" },
+    "/podogeriatria": { node_id: "SVC_PODOGERIATRIA_INFO" },
+    "/callosidades": { node_id: "OTR_CALLOSIDAD_INFO" },
+    "/heloma": { node_id: "OTR_HELOMA_INFO" },
+    "/verruga": { node_id: "OTR_VERRUGA_PLANTAR_INFO" },
+    "/extraccion": { node_id: "OTR_EXTRACCION_UNA_INFO" },
+    "/pieatleta": { node_id: "OTR_PIE_ATLETA_INFO" },
+    "/piediabetico": { node_id: "OTR_PIE_DIABETICO_INFO" },
+    "/anestesia": { node_id: "ANESTESIA_INFO" },
+    "/doctor": { node_id: "DOCTOR_HANDOFF" },
+    "/operador": { node_id: "CONTACT_METHOD" }
   },
 
   flow_name: "flujogramaV3",

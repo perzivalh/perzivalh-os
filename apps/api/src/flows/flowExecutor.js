@@ -27,6 +27,21 @@ function getCurrentLineId() {
   return getTenantContext().channel?.phone_number_id || null;
 }
 
+function getResolvedLineId(options = {}) {
+  return options.phoneNumberId || options.channel?.phone_number_id || getCurrentLineId();
+}
+
+function buildSendOptions(options = {}) {
+  const sendOptions = {};
+  if (options.channel) {
+    sendOptions.channel = options.channel;
+  }
+  if (options.meta) {
+    sendOptions.meta = options.meta;
+  }
+  return sendOptions;
+}
+
 function getStartNodeId(flow) {
   return (
     flow.start_node_id ||
@@ -282,8 +297,7 @@ async function trySendBranchRouteReply(waId, lineId, flowId, text) {
   }
 }
 
-async function setConversationToPending(waId) {
-  const phoneNumberId = getCurrentLineId();
+async function setConversationToPending(waId, phoneNumberId = getCurrentLineId()) {
   if (!waId || !phoneNumberId) {
     return;
   }
@@ -411,8 +425,9 @@ async function applyFlowAutoTags({
   routeId,
   reason,
   flow,
+  phoneNumberId: explicitPhoneNumberId,
 } = {}) {
-  const phoneNumberId = getCurrentLineId();
+  const phoneNumberId = explicitPhoneNumberId || getCurrentLineId();
   if (!waId || !phoneNumberId) {
     return;
   }
@@ -421,7 +436,7 @@ async function applyFlowAutoTags({
   if (flow && routeId) {
     const tags = getTagsForNode(flow, routeId, reason);
     if (tags.length) {
-      await applyNodeTags(waId, tags);
+      await applyNodeTags(waId, tags, { phoneNumberId });
       return;
     }
   }
@@ -445,8 +460,8 @@ async function applyFlowAutoTags({
   }
 }
 
-async function applyNodeTags(waId, tagNames) {
-  const phoneNumberId = getCurrentLineId();
+async function applyNodeTags(waId, tagNames, options = {}) {
+  const phoneNumberId = getResolvedLineId(options);
   const tags = normalizeTagNames(tagNames);
   if (!waId || !phoneNumberId || !tags.length) return;
   try {
@@ -464,15 +479,21 @@ async function applyNodeTags(waId, tagNames) {
   }
 }
 
-async function sendNode(waId, flow, node, visited) {
+async function sendNode(waId, flow, node, visited, options = {}) {
   if (!node) {
     return;
   }
 
+  const lineId = getResolvedLineId(options);
+  const sendOptions = buildSendOptions(options);
+  const shouldUpdateSession = options.updateSession !== false;
+  const shouldApplyNodeTags = options.applyNodeTags !== false;
+  const shouldAllowHandoff = options.allowHandoff !== false;
+
   // Apply node-specific tags if defined (fire-and-forget).
   const nodeTags = getConfiguredTagsFromNode(node);
-  if (nodeTags?.length) {
-    void applyNodeTags(waId, nodeTags);
+  if (nodeTags?.length && shouldApplyNodeTags) {
+    void applyNodeTags(waId, nodeTags, { phoneNumberId: lineId });
   }
 
   const delayMs =
@@ -485,30 +506,32 @@ async function sendNode(waId, flow, node, visited) {
     await sleep(delayMs);
   }
 
-  const lineId = getCurrentLineId();
   const inactivityCfg = flow?.ai?.inactivity;
-  await sessionStore.updateSession(waId, lineId, {
-    state: node.id,
-    data: { flow_id: flow.id },
-    ...(inactivityCfg
-      ? {
-        inactivity_notice_at: null,
-        next_due_at: new Date(Date.now() + inactivityCfg.first_notice_ms),
-      }
-      : {}),
-  });
+  if (shouldUpdateSession && lineId) {
+    await sessionStore.updateSession(waId, lineId, {
+      state: node.id,
+      data: { flow_id: flow.id },
+      ...(inactivityCfg
+        ? {
+          inactivity_notice_at: null,
+          next_due_at: new Date(Date.now() + inactivityCfg.first_notice_ms),
+        }
+        : {}),
+    });
+  }
 
   if (node.type === "action") {
-    if (isHandoffAction(node.action)) {
-      await setConversationToPending(waId);
+    if (isHandoffAction(node.action) && shouldAllowHandoff) {
+      await setConversationToPending(waId, lineId);
       await sendText(
         waId,
-        node.text || "Te conecto con un asesor. En breve te responderemos."
+        node.text || "Te conecto con un asesor. En breve te responderemos.",
+        sendOptions
       );
     } else if (node.text) {
-      await sendText(waId, node.text);
+      await sendText(waId, node.text, sendOptions);
     }
-    if (node.terminal) {
+    if (node.terminal && shouldUpdateSession && lineId) {
       await sessionStore.clearSession(waId, lineId);
     }
     return;
@@ -527,13 +550,13 @@ async function sendNode(waId, flow, node, visited) {
   const mediaType = inferMediaType(node, mediaUrl);
   let sendResult = null;
   if (mediaType === "image") {
-    sendResult = await sendImage(waId, mediaUrl, nodeText || null);
+    sendResult = await sendImage(waId, mediaUrl, nodeText || null, sendOptions);
   } else if (mediaType === "video") {
     // Some WhatsApp mobile clients render multiline video captions with broken layout.
-    sendResult = await sendVideo(waId, mediaUrl, null);
+    sendResult = await sendVideo(waId, mediaUrl, null, sendOptions);
     if (nodeText.trim().length > 0) {
       await sleep(VIDEO_TEXT_FOLLOWUP_DELAY_MS);
-      const followupResult = await sendText(waId, nodeText);
+      const followupResult = await sendText(waId, nodeText, sendOptions);
       if (!followupResult?.ok) {
         logger.warn("flow.video_followup_send_failed", {
           flowId: flow.id,
@@ -561,7 +584,8 @@ async function sendNode(waId, flow, node, visited) {
             title: node.sectionTitle || "Opciones",
             rows,
           },
-        ]
+        ],
+        sendOptions
       );
     } else {
       sendResult = await sendButtons(
@@ -570,11 +594,12 @@ async function sendNode(waId, flow, node, visited) {
         buttons.map((btn) => ({
           id: btn.next,
           title: btn.label,
-        }))
+        })),
+        sendOptions
       );
     }
   } else {
-    sendResult = await sendText(waId, bodyText);
+    sendResult = await sendText(waId, bodyText, sendOptions);
   }
 
   if (sendResult && !sendResult.ok) {
@@ -589,7 +614,9 @@ async function sendNode(waId, flow, node, visited) {
   }
 
   if (node.terminal) {
-    await sessionStore.clearSession(waId, lineId);
+    if (shouldUpdateSession && lineId) {
+      await sessionStore.clearSession(waId, lineId);
+    }
     return;
   }
 
@@ -606,9 +633,49 @@ async function sendNode(waId, flow, node, visited) {
       if (autoAdvanceDelayMs > 0) {
         await sleep(autoAdvanceDelayMs);
       }
-      await sendNode(waId, flow, nextNode, visited);
+      await sendNode(waId, flow, nextNode, visited, options);
     }
   }
+}
+
+async function sendPanelCommandNode({
+  waId,
+  flow,
+  nodeId,
+  channel,
+  byUserId,
+}) {
+  if (!waId || !flow || !nodeId || !channel?.phone_number_id) {
+    return { ok: false, error: "invalid_panel_command" };
+  }
+
+  const nodeMap = buildNodeMap(flow);
+  const target = nodeMap.get(nodeId);
+  if (!target) {
+    return { ok: false, error: "panel_command_node_not_found" };
+  }
+
+  await applyFlowAutoTags({
+    waId,
+    routeId: nodeId,
+    flow,
+    phoneNumberId: channel.phone_number_id,
+    reason: `panel_command:${nodeId}`,
+  });
+
+  await sendNode(waId, flow, target, new Set([nodeId]), {
+    channel,
+    phoneNumberId: channel.phone_number_id,
+    meta: {
+      source: "panel",
+      by_user_id: byUserId || null,
+      panel_command: nodeId,
+    },
+    updateSession: false,
+    allowHandoff: false,
+  });
+
+  return { ok: true, nodeId };
 }
 
 function findButtonMatch(node, normalized) {
@@ -956,4 +1023,5 @@ async function sendMainMenu(waId, flow) {
 module.exports = {
   executeDynamicFlow,
   executeDynamicInteractive,
+  sendPanelCommandNode,
 };

@@ -94,7 +94,7 @@ function buildWalkInAttentionResponse({ knowledge, flowAi }) {
   if (configured) {
     return configured;
   }
-  const clinicName = knowledge?.clinica?.nombre || "PODOPIE";
+  const clinicName = knowledge?.clinica?.nombre || "Mi Empresa";
   return `En ${clinicName} atendemos por orden de llegada, no necesitas sacar ficha ni agendar cita previa. Si quieres, te comparto horarios y ubicación para que vengas.`;
 }
 
@@ -158,8 +158,14 @@ function detectDeterministicDomainIntentRoute(text, flowAi) {
   return best;
 }
 
-function isDirectSupportRoute(routeId) {
-  return routeId === "CONTACT_METHOD" || routeId === "DOCTOR_HANDOFF";
+function isForcedRoute(routeId, flowAi) {
+  if (!routeId) {
+    return false;
+  }
+  const configured = Array.isArray(flowAi?.force_route_ids)
+    ? flowAi.force_route_ids
+    : [];
+  return configured.includes(routeId);
 }
 
 function shouldForceKeywordRoute(text) {
@@ -247,8 +253,9 @@ function isAiConversationRequest(text) {
 }
 
 function buildAiConversationReplyText({ knowledge }) {
-  const botName = knowledge?.personalidad?.nombre || "PODITO";
-  return `${botName} te responde directamente por aqui. Dime que necesitas saber y te ayudo con sucursales, precios, horarios o tratamientos de podologia.`;
+  const botName = knowledge?.personalidad?.nombre || "Asistente";
+  const businessScope = knowledge?.clinica?.especialidad || "nuestros servicios";
+  return `${botName} te responde directamente por aqui. Dime que necesitas saber y te ayudo con informacion relacionada con ${businessScope}.`;
 }
 
 /**
@@ -260,7 +267,7 @@ function isSocialClosingMessage(text) {
   if (!normalized) return false;
 
   // Must NOT contain domain questions (those should still route normally)
-  const hasQuestion = /cuanto|costo|precio|donde|cuando|horario|servicio|hongo|unero|callo|pedicure|podolog/.test(normalized);
+  const hasQuestion = /cuanto|costo|precio|donde|cuando|horario|servicio|tratamiento|consulta|doctor|operador|asesor/.test(normalized);
   if (hasQuestion) return false;
 
   // Social closing patterns
@@ -394,7 +401,7 @@ function buildDeterministicDecision({ text, previousQuestion, summary, knowledge
   const tokenCount = softenedNormalized.split(/\s+/).filter(Boolean).length;
   const shouldForceRoute = shouldForceKeywordRoute(raw);
   const isPrioritizedHoursServiceRoute = deterministicIntent?.intent?.startsWith("hours_service_override_");
-  const isDirectSupportIntent = isDirectSupportRoute(deterministicIntent?.routeId);
+  const isDirectSupportIntent = isForcedRoute(deterministicIntent?.routeId, flowAi);
 
   if (isDirectSupportIntent && !inClarifyFlow) {
     return {

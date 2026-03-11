@@ -1,5 +1,7 @@
 const prisma = require("../db");
 const { emitEvent } = require("../realtime");
+const logger = require("../lib/logger");
+const sessionStore = require("../sessionStore");
 const { sendPendingConversationPush } = require("./pushNotifications");
 
 const CONVERSATION_SELECT = {
@@ -50,6 +52,24 @@ function formatConversation(record) {
     ...record,
     tags: (record.tags || []).map((entry) => entry.tag).filter(Boolean),
   };
+}
+
+async function clearConversationSession(record) {
+  const waId = record?.wa_id;
+  const phoneNumberId = record?.phone_number_id;
+  if (!waId || !phoneNumberId) {
+    return;
+  }
+  try {
+    await sessionStore.clearSession(waId, phoneNumberId);
+  } catch (error) {
+    logger.warn("conversation.clear_session_failed", {
+      conversation_id: record?.id || null,
+      wa_id: waId,
+      phone_number_id: phoneNumberId,
+      message: error.message || String(error),
+    });
+  }
 }
 
 async function upsertConversation({
@@ -198,10 +218,14 @@ async function setConversationStatus({ conversationId, status, userId }) {
     throw new Error("conversation_not_found");
   }
   if (current.status === status) {
-    return prisma.conversation.findUnique({
+    const existing = await prisma.conversation.findUnique({
       where: { id: conversationId },
       select: CONVERSATION_SELECT,
     });
+    if (status === "pending" || status === "assigned") {
+      await clearConversationSession(existing);
+    }
+    return formatConversation(existing);
   }
 
   const nextData = { status };
@@ -225,6 +249,9 @@ async function setConversationStatus({ conversationId, status, userId }) {
     },
   });
   const formatted = formatConversation(updated);
+  if (formatted?.status === "pending" || formatted?.status === "assigned") {
+    await clearConversationSession(formatted);
+  }
   emitEvent("conversation:update", { conversation: formatted });
   if (formatted?.status === "pending" && !formatted?.assigned_user_id) {
     await sendPendingConversationPush({
@@ -267,6 +294,7 @@ async function assignConversation({ conversationId, userId }) {
   }
 
   const formatted = formatConversation(updated);
+  await clearConversationSession(formatted);
   emitEvent("conversation:update", { conversation: formatted });
   return formatted;
 }

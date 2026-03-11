@@ -48,7 +48,7 @@ function getHistoryForAI(sessionData) {
 
     return history
         .map((msg) => {
-            const prefix = msg.role === "user" ? "USUARIO" : "PODITO";
+            const prefix = msg.role === "user" ? "USUARIO" : "ASISTENTE";
             return `${prefix}: ${msg.content}`;
         })
         .join("\n");

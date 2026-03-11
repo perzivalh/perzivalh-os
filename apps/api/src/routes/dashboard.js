@@ -138,6 +138,15 @@ function buildLineLabel(line) {
   return line.line_number || line.display_name || line.phone_number_id || null;
 }
 
+function buildPatientDisplayName(name) {
+  const raw = String(name || "").normalize("NFC");
+  const cleaned = raw
+    .replace(/[^\p{L}\s]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || "[sin nombre]";
+}
+
 async function getLineMetadataMap(user) {
   const map = new Map();
   if (!process.env.CONTROL_DB_URL || !user?.tenant_id) {
@@ -187,8 +196,14 @@ async function findConversationIdsHandledByOperator(operatorId) {
       SELECT DISTINCT m.conversation_id
       FROM "Message" m
       WHERE m.direction = 'out'
-        AND m.raw_json->>'source' = 'panel'
-        AND m.raw_json->>'by_user_id' = ${normalizedOperatorId}
+        AND COALESCE(
+          NULLIF(m.raw_json->>'source', ''),
+          NULLIF(m.raw_json->'meta'->>'source', '')
+        ) = 'panel'
+        AND COALESCE(
+          NULLIF(m.raw_json->>'by_user_id', ''),
+          NULLIF(m.raw_json->'meta'->>'by_user_id', '')
+        ) = ${normalizedOperatorId}
     `,
     prisma.$queryRaw`
       SELECT DISTINCT (a.data_json->>'conversation_id') AS conversation_id
@@ -210,26 +225,31 @@ async function findConversationIdsHandledByOperator(operatorId) {
   )];
 }
 
-async function getLatestOperatorEventMap(conversationIds) {
+async function getConversationOperatorHistoryMap(conversationIds) {
   if (!Array.isArray(conversationIds) || !conversationIds.length) {
     return new Map();
   }
 
-  const latestRows = await prisma.$queryRaw`
-    SELECT DISTINCT ON (event.conversation_id)
+  const historyRows = await prisma.$queryRaw`
+    SELECT
       event.conversation_id,
       event.user_id,
       event.created_at
     FROM (
       SELECT
         m.conversation_id,
-        m.raw_json->>'by_user_id' AS user_id,
+        COALESCE(
+          NULLIF(m.raw_json->>'by_user_id', ''),
+          NULLIF(m.raw_json->'meta'->>'by_user_id', '')
+        ) AS user_id,
         m.created_at
       FROM "Message" m
       WHERE m.conversation_id = ANY(${conversationIds})
         AND m.direction = 'out'
-        AND m.raw_json->>'source' = 'panel'
-        AND COALESCE(m.raw_json->>'by_user_id', '') <> ''
+        AND COALESCE(
+          NULLIF(m.raw_json->>'source', ''),
+          NULLIF(m.raw_json->'meta'->>'source', '')
+        ) = 'panel'
 
       UNION ALL
 
@@ -246,10 +266,10 @@ async function getLatestOperatorEventMap(conversationIds) {
         AND (a.data_json->>'conversation_id') = ANY(${conversationIds})
     ) AS event
     WHERE COALESCE(event.user_id, '') <> ''
-    ORDER BY event.conversation_id, event.created_at DESC
+    ORDER BY event.conversation_id ASC, event.created_at ASC
   `;
 
-  const userIds = [...new Set((latestRows || []).map((row) => row?.user_id).filter(Boolean))];
+  const userIds = [...new Set((historyRows || []).map((row) => row?.user_id).filter(Boolean))];
   const users = userIds.length
     ? await prisma.user.findMany({
         where: { id: { in: userIds } },
@@ -257,19 +277,27 @@ async function getLatestOperatorEventMap(conversationIds) {
       })
     : [];
   const userNameById = new Map(users.map((user) => [user.id, user.name]));
+  const historyByConversation = new Map();
 
-  return new Map(
-    (latestRows || [])
-      .filter((row) => row?.conversation_id)
-      .map((row) => [
-        row.conversation_id,
-        {
-          user_id: row.user_id || null,
-          name: userNameById.get(row.user_id) || null,
-          created_at: row.created_at || null,
-        },
-      ])
-  );
+  for (const row of historyRows || []) {
+    const conversationId = row?.conversation_id;
+    const userId = row?.user_id || null;
+    if (!conversationId || !userId) {
+      continue;
+    }
+    const current = historyByConversation.get(conversationId) || [];
+    if (current.some((entry) => entry.id === userId)) {
+      continue;
+    }
+    current.push({
+      id: userId,
+      name: userNameById.get(userId) || null,
+      created_at: row.created_at || null,
+    });
+    historyByConversation.set(conversationId, current);
+  }
+
+  return historyByConversation;
 }
 
 function buildConversationOrderBy(sortByRaw, sortOrderRaw) {
@@ -733,7 +761,7 @@ async function buildDashboardTablePayload({
   ]);
 
   const conversationIds = conversations.map((conversation) => conversation.id);
-  const [outboundRows, callRows, latestOperatorEvents] = await Promise.all([
+  const [outboundRows, callRows, operatorHistoryMap] = await Promise.all([
     conversationIds.length
       ? prisma.message.findMany({
         where: {
@@ -754,7 +782,7 @@ async function buildDashboardTablePayload({
         distinct: ["conversation_id"],
       })
       : [],
-    getLatestOperatorEventMap(conversationIds),
+    getConversationOperatorHistoryMap(conversationIds),
   ]);
 
   const outboundSet = new Set(outboundRows.map((row) => row.conversation_id));
@@ -767,11 +795,28 @@ async function buildDashboardTablePayload({
     const lineId = conversation.phone_number_id || null;
     const lineMeta = lineId ? (lineMetadataMap.get(lineId) || null) : null;
     const phone = conversation.phone_e164 || conversation.wa_id || "-";
-    const latestOperator = latestOperatorEvents.get(conversation.id) || null;
+    const historicalOperators = operatorHistoryMap.get(conversation.id) || [];
+    const mergedOperators = [...historicalOperators];
+    if (
+      conversation.assigned_user?.id &&
+      !mergedOperators.some((entry) => entry.id === conversation.assigned_user.id)
+    ) {
+      mergedOperators.push({
+        id: conversation.assigned_user.id,
+        name: conversation.assigned_user.name || null,
+        created_at: null,
+      });
+    }
+    const latestOperator = mergedOperators[mergedOperators.length - 1] || null;
+    const operatorDisplay = mergedOperators
+      .map((operator) => operator?.name)
+      .filter(Boolean)
+      .join(", ") || null;
 
     return {
       id: conversation.id,
       patient: conversation.display_name || phone,
+      patient_display: buildPatientDisplayName(conversation.display_name),
       number: phone,
       date: conversation.created_at,
       call: callSet.has(conversation.id),
@@ -779,7 +824,12 @@ async function buildDashboardTablePayload({
       tags: allTagNames,
       tag: allTagNames[0] || null,
       operator: latestOperator?.name || conversation.assigned_user?.name || null,
-      operator_id: latestOperator?.user_id || conversation.assigned_user?.id || null,
+      operator_id: latestOperator?.id || conversation.assigned_user?.id || null,
+      operators: mergedOperators.map((operator) => ({
+        id: operator.id,
+        name: operator.name || null,
+      })),
+      operator_display: operatorDisplay,
       line: lineMeta?.label || lineId || null,
       line_id: lineId,
       remarketing: conversation.remarketing ?? false,

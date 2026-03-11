@@ -3,12 +3,15 @@ const { emitEvent } = require("../realtime");
 const logger = require("../lib/logger");
 const sessionStore = require("../sessionStore");
 const { sendPendingConversationPush } = require("./pushNotifications");
+const { toCanonicalBoliviaPhone } = require("../lib/normalize");
+const { trackFlowEvent } = require("./flowEventService");
 
 const CONVERSATION_SELECT = {
   id: true,
   wa_id: true,
   phone_number_id: true,
   phone_e164: true,
+  phone_canonical: true,
   display_name: true,
   status: true,
   assigned_user_id: true,
@@ -23,6 +26,8 @@ const CONVERSATION_SELECT = {
   primary_tag_id: true,
   remarketing: true,
   asistio: true,
+  asistio_source: true,
+  asistio_updated_at: true,
   created_at: true,
   assigned_user: {
     select: {
@@ -88,6 +93,7 @@ async function upsertConversation({
   const update = {};
   if (phoneE164) {
     update.phone_e164 = phoneE164;
+    update.phone_canonical = toCanonicalBoliviaPhone(phoneE164);
   }
   if (phoneNumberId) {
     update.phone_number_id = phoneNumberId;
@@ -141,6 +147,7 @@ async function upsertConversation({
       wa_id: waId,
       phone_number_id: phoneNumberId,
       phone_e164: phoneE164 || waId,
+      phone_canonical: toCanonicalBoliviaPhone(phoneE164 || waId),
       display_name: displayName || null,
       last_message_at: lastMessageAt || null,
     },
@@ -209,6 +216,13 @@ async function logAudit({ userId, action, data }) {
   });
 }
 
+function buildAutoAuditAction(source) {
+  if (source === "odoo_auto") {
+    return "conversation.flags_auto_updated";
+  }
+  return "conversation.flags_updated";
+}
+
 async function setConversationStatus({ conversationId, status, userId }) {
   const current = await prisma.conversation.findUnique({
     where: { id: conversationId },
@@ -253,6 +267,19 @@ async function setConversationStatus({ conversationId, status, userId }) {
     await clearConversationSession(formatted);
   }
   emitEvent("conversation:update", { conversation: formatted });
+  await trackFlowEvent({
+    conversationId,
+    waId: formatted?.wa_id,
+    phoneNumberId: formatted?.phone_number_id,
+    flowId: null,
+    eventType: "status_changed",
+    source: "conversation",
+    actorUserId: userId || null,
+    payload: {
+      from: current.status,
+      to: status,
+    },
+  });
   if (formatted?.status === "pending" && !formatted?.assigned_user_id) {
     await sendPendingConversationPush({
       conversation: formatted,
@@ -296,6 +323,18 @@ async function assignConversation({ conversationId, userId }) {
   const formatted = formatConversation(updated);
   await clearConversationSession(formatted);
   emitEvent("conversation:update", { conversation: formatted });
+  await trackFlowEvent({
+    conversationId,
+    waId: formatted?.wa_id,
+    phoneNumberId: formatted?.phone_number_id,
+    flowId: null,
+    eventType: "conversation_assigned",
+    source: "panel",
+    actorUserId: userId || null,
+    payload: {
+      assignee_user_id: userId || null,
+    },
+  });
   return formatted;
 }
 
@@ -393,6 +432,8 @@ async function updateConversationFlags({
   remarketing,
   asistio,
   userId,
+  source = "manual",
+  metadata = null,
 }) {
   const current = await prisma.conversation.findUnique({
     where: { id: conversationId },
@@ -400,6 +441,7 @@ async function updateConversationFlags({
       id: true,
       remarketing: true,
       asistio: true,
+      asistio_source: true,
     },
   });
 
@@ -421,12 +463,18 @@ async function updateConversationFlags({
   }
 
   if (typeof asistio === "boolean") {
+    if (source !== "manual" && current.asistio_source === "manual") {
+      delete data.asistio;
+    } else {
     data.asistio = asistio;
     if (current.asistio !== asistio) {
       changes.asistio = {
         from: current.asistio,
         to: asistio,
       };
+    }
+      data.asistio_source = asistio ? source || null : source === "manual" ? "manual" : null;
+      data.asistio_updated_at = new Date();
     }
   }
 
@@ -441,18 +489,40 @@ async function updateConversationFlags({
   });
   const formatted = formatConversation(updated);
 
-  if (userId && Object.keys(changes).length) {
+  if ((userId || source !== "manual") && Object.keys(changes).length) {
     await logAudit({
       userId,
-      action: "conversation.flags_updated",
+      action: buildAutoAuditAction(source),
       data: {
         conversation_id: conversationId,
         changes,
+        source,
+        ...(metadata ? { metadata } : {}),
       },
     });
   }
 
   emitEvent("conversation:update", { conversation: formatted });
+  if (Object.keys(changes).length) {
+    await trackFlowEvent({
+      conversationId,
+      waId: formatted?.wa_id,
+      phoneNumberId: formatted?.phone_number_id,
+      flowId: null,
+      eventType:
+        Object.prototype.hasOwnProperty.call(changes, "asistio") && changes.asistio?.to === true
+          ? "attendance_confirmed"
+          : source === "odoo_auto"
+            ? "attendance_auto_marked"
+            : "flags_updated",
+      source,
+      actorUserId: userId || null,
+      payload: {
+        changes,
+        ...(metadata ? { metadata } : {}),
+      },
+    });
+  }
   return formatted;
 }
 
@@ -474,6 +544,19 @@ async function updateConversationVerification({
   });
   const formatted = formatConversation(updated);
   emitEvent("conversation:update", { conversation: formatted });
+  await trackFlowEvent({
+    conversationId,
+    waId: formatted?.wa_id,
+    phoneNumberId: formatted?.phone_number_id,
+    flowId: null,
+    eventType: "verification_updated",
+    source: method || "verification",
+    payload: {
+      partnerId: partnerId ?? null,
+      patientId: patientId ?? null,
+      method: method || null,
+    },
+  });
   return formatted;
 }
 

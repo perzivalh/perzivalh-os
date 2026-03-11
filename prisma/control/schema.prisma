@@ -99,7 +99,18 @@ model OdooConfig {
   db_name            String
   username           String
   password_encrypted String
+  sync_enabled       Boolean  @default(true)
+  sync_interval_minutes Int   @default(5)
+  next_due_at        DateTime?
+  last_partner_write_at DateTime?
+  last_patient_write_at DateTime?
+  last_success_at    DateTime?
+  last_error_at      DateTime?
+  last_error_message String?
+  locked_at          DateTime?
+  locked_by          String?
   created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
   tenant             Tenant   @relation(fields: [tenant_id], references: [id])
 }
 

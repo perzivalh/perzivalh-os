@@ -2,6 +2,11 @@ const axios = require("axios");
 const { getTenantContext } = require("../tenancy/tenantContext");
 const { getControlClient } = require("../control/controlClient");
 const { decryptString } = require("../core/crypto");
+const {
+  digitsOnly,
+  normalizeBoliviaPhoneVariants,
+  toCanonicalBoliviaPhone,
+} = require("../lib/normalize");
 
 const SESSION_TTL_MS = 30 * 60 * 1000;
 const CONFIG_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -151,43 +156,12 @@ async function validateOdooCredentials(input) {
   };
 }
 
-function digitsOnly(value) {
-  return (value || "").toString().replace(/\D+/g, "");
-}
-
 function normalizeCI(ciRaw) {
   return digitsOnly(ciRaw);
 }
 
 function normalizePhone(raw) {
-  const digits = digitsOnly(raw);
-  if (!digits) {
-    return [];
-  }
-  const variants = new Set();
-  const addVariant = (value) => {
-    if (value) {
-      variants.add(value);
-    }
-  };
-  addVariant(digits);
-  if (digits.startsWith("591") && digits.length > 8) {
-    const local = digits.slice(3);
-    addVariant(local);
-    addVariant(`+591${local}`);
-  }
-  if (digits.startsWith("0") && digits.length >= 8) {
-    const local = digits.slice(-8);
-    addVariant(local);
-    addVariant(`+591${local}`);
-  }
-  if (digits.length === 8) {
-    addVariant(`+591${digits}`);
-  }
-  if (digits.startsWith("591")) {
-    addVariant(`+${digits}`);
-  }
-  return Array.from(variants);
+  return normalizeBoliviaPhoneVariants(raw);
 }
 
 function getCookieHeader(setCookie) {
@@ -690,6 +664,7 @@ module.exports = {
   findPatientByCI,
   findPatientByPhone,
   getPosOrdersWithLines,
+  toCanonicalBoliviaPhone,
   getSessionInfo: async () => {
     try {
       const resolved = await resolveOdooConfig();

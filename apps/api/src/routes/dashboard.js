@@ -13,6 +13,12 @@ const { requireAuth, requireModulePermission } = require("../middleware/auth");
 const prisma = require("../db");
 const { getControlClient } = require("../control/controlClient");
 const { updateConversationFlags } = require("../services/conversations");
+const {
+  buildDashboardOverview,
+  loadConversationResponseStats,
+  buildOdooConversationMaps,
+  getConversationOperatorHistoryMap: getOperatorHistoryMapForDashboard,
+} = require("../services/dashboardAnalyticsService");
 
 const EXPORT_MAX_ROWS = 5000;
 const TABLE_PAGE_SIZE_DEFAULT = 25;
@@ -223,81 +229,6 @@ async function findConversationIdsHandledByOperator(operatorId) {
       .map((row) => row?.conversation_id)
       .filter(Boolean)
   )];
-}
-
-async function getConversationOperatorHistoryMap(conversationIds) {
-  if (!Array.isArray(conversationIds) || !conversationIds.length) {
-    return new Map();
-  }
-
-  const historyRows = await prisma.$queryRaw`
-    SELECT
-      event.conversation_id,
-      event.user_id,
-      event.created_at
-    FROM (
-      SELECT
-        m.conversation_id,
-        COALESCE(
-          NULLIF(m.raw_json->>'by_user_id', ''),
-          NULLIF(m.raw_json->'meta'->>'by_user_id', '')
-        ) AS user_id,
-        m.created_at
-      FROM "Message" m
-      WHERE m.conversation_id = ANY(${conversationIds})
-        AND m.direction = 'out'
-        AND COALESCE(
-          NULLIF(m.raw_json->>'source', ''),
-          NULLIF(m.raw_json->'meta'->>'source', '')
-        ) = 'panel'
-
-      UNION ALL
-
-      SELECT
-        (a.data_json->>'conversation_id') AS conversation_id,
-        COALESCE(
-          NULLIF(a.data_json->>'to', ''),
-          NULLIF(a.data_json->>'by_user_id', ''),
-          a.user_id
-        ) AS user_id,
-        a.created_at
-      FROM "AuditLog" a
-      WHERE a.action = 'conversation.assigned'
-        AND (a.data_json->>'conversation_id') = ANY(${conversationIds})
-    ) AS event
-    WHERE COALESCE(event.user_id, '') <> ''
-    ORDER BY event.conversation_id ASC, event.created_at ASC
-  `;
-
-  const userIds = [...new Set((historyRows || []).map((row) => row?.user_id).filter(Boolean))];
-  const users = userIds.length
-    ? await prisma.user.findMany({
-        where: { id: { in: userIds } },
-        select: { id: true, name: true },
-      })
-    : [];
-  const userNameById = new Map(users.map((user) => [user.id, user.name]));
-  const historyByConversation = new Map();
-
-  for (const row of historyRows || []) {
-    const conversationId = row?.conversation_id;
-    const userId = row?.user_id || null;
-    if (!conversationId || !userId) {
-      continue;
-    }
-    const current = historyByConversation.get(conversationId) || [];
-    if (current.some((entry) => entry.id === userId)) {
-      continue;
-    }
-    current.push({
-      id: userId,
-      name: userNameById.get(userId) || null,
-      created_at: row.created_at || null,
-    });
-    historyByConversation.set(conversationId, current);
-  }
-
-  return historyByConversation;
 }
 
 function buildConversationOrderBy(sortByRaw, sortOrderRaw) {
@@ -738,8 +669,11 @@ async function buildDashboardTablePayload({
         display_name: true,
         wa_id: true,
         phone_e164: true,
+        phone_canonical: true,
         created_at: true,
         phone_number_id: true,
+        partner_id: true,
+        patient_id: true,
         assigned_user: {
           select: { id: true, name: true },
         },
@@ -756,12 +690,13 @@ async function buildDashboardTablePayload({
         },
         remarketing: true,
         asistio: true,
+        asistio_source: true,
       },
     }),
   ]);
 
   const conversationIds = conversations.map((conversation) => conversation.id);
-  const [outboundRows, callRows, operatorHistoryMap] = await Promise.all([
+  const [outboundRows, callRows, operatorHistoryMap, responseStats, odooMatchMap] = await Promise.all([
     conversationIds.length
       ? prisma.message.findMany({
         where: {
@@ -782,7 +717,9 @@ async function buildDashboardTablePayload({
         distinct: ["conversation_id"],
       })
       : [],
-    getConversationOperatorHistoryMap(conversationIds),
+    getOperatorHistoryMapForDashboard(conversationIds),
+    loadConversationResponseStats(conversationIds),
+    buildOdooConversationMaps(conversations),
   ]);
 
   const outboundSet = new Set(outboundRows.map((row) => row.conversation_id));
@@ -796,6 +733,8 @@ async function buildDashboardTablePayload({
     const lineMeta = lineId ? (lineMetadataMap.get(lineId) || null) : null;
     const phone = conversation.phone_e164 || conversation.wa_id || "-";
     const historicalOperators = operatorHistoryMap.get(conversation.id) || [];
+    const responseMeta = responseStats.statsByConversation.get(conversation.id) || {};
+    const odooMatch = odooMatchMap.get(conversation.id) || { status: "no_match" };
     const mergedOperators = [...historicalOperators];
     if (
       conversation.assigned_user?.id &&
@@ -830,10 +769,14 @@ async function buildDashboardTablePayload({
         name: operator.name || null,
       })),
       operator_display: operatorDisplay,
+      first_human_response_min: responseMeta.first_human_response_min ?? null,
+      avg_human_response_min: responseMeta.avg_human_response_min ?? null,
+      odoo_match_status: odooMatch.status || "no_match",
       line: lineMeta?.label || lineId || null,
       line_id: lineId,
       remarketing: conversation.remarketing ?? false,
       asistio: conversation.asistio ?? false,
+      asistio_source: conversation.asistio_source ?? null,
     };
   });
 
@@ -861,6 +804,20 @@ async function buildDashboardTablePayload({
     },
   };
 }
+
+// GET /api/dashboard/overview
+router.get("/dashboard/overview", requireAuth, requireModulePermission("dashboard", "read"), async (req, res) => {
+  try {
+    const payload = await buildDashboardOverview({
+      tenantId: req.user?.tenant_id || null,
+      period: req.query.period || "30d",
+      channel: req.query.channel ? String(req.query.channel).trim() : "",
+    });
+    res.json(payload);
+  } catch (error) {
+    res.status(500).json({ error: error.message || "dashboard_overview_failed" });
+  }
+});
 
 // GET /api/dashboard/metrics
 router.get("/dashboard/metrics", requireAuth, requireModulePermission("dashboard", "read"), async (req, res) => {
@@ -913,7 +870,8 @@ router.get("/dashboard/report", requireAuth, requireModulePermission("dashboard"
   try {
     const period = req.query.period || "30d";
     const channel = req.query.channel ? String(req.query.channel).trim() : "";
-    const metrics = await buildDashboardMetrics({
+    const overview = await buildDashboardOverview({
+      tenantId: req.user?.tenant_id || null,
       period,
       channel: channel || null,
     });
@@ -926,19 +884,19 @@ router.get("/dashboard/report", requireAuth, requireModulePermission("dashboard"
     const reportDate = new Date().toISOString().split("T")[0];
     const reportContent = [
       `REPORTE DE DASHBOARD - ${reportDate}`,
-      `Periodo: ${periodLabels[metrics.period] || metrics.period}`,
+      `Periodo: ${periodLabels[overview.period] || overview.period}`,
       `Línea: ${channel || "Todas"}`,
       "",
       "=== METRICAS GENERALES ===",
-      `Conversaciones Activas: ${metrics.active_conversations.value}`,
-      `Contactos Únicos: ${metrics.unique_contacts.value}`,
-      `Tiempo de respuesta promedio: ${metrics.avg_response_time.value ?? "-"} min`,
-      `Tasa de conversión: ${metrics.conversion_rate.value}%`,
+      `Activas ahora: ${overview.live?.active_now ?? 0}`,
+      `Contactos nuevos: ${overview.period_summary?.contacts_new ?? 0}`,
+      `1ra respuesta humana promedio: ${overview.response?.first_human_response_avg_min ?? "-"} min`,
+      `Respuesta humana promedio: ${overview.response?.avg_human_response_avg_min ?? "-"} min`,
       "",
-      "=== RANKING DE OPERADORES ===",
-      "Nombre,Rol,Resueltos,Pendientes",
-      ...(metrics.operators || []).map(
-        (operator) => `${operator.name},${operator.role},${operator.resolved},${operator.pending}`
+      "=== EQUIPO ===",
+      "Nombre,Rol,Atendidas,1ra respuesta,Promedio respuesta,Asignadas ahora,Asistencias",
+      ...(overview.team || []).map(
+        (operator) => `${operator.name},${operator.role || ""},${operator.handled_conversations},${operator.first_response_avg_min ?? ""},${operator.avg_response_avg_min ?? ""},${operator.assigned_now},${operator.attendances_attributed}`
       ),
       "",
       `Generado el: ${new Date().toLocaleString("es-BO")}`,

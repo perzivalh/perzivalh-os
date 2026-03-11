@@ -365,6 +365,43 @@ module.exports = {
     "/operador": { node_id: "CONTACT_METHOD" }
   },
 
+  analytics: {
+    funnel_steps: [
+      { id: "flow_started", label: "Entro al flow", event_type: "flow_started" },
+      {
+        id: "useful_content",
+        label: "Llego a contenido util",
+        event_type: "node_sent",
+        node_ids: [
+          "PRECIOS_INFO",
+          "HORARIOS_INFO",
+          "CONSULTA_GRATUITA_INFO",
+          "SVC_PEDICURE_INFO",
+          "UNERO_TIPO_TRAT",
+          "HONGOS_TIPO_TRAT",
+          "ANESTESIA_INFO",
+        ],
+      },
+      { id: "handoff", label: "Pidio operador", event_type: "handoff_requested" },
+      { id: "assigned", label: "Fue tomado", event_type: "conversation_assigned" },
+      { id: "human_reply", label: "Respondio humano", event_type: "human_message" },
+      {
+        id: "attendance",
+        label: "Asistencia confirmada",
+        event_type: "attendance_confirmed",
+      },
+    ],
+    topic_groups: [
+      { id: "precios", label: "Precios", node_ids: ["PRECIOS_INFO"] },
+      { id: "ubicacion_horario", label: "Ubicacion / horario", node_ids: ["HORARIOS_INFO"] },
+      { id: "hongos", label: "Hongos", node_ids: ["HONGOS_TIPO_TRAT"] },
+      { id: "unero", label: "Uñero", node_ids: ["UNERO_TIPO_TRAT", "TRAT_MATRICECTOMIA_INFO"] },
+      { id: "pedicure", label: "Pedicure", node_ids: ["SVC_PEDICURE_INFO"] },
+      { id: "doctor", label: "Doctor", node_ids: ["DOCTOR_HANDOFF"] },
+      { id: "operador", label: "Operador", node_ids: ["CONTACT_METHOD"] },
+    ],
+  },
+
   flow_name: "flujogramaV3",
   canva_design_id: "DAHAG6gmuBg",
   start_node_id: "WELCOME",

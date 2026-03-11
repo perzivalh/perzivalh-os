@@ -37,6 +37,7 @@ const { hasOdooConfig, getSessionInfo } = require("./src/services/odooClient");
 const { resolveTenantContextById } = require("./src/tenancy/tenantResolver");
 const { sendTemplate } = require("./src/whatsapp");
 const { processBotpoditoV2Inactivity } = require("./src/services/flowInactivity");
+const { initializeOdooSyncWorker, stopOdooSyncWorker } = require("./src/services/odooSyncService");
 
 // Rutas modulares
 const { setupRoutes } = require("./src/routes");
@@ -589,6 +590,7 @@ function registerShutdown() {
     const handler = async (signal) => {
         logger.info("server.shutdown", { signal });
         try {
+            stopOdooSyncWorker();
             await disconnectAllTenantClients();
             await disconnectControlClient();
         } catch (error) {
@@ -615,6 +617,7 @@ function start(port = PORT) {
 }
 
 if (require.main === module) {
+    void initializeOdooSyncWorker();
     start();
 }
 

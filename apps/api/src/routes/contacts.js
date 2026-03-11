@@ -6,6 +6,7 @@ const express = require("express");
 const router = express.Router();
 const { requireAuth, requireAnyPermission } = require("../middleware/auth");
 const logger = require("../lib/logger");
+const { getControlClient } = require("../control/controlClient");
 
 const contactImportService = require("../services/contactImportService");
 const { hasOdooConfig } = require("../services/odooClient");
@@ -21,6 +22,40 @@ const CONTACTS_WRITE_ACCESS = [
 
 // All routes require authentication
 router.use(requireAuth);
+
+async function getTenantOdooSyncRecord(tenantId) {
+    if (!process.env.CONTROL_DB_URL || !tenantId) {
+        return null;
+    }
+    const control = getControlClient();
+    return control.odooConfig.findUnique({
+        where: { tenant_id: tenantId },
+        select: {
+            id: true,
+            sync_interval_minutes: true,
+            last_partner_write_at: true,
+            last_patient_write_at: true,
+        },
+    });
+}
+
+async function persistTenantOdooSyncState(tenantId, updates = {}) {
+    if (!process.env.CONTROL_DB_URL || !tenantId) {
+        return;
+    }
+    const existing = await getTenantOdooSyncRecord(tenantId);
+    if (!existing?.id) {
+        return;
+    }
+    const control = getControlClient();
+    await control.odooConfig.update({
+        where: { id: existing.id },
+        data: {
+            ...updates,
+            next_due_at: new Date(Date.now() + Math.max(1, existing.sync_interval_minutes || 5) * 60 * 1000),
+        },
+    });
+}
 
 /**
  * GET /api/contacts
@@ -63,7 +98,22 @@ router.get("/contacts/stats", requireAnyPermission(CONTACTS_READ_ACCESS), async 
 router.get("/contacts/odoo-status", requireAnyPermission(CONTACTS_READ_ACCESS), async (req, res) => {
     try {
         const connected = await hasOdooConfig();
-        res.json({ connected });
+        let sync = null;
+        if (process.env.CONTROL_DB_URL && req.user?.tenant_id) {
+            const control = getControlClient();
+            sync = await control.odooConfig.findUnique({
+                where: { tenant_id: req.user.tenant_id },
+                select: {
+                    sync_enabled: true,
+                    sync_interval_minutes: true,
+                    next_due_at: true,
+                    last_success_at: true,
+                    last_error_at: true,
+                    last_error_message: true,
+                },
+            });
+        }
+        res.json({ connected, sync });
     } catch (error) {
         logger.error("Failed to check Odoo status", { error: error.message });
         res.status(500).json({ error: error.message });
@@ -87,6 +137,13 @@ router.post("/contacts/import-odoo", requireAnyPermission(CONTACTS_WRITE_ACCESS)
     try {
         const { limit } = req.body;
         const result = await contactImportService.importAllFromOdoo({ limit });
+        await persistTenantOdooSyncState(req.user?.tenant_id, {
+            last_partner_write_at: result?.cursors?.last_partner_write_at || undefined,
+            last_patient_write_at: result?.cursors?.last_patient_write_at || undefined,
+            last_success_at: new Date(),
+            last_error_at: null,
+            last_error_message: null,
+        });
         res.json(result);
     } catch (error) {
         logger.error("Odoo import failed", { error: error.message });
@@ -100,7 +157,18 @@ router.post("/contacts/import-odoo", requireAnyPermission(CONTACTS_WRITE_ACCESS)
  */
 router.post("/contacts/refresh-odoo", requireAnyPermission(CONTACTS_WRITE_ACCESS), async (req, res) => {
     try {
-        const result = await contactImportService.refreshFromOdoo();
+        const syncRecord = await getTenantOdooSyncRecord(req.user?.tenant_id);
+        const result = await contactImportService.refreshFromOdoo({
+            lastPartnerWriteAt: syncRecord?.last_partner_write_at || null,
+            lastPatientWriteAt: syncRecord?.last_patient_write_at || null,
+        });
+        await persistTenantOdooSyncState(req.user?.tenant_id, {
+            last_partner_write_at: result?.cursors?.last_partner_write_at || undefined,
+            last_patient_write_at: result?.cursors?.last_patient_write_at || undefined,
+            last_success_at: new Date(),
+            last_error_at: null,
+            last_error_message: null,
+        });
         res.json(result);
     } catch (error) {
         logger.error("Odoo refresh failed", { error: error.message });

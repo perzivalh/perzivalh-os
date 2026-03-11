@@ -12,6 +12,7 @@ const { setConversationStatus, addTagToConversation } = require("../services/con
 const { routeWithAI } = require("../services/aiRouter");
 const { applyAutoTagsByWaId, applyNamedTagsByWaId } = require("../services/conversationAutoTagService");
 const { normalizeTagKey, normalizeTagNames } = require("../services/tagNormalization");
+const { trackFlowEvent } = require("../services/flowEventService");
 
 const MAX_LIST_TITLE = 24;
 const BUTTON_TITLE_LIMIT = 20;
@@ -297,7 +298,7 @@ async function trySendBranchRouteReply(waId, lineId, flowId, text) {
   }
 }
 
-async function setConversationToPending(waId, phoneNumberId = getCurrentLineId()) {
+async function setConversationToPending(waId, phoneNumberId = getCurrentLineId(), flowId = null) {
   if (!waId || !phoneNumberId) {
     return;
   }
@@ -321,6 +322,17 @@ async function setConversationToPending(waId, phoneNumberId = getCurrentLineId()
   await addTagToConversation({
     conversationId: conversation.id,
     tagName: "pendiente",
+  });
+  await trackFlowEvent({
+    conversationId: conversation.id,
+    waId,
+    phoneNumberId,
+    flowId,
+    eventType: "handoff_requested",
+    source: "flow",
+    payload: {
+      status: "pending",
+    },
   });
 }
 
@@ -522,7 +534,7 @@ async function sendNode(waId, flow, node, visited, options = {}) {
 
   if (node.type === "action") {
     if (isHandoffAction(node.action) && shouldAllowHandoff) {
-      await setConversationToPending(waId, lineId);
+      await setConversationToPending(waId, lineId, flow?.id || null);
       await sendText(
         waId,
         node.text || "Te conecto con un asesor. En breve te responderemos.",
@@ -531,6 +543,19 @@ async function sendNode(waId, flow, node, visited, options = {}) {
     } else if (node.text) {
       await sendText(waId, node.text, sendOptions);
     }
+    await trackFlowEvent({
+      waId,
+      phoneNumberId: lineId,
+      flowId: flow?.id || null,
+      nodeId: node.id,
+      eventType: "node_sent",
+      source: sendOptions?.meta?.source || "flow",
+      actorUserId: sendOptions?.meta?.by_user_id || null,
+      payload: {
+        node_type: node.type,
+        handoff: isHandoffAction(node.action) && shouldAllowHandoff,
+      },
+    });
     if (node.terminal && shouldUpdateSession && lineId) {
       await sessionStore.clearSession(waId, lineId);
     }
@@ -613,6 +638,20 @@ async function sendNode(waId, flow, node, visited, options = {}) {
     return;
   }
 
+  await trackFlowEvent({
+    waId,
+    phoneNumberId: lineId,
+    flowId: flow?.id || null,
+    nodeId: node.id,
+    eventType: "node_sent",
+    source: sendOptions?.meta?.source || "flow",
+    actorUserId: sendOptions?.meta?.by_user_id || null,
+    payload: {
+      node_type: node.type || mediaType || "text",
+      send_ok: Boolean(sendResult?.ok ?? true),
+    },
+  });
+
   if (node.terminal) {
     if (shouldUpdateSession && lineId) {
       await sessionStore.clearSession(waId, lineId);
@@ -675,6 +714,19 @@ async function sendPanelCommandNode({
     allowHandoff: false,
   });
 
+  await trackFlowEvent({
+    waId,
+    phoneNumberId: channel.phone_number_id,
+    flowId: flow.id,
+    nodeId,
+    eventType: "panel_command",
+    source: "panel",
+    actorUserId: byUserId || null,
+    payload: {
+      command_node_id: nodeId,
+    },
+  });
+
   return { ok: true, nodeId };
 }
 
@@ -706,6 +758,8 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
   }
 
   const lineId = getCurrentLineId();
+  const existingSession = await sessionStore.getSession(waId, lineId);
+  const isFlowStart = existingSession?.data?.flow_id !== flow.id;
   await sessionStore.updateSession(waId, lineId, {
     data: {
       flow_id: flow.id,
@@ -714,6 +768,18 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
     },
     flow_id: flow.id,
   });
+  if (isFlowStart) {
+    await trackFlowEvent({
+      waId,
+      phoneNumberId: lineId,
+      flowId: flow.id,
+      eventType: "flow_started",
+      source: context?.source || "flow",
+      payload: {
+        entry_text: text || null,
+      },
+    });
+  }
 
   if (Array.isArray(flow.nodes)) {
     const nodeMap = buildNodeMap(flow);
@@ -758,6 +824,20 @@ async function executeDynamicFlow(waId, text, flowData, context = {}) {
       waId,
     });
     if (aiDecision?.action) {
+      await trackFlowEvent({
+        waId,
+        phoneNumberId: lineId,
+        flowId: flow.id,
+        nodeId: aiDecision.route_id || null,
+        eventType: "ai_routed",
+        source: aiDecision.ai_used ? "ai" : "deterministic",
+        payload: {
+          action: aiDecision.action,
+          route_id: aiDecision.route_id || null,
+          reason: aiDecision.reason || null,
+          ai_used: Boolean(aiDecision.ai_used),
+        },
+      });
       logger.info("flow.ai_decision_applied", {
         flowId: flow.id,
         action: aiDecision.action,
@@ -950,6 +1030,16 @@ async function executeDynamicInteractive(waId, selectionId, flowData, context = 
       ai_turns: 0,  // Reset AI turns on interactive button press
     },
     flow_id: flow.id,
+  });
+  await trackFlowEvent({
+    waId,
+    phoneNumberId: lineId,
+    flowId: flow.id,
+    eventType: "interactive_selection",
+    source: context?.source || "interactive",
+    payload: {
+      selection_id: selectionId,
+    },
   });
 
   if (Array.isArray(flow.nodes)) {

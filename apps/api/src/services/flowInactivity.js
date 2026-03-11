@@ -4,6 +4,7 @@ const sessionStore = require("../sessionStore");
 const { sendText, sendImage, sendVideo } = require("../whatsapp");
 const { resolveTenantContextByPhoneNumberId } = require("../tenancy/tenantResolver");
 const { loadAllFlows } = require("../../flows");
+const { trackFlowEvent } = require("./flowEventService");
 
 function findNodeText(flow, nodeId) {
   if (!flow || !Array.isArray(flow.nodes)) {
@@ -136,6 +137,16 @@ async function handleSession(session, now, flow, closingText, closingSequence, i
           )
         );
       }
+      await trackFlowEvent({
+        waId: session.wa_id,
+        phoneNumberId: session.phone_number_id,
+        flowId: flow?.id || null,
+        eventType: "inactivity_closed",
+        source: "inactivity",
+        payload: {
+          closing_node_id: inactivityCfg.closing_node_id || null,
+        },
+      });
       await sessionStore.clearSession(session.wa_id, session.phone_number_id);
     }
     return;
@@ -143,6 +154,16 @@ async function handleSession(session, now, flow, closingText, closingSequence, i
 
   if (now - lastUserAt >= firstNoticeMs) {
     await sendWithTenantContext(session, () => sendText(session.wa_id, reminderText));
+    await trackFlowEvent({
+      waId: session.wa_id,
+      phoneNumberId: session.phone_number_id,
+      flowId: flow?.id || null,
+      eventType: "inactivity_notice",
+      source: "inactivity",
+      payload: {
+        reminder_text: reminderText,
+      },
+    });
     await sessionStore.updateSession(session.wa_id, session.phone_number_id, {
       inactivity_notice_at: new Date(now).toISOString(),
       next_due_at: new Date(now + finalAfterNoticeMs),

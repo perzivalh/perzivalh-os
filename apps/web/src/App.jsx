@@ -2185,7 +2185,7 @@ function App() {
       if (channel) {
         params.set("channel", channel);
       }
-      const data = await apiGet(`/api/dashboard/metrics?${params.toString()}`);
+      const data = await apiGet(`/api/dashboard/overview?${params.toString()}`);
       setMetrics(data);
     } catch (error) {
       setPageError(normalizeError(error));

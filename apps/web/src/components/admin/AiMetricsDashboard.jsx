@@ -3,7 +3,7 @@ import { apiGet, apiPatch } from "../../api";
 
 const DEFAULT_CONFIG = {
   enabled: true,
-  tracked_providers: ["cerebras"],
+  tracked_providers: ["openai", "gemini", "cloudflare", "groq", "cerebras"],
   tenant_daily_token_limit: 1000000,
   chat_daily_token_limit: 10000,
   output_weight: 0.35,
@@ -527,7 +527,7 @@ export default function AiMetricsDashboard({ canManage = false }) {
                       value={editConfig.tracked_providers}
                       onChange={(e) => setEditConfig((p) => ({ ...p, tracked_providers: e.target.value }))}
                       style={inputStyle}
-                      placeholder="cerebras, openai"
+                      placeholder="openai, gemini, cloudflare, groq, cerebras"
                     />
                     <span style={{ fontSize: 11, color: "var(--muted)" }}>Separados por coma</span>
                   </label>

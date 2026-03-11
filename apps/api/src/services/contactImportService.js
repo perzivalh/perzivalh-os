@@ -1,490 +1,619 @@
 /**
  * Contact Import Service
- * Import and sync contacts from Odoo
+ * Import, sync and reconcile contacts from Odoo.
  */
 const prisma = require("../db");
 const logger = require("../lib/logger");
-const { normalizePhone } = require("./odooClient");
+const {
+  normalizePhone,
+  toCanonicalBoliviaPhone,
+  searchRead,
+} = require("./odooClient");
+const {
+  updateConversationFlags,
+  updateConversationVerification,
+} = require("./conversations");
 
-// Import Odoo search functions
-let odooClient = null;
-try {
-    odooClient = require("./odooClient");
-} catch (error) {
-    logger.warn("Odoo client not available for contact import");
+const DEFAULT_BATCH_SIZE = 500;
+
+function parseOdooDate(value) {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
-/**
- * Import all contacts from Odoo (initial sync)
- * This fetches all res.partner records with phone numbers
- */
+function pickPhoneRaw(record = {}) {
+  return record.mobile || record.phone || null;
+}
+
+function toPhoneE164FromRaw(phoneRaw) {
+  const variants = normalizePhone(phoneRaw);
+  return (
+    variants.find((entry) => entry.startsWith("+")) ||
+    toCanonicalBoliviaPhone(phoneRaw)
+  );
+}
+
+function extractPartnerId(partnerField) {
+  if (Array.isArray(partnerField)) {
+    return partnerField[0] || null;
+  }
+  const parsed = Number(partnerField);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatWriteDateForOdoo(date) {
+  if (!date) {
+    return null;
+  }
+  const value = new Date(date);
+  if (Number.isNaN(value.getTime())) {
+    return null;
+  }
+  return value.toISOString().slice(0, 19).replace("T", " ");
+}
+
+async function upsertOdooContactFromPartner(partner) {
+  const phoneRaw = pickPhoneRaw(partner);
+  const phoneE164 = toPhoneE164FromRaw(phoneRaw);
+  const phoneCanonical = toCanonicalBoliviaPhone(phoneRaw || partner.phone || partner.mobile);
+  const partnerCreatedAt = parseOdooDate(partner.create_date);
+  const partnerWriteAt = parseOdooDate(partner.write_date) || partnerCreatedAt || new Date();
+  const data = {
+    name: partner.name || "Sin nombre",
+    phone_e164: phoneE164 || null,
+    phone_canonical: phoneCanonical || null,
+    phone_raw: phoneRaw || null,
+    email: partner.email || null,
+    vat: partner.vat || null,
+    partner_created_at: partnerCreatedAt,
+    partner_write_at: partnerWriteAt,
+    last_synced_at: new Date(),
+  };
+
+  const existing = await prisma.odooContact.findUnique({
+    where: { odoo_partner_id: partner.id },
+    select: { id: true },
+  });
+
+  if (existing) {
+    await prisma.odooContact.update({
+      where: { odoo_partner_id: partner.id },
+      data,
+    });
+    return { imported: true, created: false, updated: true, partnerId: partner.id };
+  }
+
+  await prisma.odooContact.create({
+    data: {
+      odoo_partner_id: partner.id,
+      is_patient: false,
+      ...data,
+    },
+  });
+  return { imported: true, created: true, updated: false, partnerId: partner.id };
+}
+
+async function upsertOdooContactFromPatient(patient) {
+  const partnerId = extractPartnerId(patient.partner_id);
+  if (!partnerId) {
+    return { updated: false, partnerId: null };
+  }
+
+  const phoneRaw = pickPhoneRaw(patient);
+  const phoneE164 = toPhoneE164FromRaw(phoneRaw);
+  const phoneCanonical = toCanonicalBoliviaPhone(phoneRaw || patient.phone || patient.mobile);
+  const patientCreatedAt = parseOdooDate(patient.create_date);
+  const patientWriteAt = parseOdooDate(patient.write_date) || patientCreatedAt || new Date();
+
+  const existing = await prisma.odooContact.findUnique({
+    where: { odoo_partner_id: partnerId },
+    select: {
+      id: true,
+      is_patient: true,
+      first_seen_as_patient_at: true,
+    },
+  });
+
+  const data = {
+    name: patient.name || "Sin nombre",
+    phone_e164: phoneE164 || undefined,
+    phone_canonical: phoneCanonical || undefined,
+    phone_raw: phoneRaw || undefined,
+    is_patient: true,
+    odoo_patient_id: patient.id || null,
+    patient_created_at: patientCreatedAt,
+    patient_write_at: patientWriteAt,
+    first_seen_as_patient_at:
+      existing?.first_seen_as_patient_at ||
+      patientCreatedAt ||
+      new Date(),
+    last_synced_at: new Date(),
+  };
+
+  if (existing) {
+    await prisma.odooContact.update({
+      where: { odoo_partner_id: partnerId },
+      data,
+    });
+  } else {
+    await prisma.odooContact.create({
+      data: {
+        odoo_partner_id: partnerId,
+        name: patient.name || "Sin nombre",
+        is_patient: true,
+        ...data,
+      },
+    });
+  }
+
+  return { updated: true, partnerId };
+}
+
+async function fetchAllOdooPartners(limit) {
+  const partners = [];
+  let offset = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const batch = await searchRead(
+      "res.partner",
+      [["active", "=", true]],
+      ["id", "name", "phone", "mobile", "email", "vat", "create_date", "write_date"],
+      DEFAULT_BATCH_SIZE,
+      "id asc",
+      offset
+    );
+    if (!batch?.length) {
+      break;
+    }
+    for (const partner of batch) {
+      partners.push(partner);
+      if (limit && partners.length >= limit) {
+        hasMore = false;
+        break;
+      }
+    }
+    offset += batch.length;
+    if (batch.length < DEFAULT_BATCH_SIZE) {
+      hasMore = false;
+    }
+  }
+
+  return partners;
+}
+
+async function fetchIncrementalPartners(sinceDate) {
+  const formatted = formatWriteDateForOdoo(sinceDate);
+  const domain = [["active", "=", true]];
+  if (formatted) {
+    domain.push(["write_date", ">", formatted]);
+  }
+
+  let offset = 0;
+  let hasMore = true;
+  const rows = [];
+
+  while (hasMore) {
+    const batch = await searchRead(
+      "res.partner",
+      domain,
+      ["id", "name", "phone", "mobile", "email", "vat", "create_date", "write_date"],
+      DEFAULT_BATCH_SIZE,
+      "write_date asc, id asc",
+      offset
+    );
+    if (!batch?.length) {
+      break;
+    }
+    rows.push(...batch);
+    offset += batch.length;
+    if (batch.length < DEFAULT_BATCH_SIZE) {
+      hasMore = false;
+    }
+  }
+
+  return rows;
+}
+
+async function fetchIncrementalPatients(sinceDate) {
+  const formatted = formatWriteDateForOdoo(sinceDate);
+  const domain = [];
+  if (formatted) {
+    domain.push(["write_date", ">", formatted]);
+  }
+
+  let offset = 0;
+  let hasMore = true;
+  const rows = [];
+
+  while (hasMore) {
+    const batch = await searchRead(
+      "medical.patient",
+      domain,
+      ["id", "name", "partner_id", "phone", "mobile", "create_date", "write_date"],
+      DEFAULT_BATCH_SIZE,
+      "write_date asc, id asc",
+      offset
+    );
+    if (!batch?.length) {
+      break;
+    }
+    rows.push(...batch);
+    offset += batch.length;
+    if (batch.length < DEFAULT_BATCH_SIZE) {
+      hasMore = false;
+    }
+  }
+
+  return rows;
+}
+
+async function reconcileOdooContactsWithConversations(contactIds = []) {
+  const where = contactIds.length
+    ? { id: { in: contactIds } }
+    : { phone_canonical: { not: null } };
+
+  const contacts = await prisma.odooContact.findMany({
+    where,
+    select: {
+      id: true,
+      odoo_partner_id: true,
+      odoo_patient_id: true,
+      is_patient: true,
+      phone_canonical: true,
+      patient_created_at: true,
+    },
+  });
+
+  let matchedConversations = 0;
+  let autoAsistioApplied = 0;
+
+  for (const contact of contacts) {
+    if (!contact.phone_canonical) {
+      continue;
+    }
+    const waDigits = contact.phone_canonical.replace(/^\+/, "");
+
+    const conversations = await prisma.conversation.findMany({
+      where: {
+        OR: [
+          { phone_canonical: contact.phone_canonical },
+          { phone_e164: contact.phone_canonical },
+          { wa_id: waDigits },
+        ],
+      },
+      select: {
+        id: true,
+        created_at: true,
+        partner_id: true,
+        patient_id: true,
+        asistio: true,
+        asistio_source: true,
+      },
+    });
+
+    for (const conversation of conversations) {
+      matchedConversations += 1;
+      if (
+        conversation.partner_id !== contact.odoo_partner_id ||
+        conversation.patient_id !== (contact.odoo_patient_id || null)
+      ) {
+        await updateConversationVerification({
+          conversationId: conversation.id,
+          partnerId: contact.odoo_partner_id,
+          patientId: contact.odoo_patient_id || null,
+          method: "odoo_sync_auto",
+        });
+      }
+
+      const shouldAutoMarkAttendance =
+        contact.is_patient &&
+        contact.patient_created_at &&
+        contact.patient_created_at >= conversation.created_at &&
+        conversation.asistio_source !== "manual";
+
+      if (shouldAutoMarkAttendance) {
+        const updatedConversation = await updateConversationFlags({
+          conversationId: conversation.id,
+          asistio: true,
+          source: "odoo_auto",
+          metadata: {
+            odoo_contact_id: contact.id,
+            patient_created_at: contact.patient_created_at,
+          },
+        });
+        if (updatedConversation?.asistio_source === "odoo_auto") {
+          autoAsistioApplied += 1;
+        }
+      }
+    }
+  }
+
+  return {
+    contacts_checked: contacts.length,
+    matched_conversations: matchedConversations,
+    auto_asistio_applied: autoAsistioApplied,
+  };
+}
+
+async function syncPatientsFromOdoo({ lastPatientWriteAt = null } = {}) {
+  let patientRows = [];
+  try {
+    patientRows = await fetchIncrementalPatients(lastPatientWriteAt);
+  } catch (error) {
+    logger.warn("odoo.patient_incremental_failed", {
+      message: error.message || String(error),
+    });
+  }
+
+  let updated = 0;
+  const touchedPartnerIds = new Set();
+  let lastWriteAt = lastPatientWriteAt ? new Date(lastPatientWriteAt) : null;
+
+  for (const patient of patientRows) {
+    const result = await upsertOdooContactFromPatient(patient);
+    if (result.updated) {
+      updated += 1;
+    }
+    if (result.partnerId) {
+      touchedPartnerIds.add(result.partnerId);
+    }
+    const writeAt = parseOdooDate(patient.write_date) || parseOdooDate(patient.create_date);
+    if (writeAt && (!lastWriteAt || writeAt > lastWriteAt)) {
+      lastWriteAt = writeAt;
+    }
+  }
+
+  return {
+    updated,
+    touchedPartnerIds: Array.from(touchedPartnerIds),
+    lastPatientWriteAt: lastWriteAt,
+  };
+}
+
 async function importAllFromOdoo(options = {}) {
-    if (!odooClient || !(await odooClient.hasOdooConfig())) {
-        throw new Error("Odoo not configured");
+  logger.info("odoo.import_full.started");
+  const partners = await fetchAllOdooPartners(options.limit ? Number(options.limit) : null);
+
+  let created = 0;
+  let updated = 0;
+  const touchedPartnerIds = [];
+
+  for (const partner of partners) {
+    const result = await upsertOdooContactFromPartner(partner);
+    touchedPartnerIds.push(result.partnerId);
+    if (result.created) {
+      created += 1;
     }
+    if (result.updated) {
+      updated += 1;
+    }
+  }
 
-    logger.info("Starting full Odoo contact import");
+  const patientSync = await syncPatientsFromOdoo({});
+  const contactIds = touchedPartnerIds.length
+    ? (await prisma.odooContact.findMany({
+        where: { odoo_partner_id: { in: [...new Set([...touchedPartnerIds, ...patientSync.touchedPartnerIds])] } },
+        select: { id: true },
+      })).map((row) => row.id)
+    : [];
+  const reconciliation = await reconcileOdooContactsWithConversations(contactIds);
 
-    const parsedLimit =
-        options.limit !== undefined && options.limit !== null
-            ? Number(options.limit)
-            : null;
-    const totalLimit =
-        Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : null;
-    const batchSize = 500;
-    let offset = 0;
-    let totalImported = 0;
-    let totalCreated = 0;
-    let totalUpdated = 0;
-    let totalSkipped = 0;
-    let hasMore = true;
-
-    while (hasMore) {
-        try {
-            // Fetch partners from Odoo using odooClient's callKw
-            const { searchRead } = require("./odooClient");
-
-            const partners = await searchRead(
-                "res.partner",
-                [["active", "=", true]],
-                ["id", "name", "phone", "mobile", "email", "vat"],
-                batchSize,
-                "id asc",
-                offset
-            );
-
-            if (!partners || partners.length === 0) {
-                hasMore = false;
-                break;
-            }
-
-            // Process each partner
-            for (const partner of partners) {
-                const result = await importSinglePartner(partner);
-                if (result.imported) {
-                    totalImported++;
-                    if (result.created) {
-                        totalCreated++;
-                    } else if (result.updated) {
-                        totalUpdated++;
-                    }
-                } else {
-                    totalSkipped++;
-                }
-            }
-
-            offset += partners.length;
-
-            // Check if we've reached the limit or no more records
-            if (partners.length < batchSize || (totalLimit && offset >= totalLimit)) {
-                hasMore = false;
-            }
-
-            logger.info("Odoo import progress", {
-                processed: offset,
-                imported: totalImported,
-                skipped: totalSkipped,
-            });
-        } catch (error) {
-            logger.error("Odoo import batch error", { offset, error: error.message });
-            hasMore = false;
+  return {
+    totalProcessed: partners.length,
+    imported: created + updated,
+    new: created,
+    updated,
+    skipped: 0,
+    patient_updates: patientSync.updated,
+    reconciliation,
+    cursors: {
+      last_partner_write_at: partners.reduce((latest, partner) => {
+        const writeAt = parseOdooDate(partner.write_date) || parseOdooDate(partner.create_date);
+        if (!writeAt) {
+          return latest;
         }
-    }
-
-    // Try to get patient info for imported contacts
-    await enrichContactsWithPatientInfo();
-
-    logger.info("Odoo contact import completed", {
-        totalProcessed: offset,
-        totalImported,
-        totalSkipped,
-    });
-
-    return {
-        totalProcessed: offset,
-        imported: totalImported,
-        new: totalCreated,
-        updated: totalUpdated,
-        skipped: totalSkipped,
-    };
+        return !latest || writeAt > latest ? writeAt : latest;
+      }, null),
+      last_patient_write_at: patientSync.lastPatientWriteAt,
+    },
+  };
 }
 
-/**
- * Import a single partner into OdooContact table
- */
-async function importSinglePartner(partner) {
-    // Get phone number (prefer mobile over phone)
-    const phoneRaw = partner.mobile || partner.phone;
-    if (!phoneRaw) {
-        return { imported: false, reason: "no_phone" };
-    }
-
-    // Normalize phone using odooClient's normalizePhone
-    const phoneVariants = normalizePhone(phoneRaw);
-    if (phoneVariants.length === 0) {
-        return { imported: false, reason: "invalid_phone" };
-    }
-
-    // Use the most complete variant (with country code)
-    const phoneE164 = phoneVariants.find((p) => p.startsWith("+")) ||
-        `+591${phoneVariants[0]}`;
-
-    try {
-        const existing = await prisma.odooContact.findUnique({
-            where: { odoo_partner_id: partner.id },
-            select: { id: true },
-        });
-        if (existing) {
-            await prisma.odooContact.update({
-                where: { odoo_partner_id: partner.id },
-                data: {
-                    name: partner.name || "Sin nombre",
-                    phone_e164: phoneE164,
-                    phone_raw: phoneRaw,
-                    email: partner.email || null,
-                    vat: partner.vat || null,
-                    last_synced_at: new Date(),
-                },
-            });
-            return {
-                imported: true,
-                updated: true,
-                created: false,
-                contact: {
-                    name: partner.name || "Sin nombre",
-                    phone_e164: phoneE164,
-                    email: partner.email || null,
-                },
-            };
-        }
-        await prisma.odooContact.create({
-            data: {
-                odoo_partner_id: partner.id,
-                name: partner.name || "Sin nombre",
-                phone_e164: phoneE164,
-                phone_raw: phoneRaw,
-                email: partner.email || null,
-                vat: partner.vat || null,
-                is_patient: false,
-                last_synced_at: new Date(),
-            },
-        });
-        return {
-            imported: true,
-            created: true,
-            updated: false,
-            contact: {
-                name: partner.name || "Sin nombre",
-                phone_e164: phoneE164,
-                email: partner.email || null,
-            },
-        };
-    } catch (error) {
-        logger.error("Failed to import partner", {
-            partnerId: partner.id,
-            error: error.message,
-        });
-        return { imported: false, reason: "db_error" };
-    }
-}
-
-/**
- * Refresh contacts from Odoo (incremental - only new partners)
- */
 async function refreshFromOdoo(options = {}) {
-    if (!odooClient || !(await odooClient.hasOdooConfig())) {
-        throw new Error("Odoo not configured");
+  logger.info("odoo.refresh.started", {
+    sincePartner: options.lastPartnerWriteAt || null,
+    sincePatient: options.lastPatientWriteAt || null,
+  });
+
+  const partners = await fetchIncrementalPartners(options.lastPartnerWriteAt || null);
+  let created = 0;
+  let updated = 0;
+  const touchedPartnerIds = new Set();
+  let lastPartnerWriteAt = options.lastPartnerWriteAt ? new Date(options.lastPartnerWriteAt) : null;
+
+  for (const partner of partners) {
+    const result = await upsertOdooContactFromPartner(partner);
+    if (result.created) {
+      created += 1;
     }
-
-    logger.info("Starting incremental Odoo contact sync");
-
-    // Get the last sync date from most recently synced contact
-    const lastContact = await prisma.odooContact.findFirst({
-        orderBy: { last_synced_at: "desc" },
-        select: { last_synced_at: true, odoo_partner_id: true },
-    });
-
-    const lastPartnerId = lastContact?.odoo_partner_id || 0;
-
-    try {
-        const { searchRead } = require("./odooClient");
-
-        // Fetch only partners with ID greater than last imported
-        const partners = await searchRead(
-            "res.partner",
-            [
-                ["active", "=", true],
-                ["id", ">", lastPartnerId],
-            ],
-            ["id", "name", "phone", "mobile", "email", "vat"],
-            1000,
-            "id asc"
-        );
-
-        let imported = 0;
-        let skipped = 0;
-        let created = 0;
-        let updated = 0;
-        const createdPreview = [];
-        const updatedPreview = [];
-
-        for (const partner of partners || []) {
-            const result = await importSinglePartner(partner);
-            if (result.imported) {
-                imported++;
-                if (result.created) {
-                    created++;
-                    if (createdPreview.length < 6 && result.contact) {
-                        createdPreview.push(result.contact);
-                    }
-                }
-                if (result.updated) {
-                    updated++;
-                    if (updatedPreview.length < 6 && result.contact) {
-                        updatedPreview.push(result.contact);
-                    }
-                }
-            } else {
-                skipped++;
-            }
-        }
-
-        // Enrich with patient info
-        if (imported > 0) {
-            await enrichContactsWithPatientInfo();
-        }
-
-        logger.info("Incremental Odoo sync completed", { imported, created, updated, skipped });
-
-        return {
-            imported,
-            created,
-            updated,
-            skipped,
-            preview: {
-                created: createdPreview,
-                updated: updatedPreview,
-            },
-        };
-    } catch (error) {
-        logger.error("Incremental Odoo sync failed", { error: error.message });
-        throw error;
+    if (result.updated) {
+      updated += 1;
     }
+    if (result.partnerId) {
+      touchedPartnerIds.add(result.partnerId);
+    }
+    const writeAt = parseOdooDate(partner.write_date) || parseOdooDate(partner.create_date);
+    if (writeAt && (!lastPartnerWriteAt || writeAt > lastPartnerWriteAt)) {
+      lastPartnerWriteAt = writeAt;
+    }
+  }
+
+  const patientSync = await syncPatientsFromOdoo({
+    lastPatientWriteAt: options.lastPatientWriteAt || null,
+  });
+
+  const partnerIdsToReconcile = [...new Set([...touchedPartnerIds, ...patientSync.touchedPartnerIds])];
+  const contactIds = partnerIdsToReconcile.length
+    ? (await prisma.odooContact.findMany({
+        where: { odoo_partner_id: { in: partnerIdsToReconcile } },
+        select: { id: true },
+      })).map((row) => row.id)
+    : [];
+
+  const reconciliation = await reconcileOdooContactsWithConversations(contactIds);
+
+  logger.info("odoo.refresh.completed", {
+    imported: created + updated,
+    patientUpdates: patientSync.updated,
+    matchedConversations: reconciliation.matched_conversations,
+  });
+
+  return {
+    imported: created + updated,
+    created,
+    updated,
+    skipped: 0,
+    patient_updates: patientSync.updated,
+    reconciliation,
+    cursors: {
+      last_partner_write_at: lastPartnerWriteAt,
+      last_patient_write_at: patientSync.lastPatientWriteAt,
+    },
+  };
 }
 
-/**
- * Enrich contacts with patient information from Odoo
- */
 async function enrichContactsWithPatientInfo() {
-    try {
-        const { searchRead } = require("./odooClient");
-
-        // Get contacts that haven't been checked for patient status
-        const contacts = await prisma.odooContact.findMany({
-            where: { is_patient: false },
-            select: { id: true, odoo_partner_id: true },
-            take: 500,
-        });
-
-        if (contacts.length === 0) {
-            return;
-        }
-
-        const partnerIds = contacts.map((c) => c.odoo_partner_id);
-
-        // Check which partners are patients in medical.patient
-        try {
-            const patients = await searchRead(
-                "medical.patient",
-                [["partner_id", "in", partnerIds]],
-                ["id", "partner_id"],
-                1000,
-                null
-            );
-
-            if (!patients || patients.length === 0) {
-                return;
-            }
-
-            // Map partner_id to patient_id
-            const patientMap = new Map();
-            for (const patient of patients) {
-                const partnerId = Array.isArray(patient.partner_id)
-                    ? patient.partner_id[0]
-                    : patient.partner_id;
-                if (partnerId) {
-                    patientMap.set(partnerId, patient.id);
-                }
-            }
-
-            // Update contacts that are patients
-            for (const contact of contacts) {
-                if (patientMap.has(contact.odoo_partner_id)) {
-                    await prisma.odooContact.update({
-                        where: { id: contact.id },
-                        data: {
-                            is_patient: true,
-                            odoo_patient_id: patientMap.get(contact.odoo_partner_id),
-                        },
-                    });
-                }
-            }
-
-            logger.info("Enriched contacts with patient info", {
-                checked: contacts.length,
-                patients: patientMap.size,
-            });
-        } catch (error) {
-            // medical.patient model might not exist - that's ok
-            logger.warn("Could not check patient info", { error: error.message });
-        }
-    } catch (error) {
-        logger.error("Failed to enrich contacts", { error: error.message });
-    }
+  const result = await syncPatientsFromOdoo({});
+  return {
+    updated: result.updated,
+    lastPatientWriteAt: result.lastPatientWriteAt,
+  };
 }
 
-/**
- * Get all local contacts with pagination
- */
 async function getContacts(options = {}) {
-    const where = {};
+  const where = {};
 
-    if (options.search) {
-        where.OR = [
-            { name: { contains: options.search, mode: "insensitive" } },
-            { phone_e164: { contains: options.search } },
-            { email: { contains: options.search, mode: "insensitive" } },
-        ];
-    }
-
-    if (options.isPatient !== undefined) {
-        where.is_patient = options.isPatient;
-    }
-
-    const [contacts, total] = await Promise.all([
-        prisma.odooContact.findMany({
-            where,
-            orderBy: { name: "asc" },
-            skip: options.offset || 0,
-            take: options.limit || 50,
-        }),
-        prisma.odooContact.count({ where }),
-    ]);
-
-    return {
-        contacts,
-        total,
-        offset: options.offset || 0,
-        limit: options.limit || 50,
-    };
-}
-
-/**
- * Get contact statistics
- */
-async function getContactStats() {
-    const [total, patients, withPhone] = await Promise.all([
-        prisma.odooContact.count(),
-        prisma.odooContact.count({ where: { is_patient: true } }),
-        prisma.odooContact.count({ where: { phone_e164: { not: null } } }),
-    ]);
-
-    const lastSync = await prisma.odooContact.findFirst({
-        orderBy: { last_synced_at: "desc" },
-        select: { last_synced_at: true },
-    });
-
-    return {
-        total,
-        patients,
-        withPhone,
-        lastSyncAt: lastSync?.last_synced_at || null,
-    };
-}
-
-/**
- * Update a local contact
- */
-async function updateContact(contactId, payload = {}) {
-    const existing = await prisma.odooContact.findUnique({
-        where: { id: contactId },
-    });
-    if (!existing) {
-        throw new Error("not_found");
-    }
-    const updates = {};
-    if (typeof payload.name === "string") {
-        updates.name = payload.name.trim() || existing.name;
-    }
-    if (payload.email !== undefined) {
-        const email = typeof payload.email === "string" ? payload.email.trim() : "";
-        updates.email = email || null;
-    }
-    if (payload.vat !== undefined) {
-        const vat = typeof payload.vat === "string" ? payload.vat.trim() : "";
-        updates.vat = vat || null;
-    }
-    if (payload.phone !== undefined) {
-        const phoneRaw = typeof payload.phone === "string" ? payload.phone.trim() : "";
-        if (!phoneRaw) {
-            updates.phone_raw = null;
-            updates.phone_e164 = null;
-        } else {
-            const variants = normalizePhone(phoneRaw);
-            const phoneE164 =
-                variants.find((p) => p.startsWith("+")) ||
-                (variants[0] ? `+591${variants[0]}` : null);
-            updates.phone_raw = phoneRaw;
-            updates.phone_e164 = phoneE164;
-        }
-    }
-    updates.last_synced_at = new Date();
-
-    return prisma.odooContact.update({
-        where: { id: contactId },
-        data: updates,
-    });
-}
-
-/**
- * Delete a local contact
- */
-async function deleteContact(contactId) {
-    await prisma.campaignRecipient.updateMany({
-        where: { odoo_contact_id: contactId },
-        data: { odoo_contact_id: null },
-    });
-    return prisma.odooContact.delete({
-        where: { id: contactId },
-    });
-}
-
-/**
- * Get Odoo field options for variable mapping
- * Returns available fields that can be used in template variables
- */
-function getOdooFieldOptions() {
-    return [
-        { value: "res.partner.name", label: "Nombre del Paciente", group: "Paciente" },
-        { value: "res.partner.phone", label: "Teléfono", group: "Paciente" },
-        { value: "res.partner.email", label: "Email", group: "Paciente" },
-        { value: "res.partner.vat", label: "CI / NIT", group: "Paciente" },
-        { value: "medical.patient.name", label: "Nombre (Paciente)", group: "Paciente" },
-        { value: "account.move.amount_residual", label: "Saldo Pendiente", group: "Pagos" },
-        { value: "account.move.name", label: "Número de Factura", group: "Pagos" },
-        { value: "pos.order.date_order", label: "Última Compra (Fecha)", group: "Historial" },
-        { value: "pos.order.amount_total", label: "Última Compra (Monto)", group: "Historial" },
+  if (options.search) {
+    where.OR = [
+      { name: { contains: options.search, mode: "insensitive" } },
+      { phone_e164: { contains: options.search } },
+      { email: { contains: options.search, mode: "insensitive" } },
     ];
+  }
+
+  if (options.isPatient !== undefined) {
+    where.is_patient = options.isPatient;
+  }
+
+  const [contacts, total] = await Promise.all([
+    prisma.odooContact.findMany({
+      where,
+      orderBy: { name: "asc" },
+      skip: options.offset || 0,
+      take: options.limit || 50,
+    }),
+    prisma.odooContact.count({ where }),
+  ]);
+
+  return {
+    contacts,
+    total,
+    offset: options.offset || 0,
+    limit: options.limit || 50,
+  };
+}
+
+async function getContactStats() {
+  const [total, patients, withPhone, lastSync] = await Promise.all([
+    prisma.odooContact.count(),
+    prisma.odooContact.count({ where: { is_patient: true } }),
+    prisma.odooContact.count({ where: { phone_e164: { not: null } } }),
+    prisma.odooContact.findFirst({
+      orderBy: { last_synced_at: "desc" },
+      select: { last_synced_at: true },
+    }),
+  ]);
+
+  return {
+    total,
+    patients,
+    withPhone,
+    lastSyncAt: lastSync?.last_synced_at || null,
+  };
+}
+
+async function updateContact(contactId, payload = {}) {
+  const existing = await prisma.odooContact.findUnique({
+    where: { id: contactId },
+  });
+  if (!existing) {
+    throw new Error("not_found");
+  }
+
+  const updates = {};
+  if (typeof payload.name === "string") {
+    updates.name = payload.name.trim() || existing.name;
+  }
+  if (payload.email !== undefined) {
+    updates.email = typeof payload.email === "string" && payload.email.trim()
+      ? payload.email.trim()
+      : null;
+  }
+  if (payload.vat !== undefined) {
+    updates.vat = typeof payload.vat === "string" && payload.vat.trim()
+      ? payload.vat.trim()
+      : null;
+  }
+  if (payload.phone !== undefined) {
+    const phoneRaw = typeof payload.phone === "string" ? payload.phone.trim() : "";
+    updates.phone_raw = phoneRaw || null;
+    updates.phone_e164 = phoneRaw ? toPhoneE164FromRaw(phoneRaw) : null;
+    updates.phone_canonical = phoneRaw ? toCanonicalBoliviaPhone(phoneRaw) : null;
+  }
+  updates.last_synced_at = new Date();
+
+  return prisma.odooContact.update({
+    where: { id: contactId },
+    data: updates,
+  });
+}
+
+async function deleteContact(contactId) {
+  await prisma.campaignRecipient.updateMany({
+    where: { odoo_contact_id: contactId },
+    data: { odoo_contact_id: null },
+  });
+  return prisma.odooContact.delete({
+    where: { id: contactId },
+  });
+}
+
+function getOdooFieldOptions() {
+  return [
+    { value: "res.partner.name", label: "Nombre del Paciente", group: "Paciente" },
+    { value: "res.partner.phone", label: "Telefono", group: "Paciente" },
+    { value: "res.partner.email", label: "Email", group: "Paciente" },
+    { value: "res.partner.vat", label: "CI / NIT", group: "Paciente" },
+    { value: "medical.patient.name", label: "Nombre (Paciente)", group: "Paciente" },
+    { value: "account.move.amount_residual", label: "Saldo Pendiente", group: "Pagos" },
+    { value: "account.move.name", label: "Numero de Factura", group: "Pagos" },
+    { value: "pos.order.date_order", label: "Ultima Compra (Fecha)", group: "Historial" },
+    { value: "pos.order.amount_total", label: "Ultima Compra (Monto)", group: "Historial" },
+  ];
 }
 
 module.exports = {
-    importAllFromOdoo,
-    refreshFromOdoo,
-    importSinglePartner,
-    enrichContactsWithPatientInfo,
-    getContacts,
-    getContactStats,
-    getOdooFieldOptions,
-    updateContact,
-    deleteContact,
+  importAllFromOdoo,
+  refreshFromOdoo,
+  enrichContactsWithPatientInfo,
+  reconcileOdooContactsWithConversations,
+  getContacts,
+  getContactStats,
+  getOdooFieldOptions,
+  updateContact,
+  deleteContact,
 };

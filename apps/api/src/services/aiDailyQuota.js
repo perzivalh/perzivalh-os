@@ -4,7 +4,11 @@ const { getTenantContext } = require("../tenancy/tenantContext");
 
 const KEY_TTL_SECONDS = 60 * 60 * 48; // 48h; the date is part of the key, so exact midnight expiry is not required.
 const CONFIG_CACHE_TTL_MS = 60_000;
+const HISTORY_HASH_TTL_SECONDS = 60 * 60 * 24 * 35; // 35 days
+const HISTORY_MAX_DAYS = 30;
+const ALL_TRACKED_PROVIDERS = ["openai", "gemini", "cloudflare", "groq", "cerebras"];
 const LOCAL_COUNTERS = new Map();
+const LOCAL_HISTORY = new Map();
 const CONFIG_CACHE = new Map();
 
 function normalizeProviderName(provider) {
@@ -25,23 +29,29 @@ function toNonNegativeNumber(value, fallback) {
   return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 
-function getBudgetDay() {
+function formatBudgetDay(date = new Date()) {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: process.env.AI_DAILY_QUOTA_TIMEZONE || "America/La_Paz",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   });
-  return formatter.format(new Date());
+  return formatter.format(date);
+}
+
+function getBudgetDay() {
+  return formatBudgetDay(new Date());
 }
 
 function getDefaultAiQuotaConfig() {
   const rawEnabled = String(process.env.AI_DAILY_QUOTA_ENABLED || "true").toLowerCase();
-  const rawProviders = String(process.env.AI_DAILY_QUOTA_PROVIDERS || "cerebras").trim();
+  const rawProviders = String(
+    process.env.AI_DAILY_QUOTA_PROVIDERS || ALL_TRACKED_PROVIDERS.join(",")
+  ).trim();
 
   return {
     enabled: !(rawEnabled === "0" || rawEnabled === "false" || rawEnabled === "off"),
-    tracked_providers: normalizeTrackedProviders(rawProviders, ["cerebras"]),
+    tracked_providers: normalizeTrackedProviders(rawProviders, ALL_TRACKED_PROVIDERS),
     tenant_daily_token_limit: toPositiveNumber(process.env.AI_TENANT_DAILY_TOKEN_LIMIT || 1000000),
     chat_daily_token_limit: toPositiveNumber(process.env.AI_CHAT_DAILY_TOKEN_LIMIT || 10000),
     output_weight: toNonNegativeNumber(process.env.AI_DAILY_QUOTA_OUTPUT_WEIGHT || 0.35, 0.35),
@@ -280,6 +290,77 @@ function getChatIdFromQuotaKey(key) {
   return parts.length >= 6 ? parts[4] : "";
 }
 
+function getLocalHistoryStore(tenantId) {
+  const resolvedTenantId = tenantId || "legacy";
+  let store = LOCAL_HISTORY.get(resolvedTenantId);
+  if (!store) {
+    store = new Map();
+    LOCAL_HISTORY.set(resolvedTenantId, store);
+  }
+  return store;
+}
+
+function writeLocalHistoryRecord(tenantId, record) {
+  if (!record?.day) {
+    return;
+  }
+  const store = getLocalHistoryStore(tenantId);
+  store.set(record.day, record);
+
+  const orderedDays = [...store.keys()].sort();
+  while (orderedDays.length > HISTORY_MAX_DAYS + 7) {
+    const day = orderedDays.shift();
+    if (!day) {
+      continue;
+    }
+    store.delete(day);
+  }
+}
+
+function listRecentBudgetDays(days) {
+  const totalDays = Math.min(HISTORY_MAX_DAYS, Math.max(1, Number(days) || HISTORY_MAX_DAYS));
+  const base = new Date();
+  base.setUTCHours(12, 0, 0, 0);
+
+  const out = [];
+  for (let offset = totalDays - 1; offset >= 0; offset--) {
+    const cursor = new Date(base);
+    cursor.setUTCDate(base.getUTCDate() - offset);
+    out.push(formatBudgetDay(cursor));
+  }
+  return out;
+}
+
+function normalizeHistoryRecord(day, entry = {}) {
+  return {
+    day,
+    used_tokens: Math.max(0, Number(entry.used_tokens || 0)),
+    limit_tokens:
+      entry.limit_tokens == null || entry.limit_tokens === ""
+        ? null
+        : Math.max(0, Number(entry.limit_tokens || 0)) || null,
+    chat_count: Math.max(0, Number(entry.chat_count || 0)),
+    top_chats: Array.isArray(entry.top_chats) ? entry.top_chats : [],
+  };
+}
+
+function fillHistoryWindow(entries, days) {
+  const recentDays = listRecentBudgetDays(days);
+  const byDay = new Map();
+
+  for (const entry of entries || []) {
+    const day = String(entry?.day || "").trim();
+    if (!day) {
+      continue;
+    }
+    byDay.set(day, normalizeHistoryRecord(day, entry));
+  }
+
+  return recentDays.map((day) => (
+    byDay.get(day) || normalizeHistoryRecord(day)
+  ));
+}
+
 async function getDailyAiQuotaSnapshot({ tenantId, topChatsLimit = 8 } = {}) {
   const resolvedTenantId = tenantId || getTenantContext().tenantId || "legacy";
   const config = await getEffectiveAiQuotaConfig({ tenantId: resolvedTenantId });
@@ -457,6 +538,12 @@ async function reserveDailyAiQuota({
     });
   }
 
+  try {
+    await persistDailySnapshotToHistory({ tenantId: resolvedTenantId });
+  } catch {
+    // Best effort only. Quota reservation must not fail because analytics history couldn't persist.
+  }
+
   return {
     reserved: true,
     reserveTokens,
@@ -465,9 +552,6 @@ async function reserveDailyAiQuota({
     config,
   };
 }
-
-const HISTORY_HASH_TTL_SECONDS = 60 * 60 * 24 * 35; // 35 days
-const HISTORY_MAX_DAYS = 30;
 
 function buildHistoryHashKey(tenantId) {
   return `ai:quota:history:${tenantId || "legacy"}`;
@@ -490,6 +574,8 @@ async function persistDailySnapshotToHistory({ tenantId, snapshot } = {}) {
     })),
   };
 
+  writeLocalHistoryRecord(resolvedTenantId, record);
+
   try {
     const client = getRedis();
     await client.hset(hashKey, day, JSON.stringify(record));
@@ -511,8 +597,7 @@ async function persistDailySnapshotToHistory({ tenantId, snapshot } = {}) {
 async function getDailyUsageHistory({ tenantId, days = HISTORY_MAX_DAYS } = {}) {
   const resolvedTenantId = tenantId || getTenantContext().tenantId || "legacy";
   const hashKey = buildHistoryHashKey(resolvedTenantId);
-
-  let allEntries = [];
+  const allEntries = [];
 
   try {
     const client = getRedis();
@@ -536,13 +621,8 @@ async function getDailyUsageHistory({ tenantId, days = HISTORY_MAX_DAYS } = {}) 
     });
   }
 
-  // Sort descending by date, then take requested window
-  allEntries.sort((a, b) => (b.day > a.day ? 1 : -1));
-  const limited = allEntries.slice(0, Math.max(1, Number(days) || HISTORY_MAX_DAYS));
-  // Return ascending order for chart rendering
-  limited.reverse();
-
-  return limited;
+  const localEntries = [...getLocalHistoryStore(resolvedTenantId).values()];
+  return fillHistoryWindow([...allEntries, ...localEntries], days);
 }
 
 module.exports = {

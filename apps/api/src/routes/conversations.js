@@ -18,6 +18,7 @@ const { getTenantContext } = require("../tenancy/tenantContext");
 const { resolveChannelByPhoneNumberId } = require("../tenancy/tenantResolver");
 const { sendText, sendImage, sendDocument, sendAudio } = require("../whatsapp");
 const { sendPanelCommandNode } = require("../flows/flowExecutor");
+const { trackFlowEvent } = require("../services/flowEventService");
 const { uploadToR2, isConfigured: isR2Configured } = require("../services/mediaStorageService");
 const { downloadMedia } = require("../services/metaGraphApi");
 const { getActiveTenantFlow } = require("../services/tenantBots");
@@ -858,6 +859,16 @@ router.post("/conversations/:id/messages", requireAuth, requireModulePermission(
             text,
             rawJson: { source: "panel", by_user_id: req.user.id },
         });
+        await trackFlowEvent({
+            conversationId: conversation.id,
+            waId: conversation.wa_id,
+            phoneNumberId: conversation.phone_number_id,
+            flowId: null,
+            eventType: "human_message",
+            source: "panel_note",
+            actorUserId: req.user.id,
+            payload: { type: "note" },
+        });
         return res.json({ conversation: result.conversation, message: result.message });
     }
 
@@ -930,6 +941,16 @@ router.post("/conversations/:id/messages", requireAuth, requireModulePermission(
         channel: channelConfig,
         meta: { source: "panel", by_user_id: req.user.id },
     });
+    await trackFlowEvent({
+        conversationId: conversation.id,
+        waId: conversation.wa_id,
+        phoneNumberId: phoneNumberId,
+        flowId: null,
+        eventType: "human_message",
+        source: "panel",
+        actorUserId: req.user.id,
+        payload: { type: "text" },
+    });
     return res.json({ ok: true });
 });
 
@@ -997,6 +1018,16 @@ router.post(
                 mediaUrl,
                 mediaFilename: filename || null,
                 rawJson: { source: "panel", by_user_id: req.user.id },
+            });
+            await trackFlowEvent({
+                conversationId,
+                waId: conversation.wa_id,
+                phoneNumberId,
+                flowId: null,
+                eventType: "human_message",
+                source: "panel",
+                actorUserId: req.user.id,
+                payload: { type },
             });
 
             return res.json({ ok: true, media_url: mediaUrl });

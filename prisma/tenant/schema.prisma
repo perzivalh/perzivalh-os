@@ -36,6 +36,12 @@ enum VerificationMethod {
   phone
   ci
   manual
+  odoo_sync_auto
+}
+
+enum AsistioSource {
+  manual
+  odoo_auto
 }
 
 enum CampaignStatus {
@@ -95,6 +101,7 @@ model Conversation {
   wa_id            String
   phone_number_id  String?
   phone_e164       String
+  phone_canonical  String?
   display_name     String?
   status           ConversationStatus  @default(open)
   assigned_user_id String?
@@ -109,12 +116,15 @@ model Conversation {
   primary_tag_id   String?
   remarketing      Boolean             @default(false)
   asistio          Boolean             @default(false)
+  asistio_source   AsistioSource?
+  asistio_updated_at DateTime?
   created_at       DateTime            @default(now())
   messages         Message[]
   tags             ConversationTag[]
   primary_tag      Tag?                @relation("ConversationPrimaryTag", fields: [primary_tag_id], references: [id])
   assigned_user    User?               @relation("AssignedConversations", fields: [assigned_user_id], references: [id])
   campaign_messages CampaignMessage[]
+  flow_events      FlowEvent[]
 
   @@index([status])
   @@index([assigned_user_id])
@@ -122,8 +132,10 @@ model Conversation {
   @@index([last_message_at(sort: Desc), created_at(sort: Desc), id(sort: Desc)], map: "conversation_list_order_idx")
   @@index([status, last_message_at(sort: Desc), created_at(sort: Desc), id(sort: Desc)], map: "conversation_status_order_idx")
   @@index([partner_id])
+  @@index([patient_id])
   @@index([phone_number_id])
   @@index([phone_e164])
+  @@index([phone_canonical])
   @@unique([wa_id, phone_number_id])
 }
 
@@ -206,6 +218,26 @@ model Session {
   @@index([flow_id])
   @@index([next_due_at])
   @@index([updated_at])
+}
+
+model FlowEvent {
+  id              String       @id @default(cuid())
+  conversation_id String?
+  wa_id           String?
+  phone_number_id String?
+  flow_id         String?
+  node_id         String?
+  event_type      String
+  source          String?
+  actor_user_id   String?
+  payload_json    Json?
+  created_at      DateTime     @default(now())
+  conversation    Conversation? @relation(fields: [conversation_id], references: [id], onDelete: SetNull)
+
+  @@index([conversation_id, created_at])
+  @@index([flow_id, event_type, created_at])
+  @@index([phone_number_id, created_at])
+  @@index([event_type, created_at])
 }
 
 model AuditLogTenant {
@@ -456,16 +488,23 @@ model OdooContact {
   odoo_partner_id Int      @unique
   name            String
   phone_e164      String?
+  phone_canonical String?
   phone_raw       String?
   email           String?
   vat             String?
   is_patient      Boolean  @default(false)
   odoo_patient_id Int?
+  partner_created_at DateTime?
+  partner_write_at DateTime?
+  patient_created_at DateTime?
+  patient_write_at DateTime?
+  first_seen_as_patient_at DateTime?
   tags_json       Json?
   extra_data_json Json?
   last_synced_at  DateTime @default(now())
   created_at      DateTime @default(now())
 
   @@index([phone_e164])
+  @@index([phone_canonical])
   @@index([is_patient])
 }

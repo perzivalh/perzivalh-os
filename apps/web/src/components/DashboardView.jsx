@@ -57,6 +57,14 @@ function formatDuration(value) {
   return `${Number(value).toFixed(1)}m`;
 }
 
+function formatOdooErrorMessage(message) {
+  if (!message) return "";
+  if (/odoo login failed/i.test(message)) {
+    return "Odoo rechazo el inicio de sesion. Revisa usuario, clave o base configurada.";
+  }
+  return message;
+}
+
 function getChannelDashboardLabel(channel) {
   if (!channel) return "-";
   return channel.line_number || channel.display_name || channel.phone_number_id || "-";
@@ -272,7 +280,7 @@ function OdooStatusPanel({ odoo }) {
       <BarList items={matchDistribution.map((item) => ({ ...item, label: MATCH_STATUS_LABELS[item.status] || item.status }))} />
       {sync?.last_error_message ? (
         <div className="overview-inline-alert">
-          {sync.last_error_message}
+          {formatOdooErrorMessage(sync.last_error_message)}
         </div>
       ) : null}
     </div>
@@ -531,89 +539,91 @@ function DashboardView({
         ) : null
       }
     >
-      <div className="overview-table-toolbar">
-        <label className="ui-search overview-table-search">
-          <span>Buscar</span>
-          <input
-            type="search"
-            value={searchDraft}
-            onChange={(event) => setSearchDraft(event.target.value)}
-            placeholder="Paciente, numero o linea"
-          />
-        </label>
+      <div className="overview-table-topbar">
+        <div className="overview-table-toolbar">
+          <label className="ui-search overview-table-search">
+            <span>Buscar</span>
+            <input
+              type="search"
+              value={searchDraft}
+              onChange={(event) => setSearchDraft(event.target.value)}
+              placeholder="Paciente, numero o linea"
+            />
+          </label>
 
-        <select
-          className="dash-filter"
-          value={tableQuery.tag}
-          onChange={(event) => setTableQuery((prev) => ({ ...prev, page: 1, tag: event.target.value }))}
-        >
-          <option value="">Todas las etiquetas</option>
-          {tags.map((tag) => (
-            <option key={tag.id || tag.name} value={tag.name}>
-              {tag.name}
-            </option>
-          ))}
-        </select>
+          <select
+            className="dash-filter"
+            value={tableQuery.tag}
+            onChange={(event) => setTableQuery((prev) => ({ ...prev, page: 1, tag: event.target.value }))}
+          >
+            <option value="">Todas las etiquetas</option>
+            {tags.map((tag) => (
+              <option key={tag.id || tag.name} value={tag.name}>
+                {tag.name}
+              </option>
+            ))}
+          </select>
 
-        <select
-          className="dash-filter"
-          value={tableQuery.operator_id}
-          onChange={(event) => setTableQuery((prev) => ({ ...prev, page: 1, operator_id: event.target.value }))}
-        >
-          <option value="">Todos los operadores</option>
-          <option value="unassigned">Sin asignar</option>
-          {users.map((user) => (
-            <option key={user.id} value={user.id}>
-              {user.name}
-            </option>
-          ))}
-        </select>
+          <select
+            className="dash-filter"
+            value={tableQuery.operator_id}
+            onChange={(event) => setTableQuery((prev) => ({ ...prev, page: 1, operator_id: event.target.value }))}
+          >
+            <option value="">Todos los operadores</option>
+            <option value="unassigned">Sin asignar</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.name}
+              </option>
+            ))}
+          </select>
 
-        <select
-          className="dash-filter"
-          value={tableQuery.call}
-          onChange={(event) => setTableQuery((prev) => ({ ...prev, page: 1, call: event.target.value }))}
-        >
-          <option value="">Llamada: todos</option>
-          <option value="yes">Con llamada</option>
-          <option value="no">Sin llamada</option>
-        </select>
+          <select
+            className="dash-filter"
+            value={tableQuery.call}
+            onChange={(event) => setTableQuery((prev) => ({ ...prev, page: 1, call: event.target.value }))}
+          >
+            <option value="">Llamada: todos</option>
+            <option value="yes">Con llamada</option>
+            <option value="no">Sin llamada</option>
+          </select>
 
-        <select
-          className="dash-filter"
-          value={tableQuery.message}
-          onChange={(event) => setTableQuery((prev) => ({ ...prev, page: 1, message: event.target.value }))}
-        >
-          <option value="">Mensaje: todos</option>
-          <option value="yes">Con mensaje</option>
-          <option value="no">Sin mensaje</option>
-        </select>
+          <select
+            className="dash-filter"
+            value={tableQuery.message}
+            onChange={(event) => setTableQuery((prev) => ({ ...prev, page: 1, message: event.target.value }))}
+          >
+            <option value="">Mensaje: todos</option>
+            <option value="yes">Con mensaje</option>
+            <option value="no">Sin mensaje</option>
+          </select>
 
-        <select
-          className="dash-filter"
-          value={`${tableQuery.sort_by}:${tableQuery.sort_order}`}
-          onChange={(event) => {
-            const [sortBy, sortOrder] = event.target.value.split(":");
-            setTableQuery((prev) => ({
-              ...prev,
-              page: 1,
-              sort_by: sortBy,
-              sort_order: sortOrder,
-            }));
-          }}
-        >
-          <option value="date:desc">Fecha desc</option>
-          <option value="date:asc">Fecha asc</option>
-          <option value="patient:asc">Paciente A-Z</option>
-          <option value="number:asc">Numero asc</option>
-          <option value="operator:asc">Operador A-Z</option>
-        </select>
-      </div>
+          <select
+            className="dash-filter"
+            value={`${tableQuery.sort_by}:${tableQuery.sort_order}`}
+            onChange={(event) => {
+              const [sortBy, sortOrder] = event.target.value.split(":");
+              setTableQuery((prev) => ({
+                ...prev,
+                page: 1,
+                sort_by: sortBy,
+                sort_order: sortOrder,
+              }));
+            }}
+          >
+            <option value="date:desc">Fecha desc</option>
+            <option value="date:asc">Fecha asc</option>
+            <option value="patient:asc">Paciente A-Z</option>
+            <option value="number:asc">Numero asc</option>
+            <option value="operator:asc">Operador A-Z</option>
+          </select>
+        </div>
 
-      <div className="overview-table-meta">
-        <span>
-          Mostrando {tableRangeStart} - {tableRangeEnd} de {tableTotal.toLocaleString("es-BO")}
-        </span>
+        <div className="overview-table-meta">
+          <span>
+            Mostrando {tableRangeStart} - {tableRangeEnd} de {tableTotal.toLocaleString("es-BO")}
+          </span>
+        </div>
       </div>
 
       <div className="overview-table-wrap">
@@ -709,7 +719,7 @@ function DashboardView({
 
       <div className="overview-table-pagination">
         <button
-          className="ui-btn secondary"
+          className="overview-btn overview-btn-secondary overview-btn-sm"
           type="button"
           disabled={tableQuery.page <= 1}
           onClick={() => setTableQuery((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
@@ -718,7 +728,7 @@ function DashboardView({
         </button>
         <span>Pagina {tableQuery.page} / {totalPages}</span>
         <button
-          className="ui-btn secondary"
+          className="overview-btn overview-btn-secondary overview-btn-sm"
           type="button"
           disabled={tableQuery.page >= totalPages}
           onClick={() => setTableQuery((prev) => ({ ...prev, page: Math.min(totalPages, prev.page + 1) }))}
@@ -777,15 +787,20 @@ function DashboardView({
               </option>
             ))}
           </select>
-          <button className="ui-btn secondary" type="button" onClick={onRefresh}>
+          <button className="overview-btn overview-btn-secondary" type="button" onClick={onRefresh}>
             Actualizar
           </button>
           {viewMode === "table" ? (
-            <button className="ui-btn secondary" type="button" onClick={handleExportPdf} disabled={exportingPdf}>
+            <button
+              className="overview-btn overview-btn-secondary"
+              type="button"
+              onClick={handleExportPdf}
+              disabled={exportingPdf}
+            >
               {exportingPdf ? "Exportando..." : "Exportar PDF"}
             </button>
           ) : null}
-          <button className="ui-btn primary" type="button" onClick={onGenerateReport}>
+          <button className="overview-btn overview-btn-primary" type="button" onClick={onGenerateReport}>
             Generar reporte
           </button>
         </div>
@@ -821,14 +836,6 @@ function DashboardView({
             className="panel-funnel"
           >
             <FunnelChart steps={overview.funnel?.steps || []} />
-          </Panel>
-
-          <Panel
-            title="Cola pendiente"
-            subtitle="Antiguedad de espera"
-            className="panel-queue"
-          >
-            <BarList items={(overview.live?.queue_age_buckets || []).map((item) => ({ id: item.label, label: item.label, count: item.count }))} />
           </Panel>
 
           <Panel

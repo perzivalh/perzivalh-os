@@ -806,6 +806,59 @@ select.dash-filter:focus {
   justify-content: flex-end;
 }
 
+.overview-btn {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  padding: 0.8rem 1.15rem;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+.overview-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.overview-btn:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.overview-btn-secondary {
+  color: var(--ink);
+  border-color: rgba(148, 163, 184, 0.28);
+  background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(244,247,252,0.9) 100%);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+}
+
+.overview-btn-secondary:hover:not(:disabled) {
+  border-color: rgba(29, 78, 216, 0.24);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12);
+}
+
+.overview-btn-primary {
+  color: #fff;
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%);
+  box-shadow: 0 14px 28px rgba(29, 78, 216, 0.24);
+}
+
+.overview-btn-primary:hover:not(:disabled) {
+  box-shadow: 0 18px 34px rgba(29, 78, 216, 0.32);
+}
+
+.overview-btn-sm {
+  padding: 0.62rem 0.95rem;
+  border-radius: 14px;
+  font-size: 0.88rem;
+}
+
 .overview-view-switch {
   display: inline-flex;
   align-items: center;
@@ -952,29 +1005,24 @@ select.dash-filter:focus {
   min-height: 260px;
 }
 
-.panel-queue {
-  grid-column: 1 / span 2;
-  min-height: 240px;
-}
-
 .panel-team {
-  grid-column: 3 / span 3;
+  grid-column: 1 / span 4;
   min-height: 240px;
 }
 
 .panel-odoo {
-  grid-column: 6 / span 3;
+  grid-column: 5 / span 3;
   min-height: 240px;
 }
 
 .panel-topics {
-  grid-column: 9 / span 2;
+  grid-column: 8 / span 3;
   min-height: 240px;
 }
 
 .panel-nodes {
   grid-column: 11 / span 2;
-  min-height: 260px;
+  min-height: 240px;
 }
 
 .panel-table {
@@ -984,6 +1032,8 @@ select.dash-filter:focus {
 
 .overview-table-screen {
   min-height: calc(100dvh - 240px);
+  height: calc(100dvh - 240px);
+  max-height: calc(100dvh - 240px);
 }
 
 .overview-timeline {
@@ -1178,11 +1228,27 @@ select.dash-filter:focus {
   display: grid;
   grid-template-columns: minmax(220px, 1.4fr) repeat(5, minmax(140px, 1fr));
   gap: 0.75rem;
-  margin-bottom: 0.75rem;
 }
 
 .overview-table-search {
   min-width: 0;
+}
+
+.panel-table .overview-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow: hidden;
+}
+
+.overview-table-topbar {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.92) 100%);
 }
 
 .overview-table-meta,
@@ -1196,7 +1262,6 @@ select.dash-filter:focus {
 }
 
 .overview-table-wrap {
-  margin-top: 0.75rem;
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -1338,7 +1403,6 @@ select.dash-filter:focus {
   .panel-timeline,
   .panel-status,
   .panel-funnel,
-  .panel-queue,
   .panel-team,
   .panel-odoo,
   .panel-topics,
@@ -1353,6 +1417,12 @@ select.dash-filter:focus {
 
   .overview-table-toolbar {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .overview-table-screen {
+    min-height: auto;
+    height: auto;
+    max-height: none;
   }
 }
 
@@ -1379,6 +1449,12 @@ select.dash-filter:focus {
   .overview-table-toolbar {
     grid-template-columns: 1fr;
   }
+
+  .overview-table-meta,
+  .overview-table-pagination {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 body[data-theme="dark"] .overview-header {
@@ -1391,6 +1467,11 @@ body[data-theme="dark"] .overview-stat-card {
 
 body[data-theme="dark"] .overview-view-switch {
   background: rgba(15, 23, 42, 0.88);
+}
+
+body[data-theme="dark"] .overview-btn-secondary,
+body[data-theme="dark"] .overview-table-topbar {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.96) 0%, rgba(30, 41, 59, 0.92) 100%);
 }
 
 body[data-theme="dark"] .overview-table thead th {

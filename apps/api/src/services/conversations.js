@@ -5,6 +5,7 @@ const sessionStore = require("../sessionStore");
 const { sendPendingConversationPush } = require("./pushNotifications");
 const { toCanonicalBoliviaPhone } = require("../lib/normalize");
 const { trackFlowEvent } = require("./flowEventService");
+const { canonicalizeTagName } = require("./tagNormalization");
 
 const CONVERSATION_SELECT = {
   id: true,
@@ -339,16 +340,17 @@ async function assignConversation({ conversationId, userId }) {
 }
 
 async function ensureTagByName(name, color) {
-  if (!name) {
+  const canonicalName = canonicalizeTagName(name);
+  if (!canonicalName) {
     throw new Error("tag_name_required");
   }
   const tag = await prisma.tag.upsert({
-    where: { name },
+    where: { name: canonicalName },
     update: {
       color: color || undefined,
     },
     create: {
-      name,
+      name: canonicalName,
       color: color || null,
     },
   });

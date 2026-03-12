@@ -169,19 +169,43 @@ async function deleteSegment(id, userId = null) {
  */
 function buildWhereFromRules(rules, source = "all") {
     let resolvedSource = source;
+    let hasExplicitSource = false;
+    let hasTagRule = false;
+    let hasPrimaryTagRule = false;
+    let hasPhoneNumberRule = false;
 
     for (const rule of rules || []) {
         const ruleType = rule.type || rule.field;
         if (ruleType === "source" && rule.value) {
             resolvedSource = rule.value;
+            hasExplicitSource = true;
+        }
+        if (ruleType === "tag") {
+            hasTagRule = true;
+        }
+        if (ruleType === "primary_tag") {
+            hasPrimaryTagRule = true;
+        }
+        if (ruleType === "phone_number_id" && rule.value) {
+            hasPhoneNumberRule = true;
         }
     }
 
     // Determine which source to query
-    const queryOdoo = resolvedSource === "all" || resolvedSource === "odoo";
+    let queryOdoo = resolvedSource === "all" || resolvedSource === "odoo";
     const queryConversations =
         resolvedSource === "all" || resolvedSource === "conversation";
-    const queryImports = resolvedSource === "all" || resolvedSource === "import";
+    let queryImports = resolvedSource === "all" || resolvedSource === "import";
+
+    if (!hasExplicitSource && (hasTagRule || hasPrimaryTagRule)) {
+        queryOdoo = false;
+    }
+    if (!hasExplicitSource && (hasPrimaryTagRule || hasPhoneNumberRule)) {
+        queryImports = false;
+    }
+    if (!hasExplicitSource && hasPhoneNumberRule) {
+        queryOdoo = false;
+    }
 
     // Build conditions
     const conversationConditions = [];
@@ -235,16 +259,12 @@ function buildWhereFromRules(rules, source = "all") {
             case "primary_tag":
                 if (rule.operator === "is") {
                     if (rule.value === null || rule.value === "__NONE__") {
-                        tagConditions.push({
-                            tags: { none: {} },
+                        conversationConditions.push({
+                            primary_tag_id: null,
                         });
                     } else {
-                        tagConditions.push({
-                            tags: {
-                                some: {
-                                    tag: { id: rule.value },
-                                },
-                            },
+                        conversationConditions.push({
+                            primary_tag_id: rule.value,
                         });
                     }
                 }

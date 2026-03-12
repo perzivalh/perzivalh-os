@@ -2,6 +2,136 @@ const prisma = require("../db");
 const audienceService = require("./audienceService");
 const { ensureTagByName } = require("./conversations");
 
+const DEFAULT_AUDIENCE_DESCRIPTION = "Contactos sin etiqueta especifica";
+const TAG_AUDIENCE_DESCRIPTION = "Audiencia dinamica por etiqueta";
+
+function buildDefaultAudienceRules({ phoneNumberId } = {}) {
+  const rules = [
+    { type: "source", operator: "is", value: "conversation" },
+    { type: "primary_tag", operator: "is", value: null },
+  ];
+  if (phoneNumberId) {
+    rules.push({ type: "phone_number_id", operator: "is", value: phoneNumberId });
+  }
+  return rules;
+}
+
+function buildTagAudienceRules({ tagId, tagName, phoneNumberId } = {}) {
+  const rules = [
+    { type: "source", operator: "is", value: "conversation" },
+    { type: "primary_tag", operator: "is", value: tagId },
+    { type: "tag", operator: "has", value: tagName },
+  ];
+  if (phoneNumberId) {
+    rules.push({ type: "phone_number_id", operator: "is", value: phoneNumberId });
+  }
+  return rules;
+}
+
+function hasSourceRule(rules = []) {
+  return Array.isArray(rules) && rules.some((rule) => (rule?.type || rule?.field) === "source");
+}
+
+function ensureConversationSourceRule(rules = []) {
+  const baseRules = Array.isArray(rules)
+    ? rules.filter((rule) => (rule?.type || rule?.field) !== "source")
+    : [];
+  return [{ type: "source", operator: "is", value: "conversation" }, ...baseRules];
+}
+
+function rulesEqual(left, right) {
+  return JSON.stringify(left || []) === JSON.stringify(right || []);
+}
+
+function buildDefaultAudienceName({ phoneNumberId, lineName } = {}) {
+  const normalizedLineName = typeof lineName === "string" ? lineName.trim() : "";
+  const suffix = normalizedLineName
+    ? ` - ${normalizedLineName}`
+    : phoneNumberId
+      ? ` (${phoneNumberId})`
+      : "";
+  return `DEFAULT${suffix}`;
+}
+
+function normalizeDynamicSegmentRules({
+  isDefault = false,
+  tagId = null,
+  tagName = null,
+  phoneNumberId = null,
+  currentRules = [],
+} = {}) {
+  if (isDefault) {
+    return buildDefaultAudienceRules({ phoneNumberId });
+  }
+  if (tagId && tagName) {
+    return buildTagAudienceRules({ tagId, tagName, phoneNumberId });
+  }
+  return hasSourceRule(currentRules)
+    ? currentRules
+    : ensureConversationSourceRule(currentRules);
+}
+
+async function reconcileDynamicMapping(mapping, { phoneNumberId, lineName, refreshCount = false } = {}) {
+  if (!mapping?.segment) {
+    return null;
+  }
+
+  const nextRules = normalizeDynamicSegmentRules({
+    isDefault: Boolean(mapping.is_default),
+    tagId: mapping.tag?.id || null,
+    tagName: mapping.tag?.name || null,
+    phoneNumberId: phoneNumberId || mapping.phone_number_id || null,
+    currentRules: mapping.segment.rules_json,
+  });
+
+  const nextName = mapping.is_default
+    ? buildDefaultAudienceName({
+        phoneNumberId: phoneNumberId || mapping.phone_number_id || null,
+        lineName,
+      })
+    : mapping.tag?.name || mapping.segment.name;
+  const nextDescription = mapping.is_default
+    ? DEFAULT_AUDIENCE_DESCRIPTION
+    : TAG_AUDIENCE_DESCRIPTION;
+
+  const updateData = {};
+  if (!rulesEqual(mapping.segment.rules_json, nextRules)) {
+    updateData.rules_json = nextRules;
+  }
+  if (nextName && mapping.segment.name !== nextName) {
+    updateData.name = nextName;
+  }
+  if (mapping.segment.description !== nextDescription) {
+    updateData.description = nextDescription;
+  }
+
+  const needsSegmentUpdate = Object.keys(updateData).length > 0;
+  if (needsSegmentUpdate) {
+    await prisma.audienceSegment.update({
+      where: { id: mapping.segment.id },
+      data: updateData,
+    });
+  }
+
+  if (!needsSegmentUpdate && !refreshCount) {
+    return mapping.segment;
+  }
+
+  const count = await audienceService.estimateRecipientCount(mapping.segment.id);
+  const now = new Date();
+  const segment = await prisma.audienceSegment.update({
+    where: { id: mapping.segment.id },
+    data: { estimated_count: count, last_synced_at: now },
+  });
+
+  await prisma.audienceTag.update({
+    where: { id: mapping.id },
+    data: { last_synced_at: now },
+  });
+
+  return segment;
+}
+
 async function getAutomationSettings({ phoneNumberId } = {}) {
   const setting = await prisma.audienceAutomationSetting.findFirst({
     where: phoneNumberId ? { phone_number_id: phoneNumberId } : { phone_number_id: null },
@@ -51,29 +181,19 @@ async function ensureDefaultAudience({ phoneNumberId, userId, lineName } = {}) {
     include: { segment: true },
   });
   if (existing) {
-    return existing.segment;
-  }
-
-  const normalizedLineName = typeof lineName === "string" ? lineName.trim() : "";
-  const suffix = normalizedLineName
-    ? ` - ${normalizedLineName}`
-    : phoneNumberId
-      ? ` (${phoneNumberId})`
-      : "";
-
-  const rules = [
-    { type: "source", operator: "is", value: "conversation" },
-    { type: "primary_tag", operator: "is", value: null },
-  ];
-  if (phoneNumberId) {
-    rules.push({ type: "phone_number_id", operator: "is", value: phoneNumberId });
+    return (
+      await reconcileDynamicMapping(existing, {
+        phoneNumberId,
+        lineName,
+      })
+    ) || existing.segment;
   }
 
   const segment = await prisma.audienceSegment.create({
     data: {
-      name: `DEFAULT${suffix}`,
-      description: "Contactos sin etiqueta específica",
-      rules_json: rules,
+      name: buildDefaultAudienceName({ phoneNumberId, lineName }),
+      description: DEFAULT_AUDIENCE_DESCRIPTION,
+      rules_json: buildDefaultAudienceRules({ phoneNumberId }),
       estimated_count: 0,
       created_by_user_id: userId || null,
     },
@@ -104,25 +224,21 @@ async function ensureAudienceForTag({ tagId, tagName, phoneNumberId, userId }) {
       tag_id: tagId,
       phone_number_id: phoneNumberId || null,
     },
-    include: { segment: true },
+    include: { segment: true, tag: true },
   });
   if (existing) {
-    return existing.segment;
-  }
-
-  const rules = [
-    { type: "primary_tag", operator: "is", value: tagId },
-    { type: "tag", operator: "has", value: tagName },
-  ];
-  if (phoneNumberId) {
-    rules.push({ type: "phone_number_id", operator: "is", value: phoneNumberId });
+    return (
+      await reconcileDynamicMapping(existing, {
+        phoneNumberId,
+      })
+    ) || existing.segment;
   }
 
   const segment = await prisma.audienceSegment.create({
     data: {
       name: tagName,
-      description: "Audiencia dinámica por etiqueta",
-      rules_json: rules,
+      description: TAG_AUDIENCE_DESCRIPTION,
+      rules_json: buildTagAudienceRules({ tagId, tagName, phoneNumberId }),
       estimated_count: 0,
       created_by_user_id: userId || null,
     },
@@ -158,7 +274,21 @@ async function listDynamicAudiences({ phoneNumberId, lineName } = {}) {
   const filteredMappings = hasPendingAttention
     ? mappings.filter((mapping) => mapping.tag?.name !== "pendiente")
     : mappings;
-  return filteredMappings.map((mapping) => ({
+
+  const hydratedMappings = [];
+  for (const mapping of filteredMappings) {
+    const repairedSegment = await reconcileDynamicMapping(mapping, {
+      phoneNumberId,
+      lineName,
+      refreshCount: true,
+    });
+    hydratedMappings.push({
+      ...mapping,
+      segment: repairedSegment || mapping.segment,
+    });
+  }
+
+  return hydratedMappings.map((mapping) => ({
     id: mapping.id,
     is_default: mapping.is_default,
     phone_number_id: mapping.phone_number_id,
@@ -186,7 +316,7 @@ async function syncHistorical({ phoneNumberId, userId, lineName } = {}) {
       where: { id: conversation.id },
       data: { primary_tag_id: latestTag?.tag_id || null },
     });
-    updated++;
+    updated += 1;
   }
 
   const tags = await prisma.tag.findMany({
@@ -213,18 +343,14 @@ async function syncHistorical({ phoneNumberId, userId, lineName } = {}) {
 
   const mappings = await prisma.audienceTag.findMany({
     where: { phone_number_id: phoneNumberId || null },
-    select: { id: true, segment_id: true },
+    include: { tag: true, segment: true },
   });
 
   for (const mapping of mappings) {
-    const count = await audienceService.estimateRecipientCount(mapping.segment_id);
-    await prisma.audienceSegment.update({
-      where: { id: mapping.segment_id },
-      data: { estimated_count: count, last_synced_at: new Date() },
-    });
-    await prisma.audienceTag.update({
-      where: { id: mapping.id },
-      data: { last_synced_at: new Date() },
+    await reconcileDynamicMapping(mapping, {
+      phoneNumberId,
+      lineName,
+      refreshCount: true,
     });
   }
 

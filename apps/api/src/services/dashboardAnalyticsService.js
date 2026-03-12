@@ -45,6 +45,18 @@ function roundMinutes(value) {
   return Number.isFinite(num) ? Number(num.toFixed(1)) : null;
 }
 
+function minutesBetween(from, to) {
+  if (!from || !to) {
+    return null;
+  }
+  const fromMs = new Date(from).getTime();
+  const toMs = new Date(to).getTime();
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || toMs < fromMs) {
+    return null;
+  }
+  return roundMinutes((toMs - fromMs) / 60000);
+}
+
 function formatDayKey(value) {
   if (!value) {
     return null;
@@ -197,6 +209,51 @@ async function getConversationOperatorHistoryMap(conversationIds) {
   return historyByConversation;
 }
 
+async function getConversationHumanAnchorMap(conversationIds) {
+  const anchorMap = new Map();
+
+  if (!Array.isArray(conversationIds) || !conversationIds.length) {
+    return anchorMap;
+  }
+
+  const rows = await prisma.$queryRaw`
+    SELECT
+      anchor.conversation_id,
+      MIN(anchor.created_at) AS anchor_at
+    FROM (
+      SELECT
+        fe.conversation_id,
+        fe.created_at
+      FROM "FlowEvent" fe
+      WHERE fe.conversation_id = ANY(${conversationIds})
+        AND fe.event_type IN ('handoff_requested', 'conversation_assigned')
+
+      UNION ALL
+
+      SELECT
+        (a.data_json->>'conversation_id') AS conversation_id,
+        a.created_at
+      FROM "AuditLog" a
+      WHERE COALESCE(a.data_json->>'conversation_id', '') = ANY(${conversationIds})
+        AND (
+          (a.action = 'conversation.status_changed' AND COALESCE(a.data_json->>'to', '') IN ('pending', 'assigned'))
+          OR a.action = 'conversation.assigned'
+        )
+    ) AS anchor
+    WHERE COALESCE(anchor.conversation_id, '') <> ''
+    GROUP BY anchor.conversation_id
+  `;
+
+  for (const row of rows || []) {
+    if (!row?.conversation_id || !row?.anchor_at) {
+      continue;
+    }
+    anchorMap.set(row.conversation_id, row.anchor_at);
+  }
+
+  return anchorMap;
+}
+
 async function loadConversationResponseStats(conversationIds) {
   const statsByConversation = new Map();
   const teamMap = new Map();
@@ -214,9 +271,25 @@ async function loadConversationResponseStats(conversationIds) {
     };
   }
 
+  const anchorMap = await getConversationHumanAnchorMap(conversationIds);
+  const anchoredConversationIds = Array.from(anchorMap.keys());
+
+  if (!anchoredConversationIds.length) {
+    return {
+      statsByConversation,
+      aggregate: {
+        first_human_response_avg_min: null,
+        first_human_response_p50_min: null,
+        first_human_response_p90_min: null,
+        avg_human_response_avg_min: null,
+      },
+      team: [],
+    };
+  }
+
   const messages = await prisma.message.findMany({
     where: {
-      conversation_id: { in: conversationIds },
+      conversation_id: { in: anchoredConversationIds },
     },
     orderBy: [{ conversation_id: "asc" }, { created_at: "asc" }],
     select: {
@@ -229,6 +302,19 @@ async function loadConversationResponseStats(conversationIds) {
   });
 
   const working = new Map();
+  for (const conversationId of anchoredConversationIds) {
+    const anchorAt = anchorMap.get(conversationId) || null;
+    if (!anchorAt) {
+      continue;
+    }
+    working.set(conversationId, {
+      anchorAt,
+      firstHumanResponseAt: null,
+      firstResponderId: null,
+      openTurnAt: anchorAt,
+      turnDurations: [],
+    });
+  }
 
   const ensureTeam = (operatorId) => {
     if (!teamMap.has(operatorId)) {
@@ -245,20 +331,15 @@ async function loadConversationResponseStats(conversationIds) {
 
   for (const message of messages) {
     const conversationId = message.conversation_id;
-    const state =
-      working.get(conversationId) ||
-      {
-        firstInboundAt: null,
-        firstHumanResponseAt: null,
-        firstResponderId: null,
-        openTurnAt: null,
-        turnDurations: [],
-      };
+    const state = working.get(conversationId);
+    if (!state) {
+      continue;
+    }
+    if (new Date(message.created_at).getTime() < new Date(state.anchorAt).getTime()) {
+      continue;
+    }
 
     if (message.direction === "in" && message.type !== "note") {
-      if (!state.firstInboundAt) {
-        state.firstInboundAt = message.created_at;
-      }
       if (!state.openTurnAt) {
         state.openTurnAt = message.created_at;
       }
@@ -276,12 +357,8 @@ async function loadConversationResponseStats(conversationIds) {
     operator.human_messages_sent += 1;
     operator.handled_conversations.add(conversationId);
 
-    if (
-      state.firstInboundAt &&
-      !state.firstHumanResponseAt &&
-      message.created_at > state.firstInboundAt
-    ) {
-      const duration = roundMinutes((message.created_at - state.firstInboundAt) / 60000);
+    if (!state.firstHumanResponseAt) {
+      const duration = minutesBetween(state.anchorAt, message.created_at);
       if (duration !== null) {
         state.firstHumanResponseAt = message.created_at;
         state.firstResponderId = operatorId;
@@ -289,8 +366,8 @@ async function loadConversationResponseStats(conversationIds) {
       }
     }
 
-    if (state.openTurnAt && message.created_at > state.openTurnAt) {
-      const duration = roundMinutes((message.created_at - state.openTurnAt) / 60000);
+    if (state.openTurnAt) {
+      const duration = minutesBetween(state.openTurnAt, message.created_at);
       if (duration !== null) {
         state.turnDurations.push(duration);
         operator.response_turns.push(duration);
@@ -304,11 +381,12 @@ async function loadConversationResponseStats(conversationIds) {
   const firstDurations = [];
   const avgDurations = [];
 
-  for (const [conversationId, state] of working.entries()) {
-    const firstHumanResponseMin = state.firstHumanResponseAt && state.firstInboundAt
-      ? roundMinutes((state.firstHumanResponseAt - state.firstInboundAt) / 60000)
+  for (const conversationId of conversationIds) {
+    const state = working.get(conversationId);
+    const firstHumanResponseMin = state?.firstHumanResponseAt
+      ? minutesBetween(state.anchorAt, state.firstHumanResponseAt)
       : null;
-    const avgHumanResponseMin = average(state.turnDurations);
+    const avgHumanResponseMin = average(state?.turnDurations || []);
 
     if (firstHumanResponseMin !== null) {
       firstDurations.push(firstHumanResponseMin);
@@ -320,8 +398,8 @@ async function loadConversationResponseStats(conversationIds) {
     statsByConversation.set(conversationId, {
       first_human_response_min: firstHumanResponseMin,
       avg_human_response_min: avgHumanResponseMin,
-      first_responder_id: state.firstResponderId || null,
-      handled_by_human: state.turnDurations.length > 0 || Boolean(state.firstHumanResponseAt),
+      first_responder_id: state?.firstResponderId || null,
+      handled_by_human: (state?.turnDurations?.length || 0) > 0 || Boolean(state?.firstHumanResponseAt),
     });
   }
 

@@ -355,8 +355,8 @@ function DashboardView({
       { label: "Sesiones bot activas", value: overview.live?.bot_sessions_active ?? 0, hint: "flow activo", tone: "info" },
       { label: "Asistencia confirmada", value: overview.period_summary?.attendance_confirmed ?? 0, hint: "manual + Odoo", tone: "success" },
       { label: "Registro post-chat", value: overview.period_summary?.registered_after_chat ?? 0, hint: "Odoo posterior al chat", tone: "success" },
-      { label: "1ra respuesta humana", value: formatDuration(overview.response?.first_human_response_avg_min), hint: `p50 ${formatDuration(overview.response?.first_human_response_p50_min)} / p90 ${formatDuration(overview.response?.first_human_response_p90_min)}` },
-      { label: "Respuesta humana promedio", value: formatDuration(overview.response?.avg_human_response_avg_min), hint: "turnos usuario -> operador", tone: "info" },
+      { label: "1ra respuesta humana", value: formatDuration(overview.response?.first_human_response_avg_min), hint: `post-handoff · p50 ${formatDuration(overview.response?.first_human_response_p50_min)} / p90 ${formatDuration(overview.response?.first_human_response_p90_min)}` },
+      { label: "Respuesta humana promedio", value: formatDuration(overview.response?.avg_human_response_avg_min), hint: "turnos post-handoff", tone: "info" },
     ],
     [overview]
   );
@@ -833,7 +833,7 @@ function DashboardView({
 
           <Panel
             title="Equipo"
-            subtitle="Promedios por operador"
+            subtitle="Promedios post-handoff por operador"
             className="panel-team"
           >
             <TeamTable team={overview.team || []} />

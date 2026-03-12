@@ -1315,41 +1315,51 @@ select.dash-filter:focus {
     min-height: auto;
   }
 
-  .overview-grid {
-    grid-auto-rows: minmax(260px, auto);
-  }
+  /* Sin grid-auto-rows: cada fila se ajusta a su contenido/min-height */
 
   .overview-stats {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .overview-stats,
-  .panel-timeline,
-  .panel-status,
-  .panel-funnel,
-  .panel-queue,
-  .panel-team,
-  .panel-odoo,
-  .panel-topics,
-  .panel-nodes {
-    grid-row: auto;
+    grid-row: 1;
   }
 
   .panel-timeline {
     grid-column: 1 / span 7;
+    grid-row: 2;
   }
 
   .panel-status {
     grid-column: 8 / span 5;
+    grid-row: 2;
   }
 
-  .panel-funnel,
-  .panel-queue,
-  .panel-team,
-  .panel-odoo,
-  .panel-topics,
+  .panel-funnel {
+    grid-column: 1 / span 4;
+    grid-row: 3;
+  }
+
+  .panel-queue {
+    grid-column: 5 / span 4;
+    grid-row: 3;
+  }
+
+  .panel-team {
+    grid-column: 9 / span 4;
+    grid-row: 3;
+  }
+
+  .panel-odoo {
+    grid-column: 1 / span 4;
+    grid-row: 4;
+  }
+
+  .panel-topics {
+    grid-column: 5 / span 5;
+    grid-row: 4;
+  }
+
   .panel-nodes {
-    grid-column: span 6;
+    grid-column: 10 / span 3;
+    grid-row: 4;
   }
 }
 
@@ -1379,6 +1389,7 @@ select.dash-filter:focus {
   .panel-nodes,
   .panel-table {
     grid-column: 1 / -1;
+    grid-row: auto;
   }
 
   .overview-stats {

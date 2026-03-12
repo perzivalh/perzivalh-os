@@ -762,25 +762,25 @@ select.dash-filter:focus {
 .overview-shell {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  min-height: calc(100dvh - 150px);
+  gap: 0.8rem;
+  min-height: calc(100dvh - 120px);
 }
 
 .overview-header {
   display: flex;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.8rem;
   align-items: flex-start;
   position: sticky;
   top: 0;
   z-index: 2;
-  padding: 0.2rem 0 0.6rem;
+  padding: 0 0 0.35rem;
   background: linear-gradient(180deg, rgba(245, 247, 251, 0.96) 0%, rgba(245, 247, 251, 0.88) 100%);
   backdrop-filter: blur(12px);
 }
 
 .overview-heading h2 {
-  margin: 0.2rem 0 0;
+  margin: 0;
   font-size: 2rem;
 }
 
@@ -804,6 +804,13 @@ select.dash-filter:focus {
   flex-wrap: wrap;
   gap: 0.7rem;
   justify-content: flex-end;
+  align-items: center;
+}
+
+.overview-actions-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
 }
 
 .overview-btn {
@@ -857,6 +864,18 @@ select.dash-filter:focus {
   padding: 0.62rem 0.95rem;
   border-radius: 14px;
   font-size: 0.88rem;
+}
+
+.overview-btn-icon {
+  width: 50px;
+  height: 50px;
+  padding: 0;
+  border-radius: 18px;
+}
+
+.overview-btn-icon-svg {
+  width: 20px;
+  height: 20px;
 }
 
 .overview-view-switch {
@@ -958,7 +977,7 @@ select.dash-filter:focus {
   border-radius: 20px;
   background: var(--panel);
   box-shadow: 0 12px 28px var(--shadow);
-  padding: 1rem 1.05rem;
+  padding: 0.9rem 1rem;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -970,7 +989,7 @@ select.dash-filter:focus {
   justify-content: space-between;
   gap: 1rem;
   align-items: flex-start;
-  margin-bottom: 0.85rem;
+  margin-bottom: 0.7rem;
 }
 
 .overview-panel-header h3 {
@@ -1027,13 +1046,13 @@ select.dash-filter:focus {
 
 .panel-table {
   grid-column: 1 / -1;
-  min-height: 360px;
+  min-height: 0;
 }
 
 .overview-table-screen {
-  min-height: calc(100dvh - 240px);
-  height: calc(100dvh - 240px);
-  max-height: calc(100dvh - 240px);
+  min-height: calc(100dvh - 160px);
+  height: calc(100dvh - 160px);
+  max-height: calc(100dvh - 160px);
 }
 
 .overview-timeline {
@@ -1245,8 +1264,8 @@ select.dash-filter:focus {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding-bottom: 0.75rem;
+  gap: 0.55rem;
+  padding-bottom: 0.55rem;
   border-bottom: 1px solid rgba(148, 163, 184, 0.14);
   background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.92) 100%);
 }
@@ -1304,8 +1323,7 @@ select.dash-filter:focus {
 
 .overview-table-patient span,
 .overview-muted,
-.overview-asistio-source,
-.overview-export-meta {
+.overview-asistio-source {
   color: var(--muted);
   font-size: 0.78rem;
 }
@@ -1359,6 +1377,10 @@ select.dash-filter:focus {
   gap: 0.3rem;
 }
 
+.overview-panel.panel-table .overview-panel-header p {
+  display: none;
+}
+
 .overview-table-empty {
   text-align: center;
   padding: 1.1rem;
@@ -1403,6 +1425,10 @@ select.dash-filter:focus {
     justify-content: flex-start;
   }
 
+  .overview-actions-group {
+    margin-left: auto;
+  }
+
   .overview-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1442,6 +1468,15 @@ select.dash-filter:focus {
   .overview-controls {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .overview-actions-group {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .overview-actions-group .overview-btn-primary {
+    flex: 1;
   }
 
   .overview-stats {

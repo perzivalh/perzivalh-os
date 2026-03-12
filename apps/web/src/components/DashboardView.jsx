@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
 import { apiGet, apiPatch } from "../api";
 
@@ -336,7 +338,6 @@ function DashboardView({
   onPeriodChange,
   onChannelChange,
   onRefresh,
-  onGenerateReport,
 }) {
   const overview = metrics || {};
   const [tableRows, setTableRows] = useState([]);
@@ -356,6 +357,7 @@ function DashboardView({
     sort_order: "desc",
   });
   const [searchDraft, setSearchDraft] = useState("");
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [tableReloadSeq, setTableReloadSeq] = useState(0);
   const [tableFlagMap, setTableFlagMap] = useState({});
   const tableFlagPending = useRef({});
@@ -447,6 +449,58 @@ function DashboardView({
       active = false;
     };
   }, [tableParamsKey, selectedPeriod, selectedChannel, tableQuery, tableReloadSeq, viewMode]);
+
+  async function handleExportPdf() {
+    setExportingPdf(true);
+    try {
+      const params = buildTableParams({
+        selectedPeriod,
+        selectedChannel,
+        query: tableQuery,
+        includePaging: false,
+      });
+      const data = await apiGet(`/api/dashboard/table/export?${params.toString()}`);
+      const rows = data?.rows || [];
+      const doc = new jsPDF({ orientation: "landscape" });
+      autoTable(doc, {
+        head: [[
+          "Paciente",
+          "Numero",
+          "Fecha",
+          "Etiquetas",
+          "Operador",
+          "1ra resp.",
+          "Prom. resp.",
+          "Odoo",
+          "Remarketing",
+          "Asistio",
+        ]],
+        body: rows.map((row) => [
+          row.patient_display || row.patient || "[sin nombre]",
+          row.number || "-",
+          formatTableDate(row.date),
+          (row.tags || []).join(", "),
+          row.operator_display || "Sin asignar",
+          formatDuration(row.first_human_response_min),
+          formatDuration(row.avg_human_response_min),
+          MATCH_STATUS_LABELS[row.odoo_match_status] || row.odoo_match_status || "Sin match",
+          row.remarketing ? "Si" : "No",
+          row.asistio ? `Si (${row.asistio_source || "manual"})` : "No",
+        ]),
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+        },
+        headStyles: {
+          fillColor: [29, 78, 216],
+        },
+      });
+      const filenameDate = new Date().toISOString().split("T")[0];
+      doc.save(`dashboard-tabla-${filenameDate}.pdf`);
+    } finally {
+      setExportingPdf(false);
+    }
+  }
 
   function handleToggleFlag(row, field, value) {
     const previousFlags = getRowFlags(row, tableFlagMap[row.id]);
@@ -735,9 +789,16 @@ function DashboardView({
             >
               <RefreshIcon className="overview-btn-icon-svg" />
             </button>
-            <button className="overview-btn overview-btn-primary" type="button" onClick={onGenerateReport}>
-              Generar reporte
-            </button>
+            {viewMode === "table" ? (
+              <button
+                className="overview-btn overview-btn-primary"
+                type="button"
+                onClick={handleExportPdf}
+                disabled={exportingPdf}
+              >
+                {exportingPdf ? "Exportando..." : "Exportar PDF"}
+              </button>
+            ) : null}
           </div>
         </div>
       </header>

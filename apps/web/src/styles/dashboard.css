@@ -889,9 +889,14 @@ select.dash-filter:focus {
   min-height: 0;
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-areas:
+    "stats stats stats stats stats stats stats stats stats stats stats stats"
+    "timeline timeline timeline timeline timeline timeline status status status funnel funnel funnel"
+    "team team team team team odoo odoo odoo odoo topics topics topics";
   gap: 1rem;
   align-content: start;
-  align-items: start;
+  align-items: stretch;
+  grid-auto-flow: row;
 }
 
 .overview-grid > .overview-panel {
@@ -899,7 +904,7 @@ select.dash-filter:focus {
 }
 
 .overview-stats {
-  grid-column: 1 / -1;
+  grid-area: stats;
   display: grid;
   grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: 0.85rem;
@@ -986,7 +991,7 @@ select.dash-filter:focus {
 }
 
 .panel-timeline {
-  grid-column: 1 / span 6;
+  grid-area: timeline;
   min-height: 260px;
 }
 
@@ -996,32 +1001,27 @@ select.dash-filter:focus {
 }
 
 .panel-status {
-  grid-column: 7 / span 3;
+  grid-area: status;
   min-height: 260px;
 }
 
 .panel-funnel {
-  grid-column: 10 / span 3;
+  grid-area: funnel;
   min-height: 260px;
 }
 
 .panel-team {
-  grid-column: 1 / span 4;
+  grid-area: team;
   min-height: 240px;
 }
 
 .panel-odoo {
-  grid-column: 5 / span 3;
+  grid-area: odoo;
   min-height: 240px;
 }
 
 .panel-topics {
-  grid-column: 8 / span 3;
-  min-height: 240px;
-}
-
-.panel-nodes {
-  grid-column: 11 / span 2;
+  grid-area: topics;
   min-height: 240px;
 }
 
@@ -1379,6 +1379,14 @@ select.dash-filter:focus {
     min-height: auto;
   }
 
+  .overview-grid {
+    grid-template-areas:
+      "stats stats stats stats stats stats stats stats stats stats stats stats"
+      "timeline timeline timeline timeline timeline timeline timeline timeline status status status status"
+      "funnel funnel funnel funnel funnel team team team team team team team"
+      "odoo odoo odoo odoo odoo odoo topics topics topics topics topics topics";
+  }
+
   .overview-stats {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -1406,9 +1414,9 @@ select.dash-filter:focus {
   .panel-team,
   .panel-odoo,
   .panel-topics,
-  .panel-nodes,
   .panel-table {
     grid-column: 1 / -1;
+    grid-area: auto;
   }
 
   .overview-stats {

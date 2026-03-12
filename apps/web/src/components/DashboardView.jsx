@@ -861,14 +861,6 @@ function DashboardView({
           >
             <BarList items={overview.funnel?.top_topics || []} />
           </Panel>
-
-          <Panel
-            title="Nodos activos"
-            subtitle="Sesiones abiertas por nodo"
-            className="panel-nodes"
-          >
-            <BarList items={(overview.live?.current_nodes || []).map((item) => ({ ...item, label: item.node_id }))} />
-          </Panel>
         </div>
       ) : (
         tablePanel

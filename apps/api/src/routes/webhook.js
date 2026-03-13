@@ -473,9 +473,9 @@ router.post("/webhook", async (req, res) => {
                                 }
 
                                 if (activeFlow.flow.useLegacyHandler) {
-                                    void handleIncomingText(waId, "menu");
+                                    void handleIncomingText(waId, "menu").catch((err) => logger.error("flow.execute_failed", { message: err.message }));
                                 } else {
-                                    void executeDynamicFlow(waId, "menu", activeFlow);
+                                    void executeDynamicFlow(waId, "menu", activeFlow).catch((err) => logger.error("flow.execute_failed", { message: err.message }));
                                 }
                                 continue;
                             }
@@ -686,10 +686,10 @@ router.post("/webhook", async (req, res) => {
                             }
 
                             if (activeFlow.flow.useLegacyHandler) {
-                                void handleIncomingText(waId, flowText);
+                                void handleIncomingText(waId, flowText).catch((err) => logger.error("flow.execute_failed", { message: err.message }));
                             } else {
                                 // Ejecutar flow dinámico
-                                void executeDynamicFlow(waId, flowText, activeFlow);
+                                void executeDynamicFlow(waId, flowText, activeFlow).catch((err) => logger.error("flow.execute_failed", { message: err.message }));
                             }
                             continue;
                         }
@@ -736,9 +736,9 @@ router.post("/webhook", async (req, res) => {
                                         error: error.message || String(error),
                                     });
                                 }
-                                void handleInteractive(waId, selection?.id);
+                                void handleInteractive(waId, selection?.id).catch((err) => logger.error("flow.execute_failed", { message: err.message }));
                             } else {
-                                void executeDynamicInteractive(waId, selection?.id, activeFlow);
+                                void executeDynamicInteractive(waId, selection?.id, activeFlow).catch((err) => logger.error("flow.execute_failed", { message: err.message }));
                             }
                         }
                     }

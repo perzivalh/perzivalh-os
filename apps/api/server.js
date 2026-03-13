@@ -14,6 +14,15 @@ const path = require("path");
 const fs = require("fs");
 require("dotenv").config({ path: path.resolve(__dirname, "../../.env") });
 
+// Prevent unhandled rejections from crashing the server
+process.on("unhandledRejection", (reason, promise) => {
+  const message = reason instanceof Error ? reason.message : String(reason);
+  console.error("[unhandledRejection]", message);
+});
+process.on("uncaughtException", (error) => {
+  console.error("[uncaughtException]", error.message || error);
+});
+
 const http = require("http");
 const express = require("express");
 const cors = require("cors");

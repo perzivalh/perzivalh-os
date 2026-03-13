@@ -143,30 +143,37 @@ function TimelineChart({ items = [] }) {
       {items.length === 0 ? (
         <div className="overview-empty">Sin conversaciones en el periodo</div>
       ) : (
-        items.map((item) => (
-          <div className="overview-timeline-day" key={item.day}>
-            <div className="overview-timeline-bars">
-              <span
-                className="bar in"
-                style={{ height: `${Math.max(8, ((item.count || 0) / maxValue) * 100)}%`, width: "18px" }}
-                title={`${item.day?.slice(5) || "--"}: ${item.count || 0} conversaciones`}
-              />
+        items.map((item) => {
+          const count = item.count || 0;
+          const pct = Math.max(6, (count / maxValue) * 100);
+          return (
+            <div className="overview-timeline-day" key={item.day}>
+              <div className="overview-timeline-count">{count > 0 ? count : ""}</div>
+              <div className="overview-timeline-bars">
+                <span
+                  className="bar in"
+                  style={{ height: `${pct}%`, width: "18px" }}
+                />
+              </div>
+              <div className="overview-timeline-label">{item.day?.slice(5) || "--"}</div>
             </div>
-            <div className="overview-timeline-label">{item.day?.slice(5) || "--"}</div>
-          </div>
-        ))
+          );
+        })
       )}
     </div>
   );
 }
 
-const STATUS_LABELS_ES = { open: "Abierta", pending: "Pendiente", assigned: "Asignada" };
-const STATUS_COLORS = ["#1d4ed8", "#f59e0b", "#10b981"];
+const STATUS_LABELS_ES = { open: "Abierta", pending: "Pendiente", assigned: "Asignada", asistira: "Asistirá" };
+const STATUS_COLORS = ["#1d4ed8", "#f59e0b", "#10b981", "#7c3aed"];
 
 function DonutChart({ data = [] }) {
   const radius = 46;
   const circumference = 2 * Math.PI * radius;
-  const total = data.reduce((sum, item) => sum + (item.count || 0), 0);
+  const activeTotal = data
+    .filter((item) => item.status !== "asistira")
+    .reduce((sum, item) => sum + (item.count || 0), 0);
+  const grandTotal = data.reduce((sum, item) => sum + (item.count || 0), 0) || 1;
   let offset = 0;
 
   return (
@@ -175,8 +182,8 @@ function DonutChart({ data = [] }) {
         <circle cx="60" cy="60" r={radius} fill="none" stroke="rgba(148,163,184,0.18)" strokeWidth="16" />
         {data.map((item, index) => {
           const count = item.count || 0;
-          if (count === 0 || total === 0) return null;
-          const ratio = count / total;
+          if (count === 0 || grandTotal === 0) return null;
+          const ratio = count / grandTotal;
           const arc = ratio * circumference;
           const circle = (
             <circle
@@ -195,7 +202,7 @@ function DonutChart({ data = [] }) {
           offset += arc;
           return circle;
         })}
-        <text x="60" y="56" textAnchor="middle" className="overview-donut-total">{total}</text>
+        <text x="60" y="56" textAnchor="middle" className="overview-donut-total">{activeTotal}</text>
         <text x="60" y="70" textAnchor="middle" className="overview-donut-caption">activas</text>
       </svg>
       <div className="overview-legend">
@@ -287,6 +294,17 @@ function OdooStatusPanel({ odoo }) {
   );
 }
 
+function getInitials(name) {
+  if (!name) return "?";
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+}
+
 function TeamTable({ team = [] }) {
   return (
     <div className="overview-team-list">
@@ -295,17 +313,19 @@ function TeamTable({ team = [] }) {
       ) : (
         team.slice(0, 8).map((operator) => (
           <div key={operator.id} className="overview-team-row">
-            <div className="overview-team-main">
-              <strong>{operator.name}</strong>
-              <span>{operator.role || "operador"}</span>
-            </div>
-            <div className="overview-team-metrics">
-              <span>{operator.handled_conversations} chats</span>
-              <span>{operator.human_messages_sent} mensajes</span>
-              <span>1ra: {formatDuration(operator.first_response_avg_min)}</span>
-              <span>Prom: {formatDuration(operator.avg_response_avg_min)}</span>
-              <span>Asignadas: {operator.assigned_now ?? 0}</span>
-              <span>Asist.: {operator.attendances_attributed ?? 0}</span>
+            <div className="overview-team-avatar">{getInitials(operator.name)}</div>
+            <div className="overview-team-info">
+              <div className="overview-team-header">
+                <strong className="overview-team-name">{operator.name}</strong>
+                <span className="overview-team-role-badge">{operator.role || "operador"}</span>
+              </div>
+              <div className="overview-team-stats">
+                <span className="overview-team-stat"><b>{operator.handled_conversations}</b> chats</span>
+                <span className="overview-team-stat">1ra <b>{formatDuration(operator.first_response_avg_min)}</b></span>
+                <span className="overview-team-stat">Prom <b>{formatDuration(operator.avg_response_avg_min)}</b></span>
+                <span className="overview-team-stat">Asig <b>{operator.assigned_now ?? 0}</b></span>
+                <span className="overview-team-stat">Asist <b>{operator.attendances_attributed ?? 0}</b></span>
+              </div>
             </div>
           </div>
         ))
@@ -787,15 +807,13 @@ function DashboardView({
           </Panel>
 
           <article className="overview-stat-card panel-resp1">
-            <div className="overview-stat-label">1ra respuesta humana</div>
-            <div className="overview-stat-value">{formatDuration(overview.response?.first_human_response_avg_min)}</div>
-            <div className="overview-stat-hint">p50 {formatDuration(overview.response?.first_human_response_p50_min)} · p90 {formatDuration(overview.response?.first_human_response_p90_min)}</div>
+            <div className="overview-stat-label">1ra respuesta</div>
+            <div className="overview-stat-value overview-stat-value--fit">{formatDuration(overview.response?.first_human_response_avg_min)}</div>
           </article>
 
           <article className="overview-stat-card tone-info panel-resp2">
-            <div className="overview-stat-label">Respuesta humana promedio</div>
-            <div className="overview-stat-value">{formatDuration(overview.response?.avg_human_response_avg_min)}</div>
-            <div className="overview-stat-hint">turnos post-handoff</div>
+            <div className="overview-stat-label">Resp. promedio</div>
+            <div className="overview-stat-value overview-stat-value--fit">{formatDuration(overview.response?.avg_human_response_avg_min)}</div>
           </article>
 
           <Panel title="Estado actual" subtitle="Distribución en tiempo real" className="panel-status">

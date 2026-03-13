@@ -969,6 +969,7 @@ async function buildDashboardOverview({ tenantId, period, channel }) {
         { status: "open", count: toNumber(statusMap.get("open")) },
         { status: "pending", count: toNumber(statusMap.get("pending")) },
         { status: "assigned", count: toNumber(statusMap.get("assigned")) },
+        { status: "asistira", count: attendanceConfirmed },
       ],
       queue_age_buckets: queueAgeBuckets,
       current_nodes: currentNodeList,

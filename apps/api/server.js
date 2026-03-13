@@ -46,14 +46,14 @@ const { hasOdooConfig, getSessionInfo } = require("./src/services/odooClient");
 const { resolveTenantContextById } = require("./src/tenancy/tenantResolver");
 const { sendTemplate } = require("./src/whatsapp");
 const { processBotpoditoV2Inactivity } = require("./src/services/flowInactivity");
-const { initializeOdooSyncWorker, stopOdooSyncWorker } = require("./src/services/odooSyncService");
+const { stopOdooSyncWorker, processDueOdooSyncs } = require("./src/services/odooSyncService");
 
 // Rutas modulares
 const { setupRoutes } = require("./src/routes");
 
 // Servicios de campañas (para el interval)
 const { queueCampaignMessages, buildConversationFilter } = require("./src/routes/admin");
-const { CAMPAIGN_BATCH_SIZE, CAMPAIGN_INTERVAL_MS } = require("./src/config");
+const { CAMPAIGN_BATCH_SIZE } = require("./src/config");
 
 // ==========================================
 // CONFIGURACIÓN DE EXPRESS
@@ -387,7 +387,7 @@ async function processCampaignQueue(tenantId) {
         });
 
         if (!queuedMessages.length) {
-            return;
+            return false;
         }
 
         const processedCampaigns = new Set();
@@ -443,11 +443,13 @@ async function processCampaignQueue(tenantId) {
         for (const campaignId of processedCampaigns) {
             await refreshCampaignStatus(campaignId);
         }
+        return true;
     } catch (error) {
         logger.error("campaign.queue_error", {
             message: error.message || error,
             code: error.code,
         });
+        return false;
     }
 }
 
@@ -455,7 +457,6 @@ async function processCampaignQueueForAllTenants() {
     if (!process.env.CONTROL_DB_URL) {
         return;
     }
-    // Check schema readiness first
     const ready = await checkCampaignSchema();
     if (!ready) return;
 
@@ -465,15 +466,22 @@ async function processCampaignQueueForAllTenants() {
             where: { is_active: true },
             select: { id: true },
         });
-        for (const tenant of tenants) {
-            const context = await resolveTenantContextById(tenant.id);
-            if (!context) {
-                continue;
+        // Loop until all tenants have no more queued messages
+        let hadWork;
+        do {
+            hadWork = false;
+            for (const tenant of tenants) {
+                const context = await resolveTenantContextById(tenant.id);
+                if (!context) continue;
+                const worked = await prisma.runWithPrisma(context.prisma, () =>
+                    processCampaignQueue(context.tenantId)
+                );
+                if (worked) hadWork = true;
             }
-            await prisma.runWithPrisma(context.prisma, () =>
-                processCampaignQueue(context.tenantId)
-            );
-        }
+            if (hadWork) {
+                await new Promise((resolve) => setTimeout(resolve, 2000));
+            }
+        } while (hadWork);
     } catch (error) {
         logger.error("campaign.tenant_scan_failed", {
             message: error.message || error,
@@ -508,17 +516,31 @@ async function checkCampaignSchema() {
     }
 }
 
-setInterval(() => {
-    // Skip if schema is known to be not ready
-    if (campaignSchemaReady === false) return;
-    void processCampaignQueueForAllTenants();
-}, CAMPAIGN_INTERVAL_MS);
+// Heartbeat combinado — un solo intervalo de 5 minutos para todos los background jobs.
+// Crea ventanas de silencio reales → Neon auto-suspende compute → ahorra CU-hrs.
+const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000;
+let heartbeatTimer = null;
+
+async function runHeartbeat() {
+    // Campañas: loop interno hasta drenar todos los mensajes pendientes
+    if (campaignSchemaReady !== false) {
+        void processCampaignQueueForAllTenants().catch((e) =>
+            logger.error("heartbeat.campaign_error", { message: e.message || e })
+        );
+    }
+    // Inactividad de bot
+    void processBotpoditoInactivityForAllTenants().catch((e) =>
+        logger.error("heartbeat.inactivity_error", { message: e.message || e })
+    );
+    // Odoo sync
+    void processDueOdooSyncs().catch((e) =>
+        logger.error("heartbeat.odoo_sync_error", { message: e.message || e })
+    );
+}
 
 // ==========================================
 // INACTIVITY FLOW HANDLING (Botpodito V2)
 // ==========================================
-
-const BOTPODITO_INACTIVITY_INTERVAL_MS = 60 * 1000;
 
 async function processBotpoditoInactivityForAllTenants() {
     if (!process.env.CONTROL_DB_URL) {
@@ -546,9 +568,6 @@ async function processBotpoditoInactivityForAllTenants() {
     }
 }
 
-setInterval(() => {
-    void processBotpoditoInactivityForAllTenants();
-}, BOTPODITO_INACTIVITY_INTERVAL_MS);
 
 // ==========================================
 // ERROR HANDLER
@@ -599,6 +618,7 @@ function registerShutdown() {
     const handler = async (signal) => {
         logger.info("server.shutdown", { signal });
         try {
+            if (heartbeatTimer) clearInterval(heartbeatTimer);
             stopOdooSyncWorker();
             await disconnectAllTenantClients();
             await disconnectControlClient();
@@ -626,7 +646,10 @@ function start(port = PORT) {
 }
 
 if (require.main === module) {
-    void initializeOdooSyncWorker();
+    // Arrancar el heartbeat: primera ejecución inmediata, luego cada 5 minutos.
+    // Todos los background jobs corren juntos → ventanas de silencio reales → Neon suspende.
+    void runHeartbeat();
+    heartbeatTimer = setInterval(() => void runHeartbeat(), HEARTBEAT_INTERVAL_MS);
     start();
 }
 

@@ -32,6 +32,7 @@ const {
     setConversationStatus,
     addTagToConversation,
     removeTagFromConversation,
+    updateConversationFlags,
 } = require("../services/conversations");
 const { getActiveTenantFlow } = require("../services/tenantBots");
 const { setLastWebhook } = require("./debug");
@@ -231,6 +232,22 @@ function isAdminPhone(waId) {
     return digitsOnly(waId) === digitsOnly(ADMIN_PHONE_E164);
 }
 
+const ASISTIO_KEYWORDS = [
+    "voy a ir", "voy mañana", "voy el", "si voy", "ya voy", "claro que voy",
+    "asistiré", "asistiré", "asistire", "me anoto", "me apunto",
+    "quiero turno", "sacar turno", "agendar", "reservar turno",
+    "confirmado", "confirmo mi cita", "voy a asistir",
+];
+
+function containsAsistioKeyword(text) {
+    if (!text || typeof text !== "string") return false;
+    const lower = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return ASISTIO_KEYWORDS.some((kw) => {
+        const normalizedKw = kw.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        return lower.includes(normalizedKw);
+    });
+}
+
 // GET /webhook - Verificación de WhatsApp
 router.get("/webhook", (req, res) => {
     const mode = req.query["hub.mode"];
@@ -412,6 +429,15 @@ router.post("/webhook", async (req, res) => {
                                     conversation_id: conversation.id,
                                     error: error.message || String(error),
                                 });
+                            }
+
+                            if (incomingText && containsAsistioKeyword(incomingText) && conversation.id) {
+                                void updateConversationFlags({
+                                    conversationId: conversation.id,
+                                    asistio: true,
+                                    userId: null,
+                                    source: "auto_detected",
+                                }).catch(() => {});
                             }
                         }
 

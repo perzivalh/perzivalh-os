@@ -137,33 +137,19 @@ function RefreshIcon(props) {
 }
 
 function TimelineChart({ items = [] }) {
-  const maxValue = Math.max(
-    1,
-    ...items.map((item) => Math.max(item.in_count || 0, item.bot_out_count || 0, item.human_out_count || 0))
-  );
-
+  const maxValue = Math.max(1, ...items.map((item) => item.count || 0));
   return (
     <div className="overview-timeline">
       {items.length === 0 ? (
-        <div className="overview-empty">Sin movimiento en el periodo</div>
+        <div className="overview-empty">Sin conversaciones en el periodo</div>
       ) : (
         items.map((item) => (
           <div className="overview-timeline-day" key={item.day}>
             <div className="overview-timeline-bars">
               <span
                 className="bar in"
-                style={{ height: `${Math.max(8, ((item.in_count || 0) / maxValue) * 100)}%` }}
-                title={`Entrantes: ${item.in_count || 0}`}
-              />
-              <span
-                className="bar bot"
-                style={{ height: `${Math.max(8, ((item.bot_out_count || 0) / maxValue) * 100)}%` }}
-                title={`Bot: ${item.bot_out_count || 0}`}
-              />
-              <span
-                className="bar human"
-                style={{ height: `${Math.max(8, ((item.human_out_count || 0) / maxValue) * 100)}%` }}
-                title={`Humano: ${item.human_out_count || 0}`}
+                style={{ height: `${Math.max(8, ((item.count || 0) / maxValue) * 100)}%`, width: "18px" }}
+                title={`${item.day?.slice(5) || "--"}: ${item.count || 0} conversaciones`}
               />
             </div>
             <div className="overview-timeline-label">{item.day?.slice(5) || "--"}</div>
@@ -174,20 +160,24 @@ function TimelineChart({ items = [] }) {
   );
 }
 
+const STATUS_LABELS_ES = { open: "Abierta", pending: "Pendiente", assigned: "Asignada" };
+const STATUS_COLORS = ["#1d4ed8", "#f59e0b", "#10b981"];
+
 function DonutChart({ data = [] }) {
-  const total = data.reduce((sum, item) => sum + (item.count || 0), 0);
   const radius = 46;
   const circumference = 2 * Math.PI * radius;
+  const total = data.reduce((sum, item) => sum + (item.count || 0), 0);
   let offset = 0;
-  const colors = ["#1d4ed8", "#f59e0b", "#10b981"];
 
   return (
     <div className="overview-donut-wrap">
       <svg viewBox="0 0 120 120" className="overview-donut">
         <circle cx="60" cy="60" r={radius} fill="none" stroke="rgba(148,163,184,0.18)" strokeWidth="16" />
         {data.map((item, index) => {
-          const ratio = total > 0 ? item.count / total : 0;
-          const strokeDasharray = `${ratio * circumference} ${circumference}`;
+          const count = item.count || 0;
+          if (count === 0 || total === 0) return null;
+          const ratio = count / total;
+          const arc = ratio * circumference;
           const circle = (
             <circle
               key={item.status}
@@ -195,29 +185,25 @@ function DonutChart({ data = [] }) {
               cy="60"
               r={radius}
               fill="none"
-              stroke={colors[index % colors.length]}
+              stroke={STATUS_COLORS[index % STATUS_COLORS.length]}
               strokeWidth="16"
-              strokeDasharray={strokeDasharray}
+              strokeDasharray={`${arc} ${circumference}`}
               strokeDashoffset={-offset}
               strokeLinecap="round"
             />
           );
-          offset += ratio * circumference;
+          offset += arc;
           return circle;
         })}
-        <text x="60" y="58" textAnchor="middle" className="overview-donut-total">
-          {total}
-        </text>
-        <text x="60" y="74" textAnchor="middle" className="overview-donut-caption">
-          activas
-        </text>
+        <text x="60" y="56" textAnchor="middle" className="overview-donut-total">{total}</text>
+        <text x="60" y="70" textAnchor="middle" className="overview-donut-caption">activas</text>
       </svg>
       <div className="overview-legend">
         {data.map((item, index) => (
           <div className="overview-legend-row" key={item.status}>
-            <span className="swatch" style={{ background: colors[index % colors.length] }} />
-            <span>{item.status}</span>
-            <strong>{item.count}</strong>
+            <span className="swatch" style={{ background: STATUS_COLORS[index % STATUS_COLORS.length], opacity: (item.count || 0) === 0 ? 0.3 : 1 }} />
+            <span>{STATUS_LABELS_ES[item.status] || item.status}</span>
+            <strong>{item.count ?? 0}</strong>
           </div>
         ))}
       </div>
@@ -367,19 +353,6 @@ function DashboardView({
     [tableTotal, tableQuery.page_size]
   );
 
-  const topCards = useMemo(
-    () => [
-      { label: "Activas ahora", value: overview.live?.active_now ?? 0, hint: "open + pending + assigned" },
-      { label: "Pendientes sin tomar", value: overview.live?.pending_unassigned ?? 0, hint: "cola actual", tone: "warning" },
-      { label: "Tomadas por operador", value: overview.live?.assigned_now ?? 0, hint: "asignadas ahora" },
-      { label: "Sesiones bot activas", value: overview.live?.bot_sessions_active ?? 0, hint: "flow activo", tone: "info" },
-      { label: "Asistencia confirmada", value: overview.period_summary?.attendance_confirmed ?? 0, hint: "manual + Odoo", tone: "success" },
-      { label: "Registro post-chat", value: overview.period_summary?.registered_after_chat ?? 0, hint: "Odoo posterior al chat", tone: "success" },
-      { label: "1ra respuesta humana", value: formatDuration(overview.response?.first_human_response_avg_min), hint: `post-handoff · p50 ${formatDuration(overview.response?.first_human_response_p50_min)} / p90 ${formatDuration(overview.response?.first_human_response_p90_min)}` },
-      { label: "Respuesta humana promedio", value: formatDuration(overview.response?.avg_human_response_avg_min), hint: "turnos post-handoff", tone: "info" },
-    ],
-    [overview]
-  );
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -633,7 +606,7 @@ function DashboardView({
               <th>Prom. resp.</th>
               <th>Odoo</th>
               <th>Remarketing</th>
-              <th>Asistio</th>
+              <th>Asistirá</th>
             </tr>
           </thead>
           <tbody>
@@ -805,57 +778,43 @@ function DashboardView({
 
       {viewMode === "dashboard" ? (
         <div className="overview-grid">
-          <section className="overview-stats">
-            {topCards.map((card) => (
-              <StatCard key={card.label} {...card} />
-            ))}
-          </section>
-
-          <Panel
-            title="Serie diaria"
-            subtitle="Entrantes, bot y humano"
-            className="panel-timeline"
-          >
-            <TimelineChart items={overview.period_summary?.message_timeline || []} />
+          <Panel title="Odoo" subtitle="Match por telefono y salud del sync" className="panel-odoo">
+            <OdooStatusPanel odoo={overview.odoo} />
           </Panel>
 
-          <Panel
-            title="Estado actual"
-            subtitle="Distribucion instantanea"
-            className="panel-status"
-          >
+          <Panel title="Equipo" subtitle="Tiempos de respuesta post-handoff" className="panel-equipo">
+            <TeamTable team={overview.team || []} />
+          </Panel>
+
+          <article className="overview-stat-card panel-resp1">
+            <div className="overview-stat-label">1ra respuesta humana</div>
+            <div className="overview-stat-value">{formatDuration(overview.response?.first_human_response_avg_min)}</div>
+            <div className="overview-stat-hint">p50 {formatDuration(overview.response?.first_human_response_p50_min)} · p90 {formatDuration(overview.response?.first_human_response_p90_min)}</div>
+          </article>
+
+          <article className="overview-stat-card tone-info panel-resp2">
+            <div className="overview-stat-label">Respuesta humana promedio</div>
+            <div className="overview-stat-value">{formatDuration(overview.response?.avg_human_response_avg_min)}</div>
+            <div className="overview-stat-hint">turnos post-handoff</div>
+          </article>
+
+          <Panel title="Estado actual" subtitle="Distribución en tiempo real" className="panel-status">
             <DonutChart data={overview.live?.status_distribution || []} />
+          </Panel>
+
+          <Panel title="Conversaciones por día" className="panel-timeline">
+            <TimelineChart items={overview.period_summary?.conversation_timeline || []} />
           </Panel>
 
           <Panel
             title="Funnel del flow"
-            subtitle={(overview.funnel?.tracking_ready ? "Unico por conversacion" : "Desde despliegue del tracking")}
+            subtitle={overview.funnel?.tracking_ready ? "Único por conversación" : "En espera de datos"}
             className="panel-funnel"
           >
             <FunnelChart steps={overview.funnel?.steps || []} />
           </Panel>
 
-          <Panel
-            title="Equipo"
-            subtitle="Promedios post-handoff por operador"
-            className="panel-team"
-          >
-            <TeamTable team={overview.team || []} />
-          </Panel>
-
-          <Panel
-            title="Odoo"
-            subtitle="Match por telefono y salud del sync"
-            className="panel-odoo"
-          >
-            <OdooStatusPanel odoo={overview.odoo} />
-          </Panel>
-
-          <Panel
-            title="Temas top"
-            subtitle="Nodos mas visitados del flow"
-            className="panel-topics"
-          >
+          <Panel title="Temas top" subtitle="Nodos más visitados" className="panel-topics">
             <BarList items={overview.funnel?.top_topics || []} />
           </Panel>
         </div>

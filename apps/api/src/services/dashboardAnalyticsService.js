@@ -68,6 +68,25 @@ function formatDayKey(value) {
   return date.toISOString().split("T")[0];
 }
 
+function buildConversationTimeline(conversations, from, to) {
+  const byDay = new Map();
+  for (const conv of conversations) {
+    const day = formatDayKey(new Date(conv.created_at));
+    byDay.set(day, (byDay.get(day) || 0) + 1);
+  }
+  const cursor = new Date(from);
+  const end = new Date(to);
+  cursor.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+  const series = [];
+  while (cursor <= end) {
+    const day = formatDayKey(cursor);
+    series.push({ day, count: byDay.get(day) || 0 });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return series;
+}
+
 function fillDailySeries(rows, from, to) {
   const byDay = new Map(
     (rows || [])
@@ -715,10 +734,8 @@ async function buildDashboardOverview({ tenantId, period, channel }) {
   const [
     liveStatusCounts,
     pendingQueue,
-    sessionsCount,
     currentNodes,
     conversationsInPeriod,
-    timeline,
   ] = await Promise.all([
     prisma.conversation.groupBy({
       by: ["status"],
@@ -729,12 +746,6 @@ async function buildDashboardOverview({ tenantId, period, channel }) {
       _count: { status: true },
     }),
     queryPendingQueueState({ channel }),
-    prisma.session.count({
-      where: {
-        ...(channel ? { phone_number_id: channel } : {}),
-        ...(activeFlow?.flowId ? { flow_id: activeFlow.flowId } : {}),
-      },
-    }),
     prisma.session.groupBy({
       by: ["state"],
       where: {
@@ -761,8 +772,9 @@ async function buildDashboardOverview({ tenantId, period, channel }) {
         asistio_source: true,
       },
     }),
-    queryTimelineBySource({ from: startDate, to: now, channel }),
   ]);
+
+  const timeline = buildConversationTimeline(conversationsInPeriod, startDate, now);
 
   const responseStats = await loadConversationResponseStats(conversationsInPeriod.map((row) => row.id));
   const odooMatchMap = await buildOdooConversationMaps(conversationsInPeriod);
@@ -799,7 +811,7 @@ async function buildDashboardOverview({ tenantId, period, channel }) {
     .sort((a, b) => b.count - a.count)
     .slice(0, 8);
 
-  const [handoffRows, humanMessageRows, attendanceRows] = await Promise.all([
+  const [handoffRows, humanMessageRows] = await Promise.all([
     prisma.flowEvent.findMany({
       where: {
         created_at: { gte: startDate, lt: now },
@@ -820,19 +832,10 @@ async function buildDashboardOverview({ tenantId, period, channel }) {
       distinct: ["conversation_id"],
       select: { conversation_id: true },
     }),
-    prisma.flowEvent.findMany({
-      where: {
-        created_at: { gte: startDate, lt: now },
-        event_type: "attendance_confirmed",
-        ...(channel ? { phone_number_id: channel } : {}),
-      },
-      distinct: ["conversation_id"],
-      select: { conversation_id: true },
-    }),
   ]);
 
   let attendedByHuman = humanMessageRows.length;
-  let attendanceConfirmed = attendanceRows.length;
+  let attendanceConfirmed = 0;
   let registeredAfterChat = 0;
   let patientExisting = 0;
   let directOdooContacts = 0;
@@ -843,7 +846,7 @@ async function buildDashboardOverview({ tenantId, period, channel }) {
     if (humanMessageRows.length === 0 && response?.handled_by_human) {
       attendedByHuman += 1;
     }
-    if (attendanceRows.length === 0 && conversation.asistio) {
+    if (conversation.asistio) {
       attendanceConfirmed += 1;
     }
     if (conversation.asistio) {
@@ -962,7 +965,6 @@ async function buildDashboardOverview({ tenantId, period, channel }) {
       active_now: activeNow,
       pending_unassigned: pendingUnassigned,
       assigned_now: assignedNow,
-      bot_sessions_active: sessionsCount,
       status_distribution: [
         { status: "open", count: toNumber(statusMap.get("open")) },
         { status: "pending", count: toNumber(statusMap.get("pending")) },
@@ -979,7 +981,7 @@ async function buildDashboardOverview({ tenantId, period, channel }) {
       registered_after_chat: registeredAfterChat,
       patient_existing: patientExisting,
       odoo_contact_only: directOdooContacts,
-      message_timeline: timeline,
+      conversation_timeline: timeline,
     },
     response: responseStats.aggregate,
     funnel: {

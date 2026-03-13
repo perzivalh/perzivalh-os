@@ -907,26 +907,20 @@ select.dash-filter:focus {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: auto auto auto;
   grid-template-areas:
-    "stats stats stats stats stats stats stats stats stats stats stats stats"
-    "timeline timeline timeline timeline timeline timeline status status status funnel funnel funnel"
-    "team team team team team odoo odoo odoo odoo topics topics topics";
+    "odoo  equipo resp1 resp2"
+    "odoo  equipo estado estado"
+    "serie serie  funnel temas";
   gap: 1rem;
   align-content: start;
   align-items: stretch;
-  grid-auto-flow: row;
 }
 
-.overview-grid > .overview-panel {
+.overview-grid > .overview-panel,
+.overview-grid > .overview-stat-card {
   min-height: 0;
-}
-
-.overview-stats {
-  grid-area: stats;
-  display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  gap: 0.85rem;
 }
 
 .overview-stat-card {
@@ -1009,39 +1003,18 @@ select.dash-filter:focus {
   overflow: auto;
 }
 
-.panel-timeline {
-  grid-area: timeline;
-  min-height: 260px;
-}
+.panel-odoo    { grid-area: odoo;   min-height: 260px; }
+.panel-equipo  { grid-area: equipo; min-height: 260px; }
+.panel-resp1   { grid-area: resp1;  min-height: 120px; }
+.panel-resp2   { grid-area: resp2;  min-height: 120px; }
+.panel-status  { grid-area: estado; min-height: 260px; }
+.panel-timeline { grid-area: serie;  min-height: 240px; }
+.panel-funnel  { grid-area: funnel; min-height: 240px; }
+.panel-topics  { grid-area: temas;  min-height: 240px; }
 
 .panel-timeline .overview-panel-body {
   overflow-x: auto;
   overflow-y: hidden;
-}
-
-.panel-status {
-  grid-area: status;
-  min-height: 260px;
-}
-
-.panel-funnel {
-  grid-area: funnel;
-  min-height: 260px;
-}
-
-.panel-team {
-  grid-area: team;
-  min-height: 240px;
-}
-
-.panel-odoo {
-  grid-area: odoo;
-  min-height: 240px;
-}
-
-.panel-topics {
-  grid-area: topics;
-  min-height: 240px;
 }
 
 .panel-table {
@@ -1402,15 +1375,13 @@ select.dash-filter:focus {
   }
 
   .overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-areas:
-      "stats stats stats stats stats stats stats stats stats stats stats stats"
-      "timeline timeline timeline timeline timeline timeline timeline timeline status status status status"
-      "funnel funnel funnel funnel funnel team team team team team team team"
-      "odoo odoo odoo odoo odoo odoo topics topics topics topics topics topics";
-  }
-
-  .overview-stats {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+      "odoo  equipo"
+      "resp1 resp2"
+      "estado estado"
+      "serie  serie"
+      "funnel temas";
   }
 }
 
@@ -1430,23 +1401,28 @@ select.dash-filter:focus {
   }
 
   .overview-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "odoo"
+      "equipo"
+      "resp1"
+      "resp2"
+      "estado"
+      "serie"
+      "funnel"
+      "temas";
   }
 
-  .overview-stats,
-  .panel-timeline,
-  .panel-status,
-  .panel-funnel,
-  .panel-team,
   .panel-odoo,
+  .panel-equipo,
+  .panel-resp1,
+  .panel-resp2,
+  .panel-status,
+  .panel-timeline,
+  .panel-funnel,
   .panel-topics,
   .panel-table {
-    grid-column: 1 / -1;
     grid-area: auto;
-  }
-
-  .overview-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .overview-table-toolbar {

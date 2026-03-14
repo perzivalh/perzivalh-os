@@ -564,7 +564,12 @@ function ChatView({
                   </div>
                   <div className="conversation-body">
                     <div className="conversation-row">
-                      <span className="conversation-name">{displayName}</span>
+                      <div className="conversation-name-block">
+                        <span className="conversation-name">{displayName}</span>
+                        {conversation.phone_e164 && conversation.display_name && (
+                          <span className="conversation-phone">{conversation.phone_e164}</span>
+                        )}
+                      </div>
                       <div className="conversation-right">
                         <span className="conversation-time">
                           {formatListTime(conversation.last_message_at)}
@@ -867,8 +872,8 @@ function ChatView({
                     disabled={!canEditConversationFlags}
                   />
                   <span className="info-checkbox-copy">
-                    <strong>Asistio</strong>
-                    <small>Marca si el contacto asistio o vino.</small>
+                    <strong>Asistirá</strong>
+                    <small>Marca si el contacto asistirá o vino.</small>
                   </span>
                 </label>
               </div>

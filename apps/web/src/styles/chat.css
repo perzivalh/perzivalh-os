@@ -260,6 +260,13 @@
   flex-shrink: 0;
 }
 
+.conversation-name-block {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
 .conversation-name {
   font-weight: 600;
   font-size: 0.95rem;
@@ -267,6 +274,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--ink);
+}
+
+.conversation-phone {
+  font-size: 0.72rem;
+  color: var(--ink-light, #888);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .conversation-time {

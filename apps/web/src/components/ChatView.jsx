@@ -564,12 +564,7 @@ function ChatView({
                   </div>
                   <div className="conversation-body">
                     <div className="conversation-row">
-                      <div className="conversation-name-block">
-                        <span className="conversation-name">{displayName}</span>
-                        {conversation.phone_e164 && conversation.display_name && (
-                          <span className="conversation-phone">{conversation.phone_e164}</span>
-                        )}
-                      </div>
+                      <span className="conversation-name">{displayName}</span>
                       <div className="conversation-right">
                         <span className="conversation-time">
                           {formatListTime(conversation.last_message_at)}
@@ -630,7 +625,10 @@ function ChatView({
                   <span>{getInitial(activeName)}</span>
                 </div>
                 <div className="chat-title-copy">
-                  <div className="chat-name">{activeName}</div>
+                  <div className="chat-name">
+                    {activeName}
+                    {activePhone && <span className="chat-name-phone">{activePhone}</span>}
+                  </div>
                   {activeConversation ? (
                     <div className="chat-status">{activeStatusLabel}</div>
                   ) : (

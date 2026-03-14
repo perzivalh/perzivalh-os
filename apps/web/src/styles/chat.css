@@ -510,6 +510,15 @@ body[data-theme="dark"] .chat-avatar {
   font-weight: 600;
   font-size: 1.05rem;
   color: var(--ink);
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.chat-name-phone {
+  font-weight: 400;
+  font-size: 0.8rem;
+  color: var(--ink-light, #888);
 }
 
 .chat-status {
